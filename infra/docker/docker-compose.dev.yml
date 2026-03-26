@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: lenjoy-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-lenjoy}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-lenjoy}
+      POSTGRES_DB: ${DB_NAME:-lenjoy_bbs}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres-dev-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: lenjoy-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+
+volumes:
+  postgres-dev-data:

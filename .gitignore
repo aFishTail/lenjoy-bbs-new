@@ -1,0 +1,23 @@
+# Node
+node_modules/
+.next/
+
+# Java
+apps/api/target/
+
+# IDE and OS
+.vscode/
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.*
+
+# Logs
+*.log
+
+# Docker
+postgres-data/
