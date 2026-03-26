@@ -31,9 +31,9 @@ docker compose -f infra/docker/docker-compose.yml up --build
 
 1. Access services:
 
-- Web: <http://localhost/>
-- API health: <http://localhost/api/v1/health>
-- Swagger: <http://localhost/swagger-ui/index.html>
+- Web: <http://localhost:8080/>
+- API health: <http://localhost:8080/api/v1/health>
+- Swagger: <http://localhost:8080/swagger-ui/index.html>
 
 ## Local Dependencies Only (PostgreSQL + Redis)
 
@@ -98,6 +98,21 @@ cd apps/api
 mvn spring-boot:run
 ```
 
+### Backend Hot Reload
+
+`apps/api` now includes `spring-boot-devtools`.
+
+For terminal development:
+
+1. Run API with `mvn spring-boot:run`.
+2. After code changes, trigger compile in your IDE (or save if auto-build is enabled).
+3. DevTools restarts the Spring context automatically.
+
+For IntelliJ IDEA, enable:
+
+1. `Build project automatically` in compiler settings.
+2. `Advanced Settings -> Allow auto-make to start even if developed application is currently running`.
+
 ### Run API in IntelliJ IDEA
 
 `docker compose --env-file .env ...` only affects Docker containers.
@@ -126,6 +141,55 @@ Environment variables:
 - `DB_USER`
 - `DB_PASSWORD`
 - `SERVER_PORT`
+
+## Auth API (US-A02)
+
+Implemented backend endpoints:
+
+- `GET /api/v1/auth/captcha`
+- `GET /api/v1/auth/captcha/{captchaId}/image`
+- `POST /api/v1/auth/register`
+- `POST /api/v1/auth/login`
+
+The captcha is split into metadata and image stream:
+
+1. Request metadata endpoint to get `captchaId`, `imageUrl`, `expireAt`.
+2. Render image by requesting `imageUrl`.
+3. Submit `captchaId` and `captchaCode` in register/login requests.
+
+Example register payload:
+
+```json
+{
+  "username": "new_user",
+  "password": "StrongPass123",
+  "email": "new_user@example.com",
+  "phone": "",
+  "captchaId": "c95db4f401314b03adf1be65a90f3c12",
+  "captchaCode": "A7KD"
+}
+```
+
+Example login payload:
+
+```json
+{
+  "account": "new_user@example.com",
+  "password": "StrongPass123",
+  "captchaId": "9a8bb90d5dca4d95bd0ebf40ecf07aca",
+  "captchaCode": "3KPM"
+}
+```
+
+Auth related env vars:
+
+- `JWT_SECRET` (at least 32 chars)
+- `JWT_ACCESS_TOKEN_TTL_SECONDS`
+- `CAPTCHA_TTL_SECONDS`
+- `CAPTCHA_LENGTH`
+- `REDIS_HOST`
+- `REDIS_PORT`
+- `REDIS_PASSWORD`
 
 ## Local Web Run (without Docker)
 
