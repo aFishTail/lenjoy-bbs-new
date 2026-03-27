@@ -1,5 +1,5 @@
-import { AuthPageClient } from "@/components/auth/auth-page-client";
+import { PostHomeClient } from "@/components/post/post-home-client";
 
 export default function HomePage() {
-  return <AuthPageClient />;
+  return <PostHomeClient />;
 }

@@ -1,0 +1,57 @@
+package com.lenjoy.bbs.domain.entity;
+
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import java.time.LocalDateTime;
+import lombok.Data;
+
+@Data
+@TableName("bbs_post")
+public class PostEntity {
+
+    @TableId(type = IdType.AUTO)
+    private Long id;
+
+    @TableField("author_id")
+    private Long authorId;
+
+    @TableField("post_type")
+    private String postType;
+
+    private String title;
+
+    private String content;
+
+    @TableField("public_content")
+    private String publicContent;
+
+    @TableField("hidden_content")
+    private String hiddenContent;
+
+    private Integer price;
+
+    @TableField("bounty_amount")
+    private Integer bountyAmount;
+
+    private String status;
+
+    @TableField("offline_reason")
+    private String offlineReason;
+
+    @TableField("offlined_at")
+    private LocalDateTime offlinedAt;
+
+    @TableField("offlined_by")
+    private Long offlinedBy;
+
+    @TableField("is_deleted")
+    private Boolean deleted;
+
+    @TableField("created_at")
+    private LocalDateTime createdAt;
+
+    @TableField("updated_at")
+    private LocalDateTime updatedAt;
+}
