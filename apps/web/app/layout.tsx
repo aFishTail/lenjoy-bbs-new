@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Navigation } from "@/components/layout/navigation";
+import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
   title: "Lenjoy BBS - 社区",
@@ -17,6 +18,7 @@ export default function RootLayout({
       <body>
         <Navigation />
         {children}
+        <Toaster />
       </body>
     </html>
   );

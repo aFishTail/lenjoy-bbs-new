@@ -7,6 +7,25 @@ import { AuthData, AuthUser } from "@/components/auth/types";
 
 const AUTH_STORAGE_KEY = "lenjoy.auth";
 
+function Avatar({ user, sizeClass }: { user: AuthUser; sizeClass?: string }) {
+  const avatarUrl = user.avatarUrl?.trim();
+  if (avatarUrl) {
+    return (
+      <img
+        src={avatarUrl}
+        alt={`${user.username} 的头像`}
+        className={`avatar avatar-image ${sizeClass || ""}`.trim()}
+      />
+    );
+  }
+
+  return (
+    <div className={`avatar ${sizeClass || ""}`.trim()}>
+      {user.username.charAt(0).toUpperCase()}
+    </div>
+  );
+}
+
 export function UserMenu() {
   const router = useRouter();
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -85,9 +104,7 @@ export function UserMenu() {
         aria-expanded={isOpen}
         aria-haspopup="true"
       >
-        <div className="avatar avatar-sm">
-          {user.username.charAt(0).toUpperCase()}
-        </div>
+        <Avatar user={user} sizeClass="avatar-sm" />
         <span className="user-menu-name">{user.username}</span>
         <svg
           className={`user-menu-arrow ${isOpen ? "open" : ""}`}
@@ -105,12 +122,12 @@ export function UserMenu() {
       {isOpen && (
         <div className="user-menu-dropdown">
           <div className="user-menu-header">
-            <div className="user-menu-avatar avatar">
-              {user.username.charAt(0).toUpperCase()}
-            </div>
+            <Avatar user={user} />
             <div className="user-menu-info">
               <div className="user-menu-username">{user.username}</div>
-              <div className="user-menu-email">{user.email || user.phone || "未绑定邮箱"}</div>
+              <div className="user-menu-email">
+                {user.email || user.phone || "未绑定邮箱"}
+              </div>
             </div>
           </div>
           <div className="user-menu-divider" />
@@ -119,7 +136,14 @@ export function UserMenu() {
             className="user-menu-item"
             onClick={() => setIsOpen(false)}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
               <polyline points="14 2 14 8 20 8" />
               <line x1="16" y1="13" x2="8" y2="13" />
@@ -133,7 +157,14 @@ export function UserMenu() {
             className="user-menu-item"
             onClick={() => setIsOpen(false)}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
               <circle cx="12" cy="7" r="4" />
             </svg>
@@ -145,7 +176,14 @@ export function UserMenu() {
             className="user-menu-item user-menu-logout"
             onClick={handleLogout}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
               <polyline points="16 17 21 12 16 7" />
               <line x1="21" y1="12" x2="9" y2="12" />

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 import {
   authHeaders,
@@ -9,25 +10,47 @@ import {
   readError,
 } from "@/components/post/client-helpers";
 import type { PostSummary } from "@/components/post/types";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export function AdminPostsClient() {
   const [posts, setPosts] = useState<PostSummary[]>([]);
-  const [reasonById, setReasonById] = useState<Record<number, string>>({});
-  const [errorText, setErrorText] = useState("");
-  const [successText, setSuccessText] = useState("");
+  const [status, setStatus] = useState("");
+  const [postType, setPostType] = useState("");
+  const [author, setAuthor] = useState("");
   const [loading, setLoading] = useState(true);
 
   async function load() {
+    setLoading(true);
     try {
-      const response = await fetch("/api/admin/posts", {
+      const params = new URLSearchParams();
+      if (status) {
+        params.set("status", status);
+      }
+      if (postType) {
+        params.set("postType", postType);
+      }
+      if (author.trim()) {
+        params.set("author", author.trim());
+      }
+
+      const response = await fetch(`/api/admin/posts?${params.toString()}`, {
         headers: authHeaders(),
         cache: "no-store",
       });
       const payload = await readApi<PostSummary[]>(response);
       setPosts(payload.data);
-      setErrorText("");
     } catch (error) {
-      setErrorText(readError(error));
+      toast.error(readError(error));
     } finally {
       setLoading(false);
     }
@@ -38,8 +61,6 @@ export function AdminPostsClient() {
   }, []);
 
   async function offlinePost(postId: number) {
-    setErrorText("");
-    setSuccessText("");
     try {
       const response = await fetch(`/api/admin/posts/${postId}/offline`, {
         method: "PATCH",
@@ -47,133 +68,178 @@ export function AdminPostsClient() {
           "Content-Type": "application/json",
           ...authHeaders(),
         },
-        body: JSON.stringify({ reason: reasonById[postId] || "违规内容" }),
+        body: JSON.stringify({ reason: "管理员下架" }),
       });
       await readApi(response);
-      setSuccessText(`帖子 ${postId} 已下架`);
+      toast.success(`帖子 ${postId} 已下架`);
       await load();
     } catch (error) {
-      setErrorText(readError(error));
+      toast.error(readError(error));
+    }
+  }
+
+  async function onlinePost(postId: number) {
+    try {
+      const response = await fetch(`/api/admin/posts/${postId}/online`, {
+        method: "PATCH",
+        headers: {
+          ...authHeaders(),
+        },
+      });
+      await readApi(response);
+      toast.success(`帖子 ${postId} 已上架`);
+      await load();
+    } catch (error) {
+      toast.error(readError(error));
     }
   }
 
   const getBadgeClass = (type: string) => {
     switch (type) {
       case "RESOURCE":
-        return "badge badge-resource";
+        return "admin-badge is-resource";
       case "BOUNTY":
-        return "badge badge-bounty";
+        return "admin-badge is-bounty";
       default:
-        return "badge badge-normal";
+        return "admin-badge is-normal";
+    }
+  };
+
+  const getStatusClass = (value: string) => {
+    switch (value) {
+      case "OFFLINE":
+        return "admin-badge is-banned";
+      case "CLOSED":
+        return "admin-badge is-muted";
+      default:
+        return "admin-badge is-active";
     }
   };
 
   return (
-    <main className="page">
-      {/* Back Link */}
-      <div className="mb-4">
-        <Link href="/" className="nav-link">
-          <svg className="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ display: "inline", marginRight: "4px" }}>
-            <path d="M19 12H5M12 19l-7-7 7-7" />
-          </svg>
-          返回首页
-        </Link>
-      </div>
-
-      {/* Hero */}
-      <section className="card-hero mb-6">
-        <div className="hero-content">
-          <h1 className="hero-title">帖子管理</h1>
-          <p className="hero-subtitle">
-            可执行下架操作，请填写可追溯的处理原因
-          </p>
+    <main className="admin-main">
+      <section className="admin-toolbar">
+        <div className="admin-filter-grid">
+          <Select
+            className="admin-input"
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+          >
+            <option value="">全部状态</option>
+            <option value="PUBLISHED">PUBLISHED</option>
+            <option value="CLOSED">CLOSED</option>
+            <option value="OFFLINE">OFFLINE</option>
+            <option value="DELETED">DELETED</option>
+          </Select>
+          <Select
+            className="admin-input"
+            value={postType}
+            onChange={(e) => setPostType(e.target.value)}
+          >
+            <option value="">全部类型</option>
+            <option value="NORMAL">NORMAL</option>
+            <option value="RESOURCE">RESOURCE</option>
+            <option value="BOUNTY">BOUNTY</option>
+          </Select>
+          <Input
+            className="admin-input"
+            placeholder="按作者搜索"
+            value={author}
+            onChange={(e) => setAuthor(e.target.value)}
+          />
+          <Button
+            className="admin-btn"
+            type="button"
+            onClick={() => void load()}
+          >
+            查询帖子
+          </Button>
         </div>
       </section>
 
-      {/* Messages */}
-      {errorText && (
-        <div className="banner banner-error mb-4">
-          <svg className="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="15" y1="9" x2="9" y2="15" />
-            <line x1="9" y1="9" x2="15" y2="15" />
-          </svg>
-          {errorText}
+      <section className="admin-table-card">
+        <div className="admin-table-head">
+          <h2>帖子管理</h2>
+          <p>针对违规或不合规内容执行下架与上架处理。</p>
         </div>
-      )}
-      {successText && (
-        <div className="banner banner-success mb-4">
-          <svg className="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-            <polyline points="22 4 12 14.01 9 11.01" />
-          </svg>
-          {successText}
-        </div>
-      )}
-
-      {/* Posts List */}
-      {loading ? (
-        <div className="loading">
-          <div className="spinner"></div>
-          <span className="ml-3">加载中...</span>
-        </div>
-      ) : posts.length === 0 ? (
-        <div className="empty">
-          <div className="empty-icon">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-            </svg>
+        {loading ? (
+          <div className="admin-loading">加载中...</div>
+        ) : posts.length === 0 ? (
+          <div className="admin-empty">暂无帖子</div>
+        ) : (
+          <div className="admin-table-wrap">
+            <Table className="admin-table">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>ID</TableHead>
+                  <TableHead>标题</TableHead>
+                  <TableHead>作者</TableHead>
+                  <TableHead>类型</TableHead>
+                  <TableHead>状态</TableHead>
+                  <TableHead>操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {posts.map((post) => (
+                  <TableRow key={post.id}>
+                    <TableCell>{post.id}</TableCell>
+                    <TableCell>
+                      <Link
+                        href={`/posts/${post.id}`}
+                        className="admin-inline-link"
+                      >
+                        {post.title}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      {post.authorUsername || post.authorId}
+                    </TableCell>
+                    <TableCell>
+                      <span className={getBadgeClass(post.postType)}>
+                        {post.postType}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span className={getStatusClass(post.status)}>
+                        {post.status}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="admin-row-actions">
+                        <Button
+                          className="admin-btn is-soft"
+                          onClick={() => void onlinePost(post.id)}
+                          type="button"
+                          disabled={post.status !== "OFFLINE"}
+                        >
+                          上架
+                        </Button>
+                        <Button
+                          className="admin-btn is-danger"
+                          onClick={() => void offlinePost(post.id)}
+                          type="button"
+                          disabled={
+                            post.status === "OFFLINE" ||
+                            post.status === "DELETED"
+                          }
+                        >
+                          下架
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
-          <p className="empty-title">暂无帖子</p>
-        </div>
-      ) : (
-        <div className="grid gap-3">
-          {posts.map((post) => (
-            <div key={post.id} className="card">
-              <div className="flex gap-2 mb-2">
-                <span className={getBadgeClass(post.postType)}>
-                  {post.postType === "NORMAL" && "普通"}
-                  {post.postType === "RESOURCE" && "资源"}
-                  {post.postType === "BOUNTY" && "悬赏"}
-                </span>
-                <span className="badge badge-info">{post.status}</span>
-                <span className="text-muted text-sm">
-                  作者: {post.authorUsername || post.authorId}
-                </span>
-              </div>
-              <Link href={`/posts/${post.id}`} className="post-item-title block mb-3">
-                {post.title}
-              </Link>
-              <div className="flex gap-3 items-center">
-                <input
-                  className="form-input"
-                  style={{ flex: "1 1 200px" }}
-                  placeholder="下架原因"
-                  value={reasonById[post.id] || ""}
-                  onChange={(e) =>
-                    setReasonById((prev) => ({
-                      ...prev,
-                      [post.id]: e.target.value,
-                    }))
-                  }
-                />
-                <button
-                  className="btn btn-danger"
-                  onClick={() => void offlinePost(post.id)}
-                  type="button"
-                >
-                  <svg className="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-                  </svg>
-                  下架
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+        )}
+      </section>
+
+      <div className="admin-footer-link">
+        <Link href="/admin/users" className="admin-inline-link">
+          前往用户管理
+        </Link>
+      </div>
     </main>
   );
 }

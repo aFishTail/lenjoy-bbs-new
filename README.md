@@ -34,10 +34,12 @@ docker compose -f infra/docker/docker-compose.yml up --build
 - Web: <http://localhost:8080/>
 - API health: <http://localhost:8080/api/v1/health>
 - Swagger: <http://localhost:8080/swagger-ui/index.html>
+- MinIO API: <http://localhost:9000>
+- MinIO Console: <http://localhost:9001>
 
-## Local Dependencies Only (PostgreSQL + Redis)
+## Local Dependencies Only (PostgreSQL + Redis + MinIO)
 
-For daily local development, you usually only need database and cache:
+For daily local development, you usually only need database, cache, and object storage:
 
 1. Copy env template:
 
@@ -45,7 +47,7 @@ For daily local development, you usually only need database and cache:
 cp .env.example .env
 ```
 
-`docker-compose.dev.yml` reuses `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_PORT` directly, so you only need one set of database variables.
+`docker-compose.dev.yml` reuses DB and MinIO related variables directly, so `.env` can be used as the single source of truth for local dependencies.
 
 1. Start dependencies with external env file:
 
@@ -79,7 +81,7 @@ docker compose --env-file .env -f infra/docker/docker-compose.dev.yml up -d
 Alternative (using full compose file):
 
 ```bash
-docker compose -f infra/docker/docker-compose.yml up -d postgres redis
+docker compose -f infra/docker/docker-compose.yml up -d postgres redis minio minio-init
 ```
 
 ## Local API Run (without Docker)
@@ -141,6 +143,14 @@ Environment variables:
 - `DB_USER`
 - `DB_PASSWORD`
 - `SERVER_PORT`
+- `MINIO_ENDPOINT`
+- `MINIO_ACCESS_KEY`
+- `MINIO_SECRET_KEY`
+- `MINIO_BUCKET`
+- `MINIO_PUBLIC_BASE_URL`
+- `UPLOAD_MAX_FILE_SIZE`
+- `UPLOAD_MAX_REQUEST_SIZE`
+- `MINIO_MAX_FILE_SIZE_BYTES`
 
 ## Auth API (US-A02)
 

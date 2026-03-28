@@ -77,8 +77,8 @@ public class AuthService {
         if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             throw new ApiException("LOGIN_FAILED", "账号或密码错误", HttpStatus.UNAUTHORIZED);
         }
-        if (!"ACTIVE".equalsIgnoreCase(user.getStatus())) {
-            throw new ApiException("ACCOUNT_DISABLED", "账号已被禁用", HttpStatus.FORBIDDEN);
+        if ("BANNED".equalsIgnoreCase(user.getStatus())) {
+            throw new ApiException("ACCOUNT_DISABLED", "账号已被封禁", HttpStatus.FORBIDDEN);
         }
         List<String> roles = loadRoleCodes(user.getId());
         if (roles.isEmpty()) {
@@ -152,6 +152,8 @@ public class AuthService {
         summary.setUsername(user.getUsername());
         summary.setEmail(user.getEmail());
         summary.setPhone(user.getPhone());
+        summary.setAvatarUrl(user.getAvatarUrl());
+        summary.setBio(user.getBio());
         resp.setUser(summary);
         return resp;
     }

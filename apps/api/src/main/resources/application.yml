@@ -16,6 +16,10 @@ spring:
     enabled: true
     baseline-on-migrate: true
     locations: classpath:db/migration
+  servlet:
+    multipart:
+      max-file-size: ${UPLOAD_MAX_FILE_SIZE:5MB}
+      max-request-size: ${UPLOAD_MAX_REQUEST_SIZE:5MB}
   jackson:
     default-property-inclusion: non_null
 
@@ -47,3 +51,12 @@ auth:
   captcha:
     ttl-seconds: ${CAPTCHA_TTL_SECONDS:120}
     length: ${CAPTCHA_LENGTH:4}
+
+storage:
+  minio:
+    endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+    access-key: ${MINIO_ACCESS_KEY:minioadmin}
+    secret-key: ${MINIO_SECRET_KEY:minioadmin}
+    bucket: ${MINIO_BUCKET:lenjoy-bbs}
+    public-base-url: ${MINIO_PUBLIC_BASE_URL:http://localhost:9000/lenjoy-bbs}
+    max-file-size-bytes: ${MINIO_MAX_FILE_SIZE_BYTES:5242880}

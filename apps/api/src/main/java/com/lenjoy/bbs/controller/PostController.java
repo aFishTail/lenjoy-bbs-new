@@ -98,6 +98,13 @@ public class PostController {
         return ApiResponse.ok(null);
     }
 
+    @PatchMapping("/admin/posts/{postId}/online")
+    public ApiResponse<Void> online(@PathVariable Long postId, Authentication authentication) {
+        AuthUserPrincipal principal = requireAdmin(authentication);
+        postService.online(postId, principal.getUserId());
+        return ApiResponse.ok(null);
+    }
+
     private AuthUserPrincipal requireAdmin(Authentication authentication) {
         AuthUserPrincipal principal = requirePrincipal(authentication);
         if (!hasRole(authentication, "ROLE_ADMIN")) {

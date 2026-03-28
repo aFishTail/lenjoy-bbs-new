@@ -20,6 +20,11 @@ public class UserAccountEntity {
 
     private String phone;
 
+    @TableField("avatar_url")
+    private String avatarUrl;
+
+    private String bio;
+
     @TableField("password_hash")
     private String passwordHash;
 

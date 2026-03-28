@@ -174,6 +174,24 @@ public class PostService {
         postMapper.updateById(entity);
     }
 
+    @Transactional
+    public void online(Long postId, Long adminUserId) {
+        PostEntity entity = requirePost(postId);
+        if (STATUS_DELETED.equals(entity.getStatus()) || Boolean.TRUE.equals(entity.getDeleted())) {
+            throw new ApiException("POST_DELETED", "帖子已删除", HttpStatus.BAD_REQUEST);
+        }
+        if (!STATUS_OFFLINE.equals(entity.getStatus())) {
+            throw new ApiException("POST_STATUS_INVALID", "仅下架帖子可执行上架", HttpStatus.BAD_REQUEST);
+        }
+
+        entity.setStatus(STATUS_PUBLISHED);
+        entity.setOfflineReason(null);
+        entity.setOfflinedAt(null);
+        entity.setOfflinedBy(null);
+        entity.setUpdatedAt(LocalDateTime.now());
+        postMapper.updateById(entity);
+    }
+
     private List<PostSummaryResponse> fillAuthorAndMap(List<PostEntity> posts) {
         if (posts.isEmpty()) {
             return List.of();

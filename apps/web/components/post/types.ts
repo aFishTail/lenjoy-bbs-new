@@ -14,7 +14,21 @@ export type AuthData = {
     username: string;
     email?: string;
     phone?: string;
+    avatarUrl?: string | null;
+    bio?: string | null;
   };
+};
+
+export type MyProfile = {
+  id: number;
+  username: string;
+  email?: string | null;
+  phone?: string | null;
+  avatarUrl?: string | null;
+  bio?: string | null;
+  postCount: number;
+  followingCount: number;
+  followerCount: number;
 };
 
 export type PostSummary = {
@@ -24,6 +38,10 @@ export type PostSummary = {
   status: "PUBLISHED" | "CLOSED" | "OFFLINE" | "DELETED";
   authorId: number;
   authorUsername?: string;
+  viewCount?: number;
+  likeCount?: number;
+  collectCount?: number;
+  commentCount?: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -39,8 +57,23 @@ export type PostDetail = {
   hiddenContent?: string;
   price?: number;
   bountyAmount?: number;
+  viewCount?: number;
+  likeCount?: number;
+  collectCount?: number;
+  commentCount?: number;
   offlineReason?: string;
   offlinedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdminUserSummary = {
+  id: number;
+  username: string;
+  email?: string;
+  phone?: string;
+  status: "ACTIVE" | "MUTED" | "BANNED";
+  roles: string[];
   createdAt: string;
   updatedAt: string;
 };
