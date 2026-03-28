@@ -1,9 +1,6 @@
 import { FormEvent } from "react";
 
 import { CaptchaField } from "@/components/auth/captcha-field";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
 type LoginFormValue = {
   account: string;
@@ -35,49 +32,70 @@ export function LoginForm({
   onSubmit,
 }: LoginFormProps) {
   return (
-    <form
-      className="mt-5 grid gap-4"
-      onSubmit={(event) => void onSubmit(event)}
-    >
-      <div className="space-y-2">
-        <Label htmlFor="account">账号（邮箱/手机号/用户名）</Label>
-        <Input
-          id="account"
-          required
-          placeholder="name@example.com 或 13800138000 或 username"
-          value={value.account}
-          onChange={(e) => onChange({ ...value, account: e.target.value })}
+    <form onSubmit={(event) => void onSubmit(event)}>
+      <div className="grid gap-4">
+        <div className="form-group">
+          <label className="form-label" htmlFor="account">
+            账号（邮箱/手机号/用户名）
+          </label>
+          <input
+            id="account"
+            className="form-input"
+            required
+            placeholder="name@example.com 或 13800138000"
+            value={value.account}
+            onChange={(e) => onChange({ ...value, account: e.target.value })}
+          />
+        </div>
+
+        <div className="form-group">
+          <label className="form-label" htmlFor="password">
+            密码
+          </label>
+          <input
+            id="password"
+            className="form-input"
+            required
+            type="password"
+            minLength={6}
+            placeholder="请输入密码"
+            value={value.password}
+            onChange={(e) => onChange({ ...value, password: e.target.value })}
+          />
+        </div>
+
+        <CaptchaField
+          captchaId={captchaId}
+          captchaImageSrc={captchaImageSrc}
+          captchaCode={value.captchaCode}
+          captchaExpireText={captchaExpireText}
+          refreshingCaptcha={refreshingCaptcha}
+          onCaptchaCodeChange={(captchaCode) =>
+            onChange({ ...value, captchaCode })
+          }
+          onRefresh={onRefreshCaptcha}
         />
+
+        <button
+          className="btn btn-primary"
+          disabled={submitting || refreshingCaptcha}
+          type="submit"
+        >
+          {submitting ? (
+            <>
+              <div className="spinner" style={{ width: "16px", height: "16px" }}></div>
+              登录中...
+            </>
+          ) : (
+            <>
+              <svg className="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3" />
+              </svg>
+              登录
+            </>
+          )}
+        </button>
       </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="password">密码</Label>
-        <Input
-          id="password"
-          required
-          type="password"
-          minLength={6}
-          placeholder="请输入密码"
-          value={value.password}
-          onChange={(e) => onChange({ ...value, password: e.target.value })}
-        />
-      </div>
-
-      <CaptchaField
-        captchaId={captchaId}
-        captchaImageSrc={captchaImageSrc}
-        captchaCode={value.captchaCode}
-        captchaExpireText={captchaExpireText}
-        refreshingCaptcha={refreshingCaptcha}
-        onCaptchaCodeChange={(captchaCode) =>
-          onChange({ ...value, captchaCode })
-        }
-        onRefresh={onRefreshCaptcha}
-      />
-
-      <Button disabled={submitting || refreshingCaptcha} type="submit">
-        {submitting ? "提交中..." : "登录"}
-      </Button>
     </form>
   );
 }

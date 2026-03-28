@@ -1,7 +1,3 @@
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-
 type CaptchaFieldProps = {
   captchaId: string;
   captchaImageSrc: string;
@@ -22,43 +18,48 @@ export function CaptchaField({
   onRefresh,
 }: CaptchaFieldProps) {
   return (
-    <div className="space-y-3">
-      <div className="space-y-2">
-        <Label htmlFor="captchaCode">图形验证码</Label>
-        <Input
-          id="captchaCode"
-          required
-          placeholder="请输入图中字符"
-          value={captchaCode}
-          onChange={(e) => onCaptchaCodeChange(e.target.value)}
-        />
-      </div>
+    <div className="form-group">
+      <label className="form-label" htmlFor="captchaCode">
+        图形验证码
+      </label>
+      <input
+        id="captchaCode"
+        className="form-input"
+        required
+        placeholder="请输入图中字符"
+        value={captchaCode}
+        onChange={(e) => onCaptchaCodeChange(e.target.value)}
+      />
 
-      <div className="grid gap-3 sm:grid-cols-[180px_1fr]">
-        <div className="grid min-h-[68px] place-items-center overflow-hidden rounded-md border border-dashed border-slate-300 bg-slate-50">
+      <div className="grid gap-3" style={{ gridTemplateColumns: "180px 1fr" }}>
+        <div
+          className="captcha-image-wrap"
+          style={{ minHeight: "68px" }}
+        >
           {captchaImageSrc ? (
             <img
               src={captchaImageSrc}
               alt="图形验证码"
-              className="h-full w-full object-cover"
+              className="captcha-image"
             />
           ) : (
-            <span className="text-sm text-slate-500">验证码加载中</span>
+            <span className="text-muted text-sm">验证码加载中</span>
           )}
         </div>
-        <div className="grid content-center gap-1.5">
-          <Button
+        <div className="captcha-actions">
+          <button
             type="button"
-            variant="outline"
+            className="btn btn-ghost btn-sm"
             onClick={() => void onRefresh()}
+            disabled={refreshingCaptcha}
           >
             {refreshingCaptcha ? "刷新中..." : "刷新验证码"}
-          </Button>
-          <small className="text-xs text-slate-500">
-            captchaId: {captchaId || "-"}
+          </button>
+          <small className="text-muted">
+            ID: {captchaId || "-"}
           </small>
-          <small className="text-xs text-slate-500">
-            过期时间: {captchaExpireText}
+          <small className="text-muted">
+            过期: {captchaExpireText}
           </small>
         </div>
       </div>

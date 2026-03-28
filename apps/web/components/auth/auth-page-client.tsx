@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 
 import { AuthSessionCard } from "@/components/auth/auth-session-card";
 import { LoginForm } from "@/components/auth/login-form";
@@ -11,14 +12,6 @@ import {
   type CaptchaMetadata,
   type Mode,
 } from "@/components/auth/types";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 
 const AUTH_STORAGE_KEY = "lenjoy.auth";
 
@@ -200,52 +193,49 @@ export function AuthPageClient() {
   }
 
   return (
-    <main className="mx-auto grid w-[min(1000px,94vw)] gap-6 py-10 sm:py-14">
-      <header className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">
-          US-A02 · 账户与身份
-        </p>
-        <h1 className="text-3xl font-semibold leading-tight text-slate-900 sm:text-5xl">
-          登录 / 注册
-        </h1>
-        <p className="text-sm text-slate-600 sm:text-base">
-          支持邮箱、手机号、用户名登录。注册与登录均需图形验证码校验，并可随时刷新验证码。
-        </p>
-      </header>
+    <main className="page">
+      <div style={{ maxWidth: "500px", margin: "0 auto" }}>
+        {/* Header */}
+        <div className="text-center mb-6">
+          <div className="avatar avatar-lg mx-auto mb-4" style={{ margin: "0 auto" }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-bold" style={{ fontFamily: "'Newsreader', serif" }}>
+            {mode === "login" ? "欢迎回来" : "创建账号"}
+          </h1>
+          <p className="text-muted mt-2">
+            {mode === "login"
+              ? "输入账号与密码，完成验证码后登录"
+              : "完成基础信息填写后即可注册并自动登录"}
+          </p>
+        </div>
 
-      <Card className="border-slate-200/90 bg-white/85 backdrop-blur">
-        <CardHeader className="space-y-4">
-          <div className="inline-flex rounded-md border border-slate-200 p-1">
-            <Button
+        {/* Auth Card */}
+        <div className="card">
+          {/* Tabs */}
+          <div className="tabs mb-4" style={{ width: "100%" }}>
+            <button
               type="button"
-              variant={mode === "login" ? "default" : "ghost"}
-              size="sm"
+              className={`tab ${mode === "login" ? "active" : ""}`}
               onClick={() => setMode("login")}
+              style={{ flex: 1 }}
             >
               登录
-            </Button>
-            <Button
+            </button>
+            <button
               type="button"
-              variant={mode === "register" ? "default" : "ghost"}
-              size="sm"
+              className={`tab ${mode === "register" ? "active" : ""}`}
               onClick={() => setMode("register")}
+              style={{ flex: 1 }}
             >
               注册
-            </Button>
+            </button>
           </div>
-          <div>
-            <CardTitle className="text-lg">
-              {mode === "login" ? "欢迎回来" : "创建账号"}
-            </CardTitle>
-            <CardDescription>
-              {mode === "login"
-                ? "输入账号与密码，完成验证码后登录。"
-                : "完成基础信息填写后即可注册并自动登录。"}
-            </CardDescription>
-          </div>
-        </CardHeader>
 
-        <CardContent>
+          {/* Form */}
           {mode === "login" ? (
             <LoginForm
               value={loginForm}
@@ -272,21 +262,41 @@ export function AuthPageClient() {
             />
           )}
 
-          {errorText ? (
-            <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+          {/* Messages */}
+          {errorText && (
+            <div className="banner banner-error mt-4">
+              <svg className="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="15" y1="9" x2="9" y2="15" />
+                <line x1="9" y1="9" x2="15" y2="15" />
+              </svg>
               {errorText}
-            </p>
-          ) : null}
+            </div>
+          )}
 
-          {successText ? (
-            <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
+          {successText && (
+            <div className="banner banner-success mt-4">
+              <svg className="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
               {successText}
-            </p>
-          ) : null}
+            </div>
+          )}
 
-          {auth ? <AuthSessionCard auth={auth} onLogout={logout} /> : null}
-        </CardContent>
-      </Card>
+          {auth && <AuthSessionCard auth={auth} onLogout={logout} />}
+        </div>
+
+        {/* Back Link */}
+        <div className="text-center mt-6">
+          <Link href="/" className="nav-link">
+            <svg className="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ display: "inline", marginRight: "4px" }}>
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+            返回首页
+          </Link>
+        </div>
+      </div>
     </main>
   );
 }
