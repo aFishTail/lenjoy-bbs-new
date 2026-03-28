@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
@@ -31,6 +32,7 @@ function readError(error: unknown) {
 }
 
 export function AuthPageClient() {
+  const router = useRouter();
   const [mode, setMode] = useState<Mode>("login");
   const [captchaId, setCaptchaId] = useState("");
   const [captchaStamp, setCaptchaStamp] = useState<number>(Date.now());
@@ -143,9 +145,8 @@ export function AuthPageClient() {
       });
       const payload = await readApi<AuthData>(resp);
       saveAuth(payload.data);
-      setSuccessText("登录成功，已获得访问令牌");
-      await refreshCaptcha();
-      setLoginForm((prev) => ({ ...prev, password: "", captchaCode: "" }));
+      setSuccessText("登录成功，正在跳转...");
+      router.replace("/");
     } catch (error) {
       setErrorText(readError(error));
       await refreshCaptcha({ clearError: false });
@@ -180,10 +181,8 @@ export function AuthPageClient() {
       });
       const payload = await readApi<AuthData>(resp);
       saveAuth(payload.data);
-      setSuccessText("注册成功，已自动登录");
-      await refreshCaptcha();
-      setRegisterForm((prev) => ({ ...prev, password: "", captchaCode: "" }));
-      setMode("login");
+      setSuccessText("注册成功，正在跳转...");
+      router.replace("/");
     } catch (error) {
       setErrorText(readError(error));
       await refreshCaptcha({ clearError: false });
