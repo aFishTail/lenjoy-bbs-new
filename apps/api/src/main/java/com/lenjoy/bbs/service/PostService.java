@@ -49,7 +49,6 @@ public class PostService {
         entity.setPostType(postType);
         entity.setTitle(request.getTitle().trim());
         entity.setContent(blankToNull(request.getContent()));
-        entity.setPublicContent(blankToNull(request.getPublicContent()));
         entity.setHiddenContent(blankToNull(request.getHiddenContent()));
         entity.setPrice(request.getPrice());
         entity.setBountyAmount(request.getBountyAmount());
@@ -123,7 +122,6 @@ public class PostService {
 
         entity.setTitle(request.getTitle().trim());
         entity.setContent(blankToNull(request.getContent()));
-        entity.setPublicContent(blankToNull(request.getPublicContent()));
         entity.setHiddenContent(blankToNull(request.getHiddenContent()));
         entity.setPrice(request.getPrice());
         entity.setBountyAmount(request.getBountyAmount());
@@ -210,7 +208,7 @@ public class PostService {
         resp.setAuthorId(entity.getAuthorId());
         resp.setAuthorUsername(authorUsername);
         resp.setContent(entity.getContent());
-        resp.setPublicContent(entity.getPublicContent());
+        resp.setHiddenContent(blankToNull(entity.getHiddenContent()));
         resp.setPrice(entity.getPrice());
         resp.setBountyAmount(entity.getBountyAmount());
         resp.setOfflineReason(entity.getOfflineReason());
@@ -290,8 +288,8 @@ public class PostService {
             throw new ApiException("CONTENT_REQUIRED", "普通帖正文不能为空", HttpStatus.BAD_REQUEST);
         }
         if (TYPE_RESOURCE.equals(postType)) {
-            if (isBlank(request.getPublicContent()) || isBlank(request.getHiddenContent())) {
-                throw new ApiException("RESOURCE_CONTENT_REQUIRED", "资源帖公开内容与隐藏内容不能为空", HttpStatus.BAD_REQUEST);
+            if (isBlank(request.getHiddenContent())) {
+                throw new ApiException("RESOURCE_CONTENT_REQUIRED", "资源帖隐藏内容不能为空", HttpStatus.BAD_REQUEST);
             }
             if (request.getPrice() == null || request.getPrice() <= 0) {
                 throw new ApiException("PRICE_INVALID", "资源帖售价必须大于 0", HttpStatus.BAD_REQUEST);
@@ -312,8 +310,8 @@ public class PostService {
             throw new ApiException("CONTENT_REQUIRED", "普通帖正文不能为空", HttpStatus.BAD_REQUEST);
         }
         if (TYPE_RESOURCE.equals(postType)) {
-            if (isBlank(request.getPublicContent()) || isBlank(request.getHiddenContent())) {
-                throw new ApiException("RESOURCE_CONTENT_REQUIRED", "资源帖公开内容与隐藏内容不能为空", HttpStatus.BAD_REQUEST);
+            if (isBlank(request.getHiddenContent())) {
+                throw new ApiException("RESOURCE_CONTENT_REQUIRED", "资源帖隐藏内容不能为空", HttpStatus.BAD_REQUEST);
             }
             if (request.getPrice() == null || request.getPrice() <= 0) {
                 throw new ApiException("PRICE_INVALID", "资源帖售价必须大于 0", HttpStatus.BAD_REQUEST);

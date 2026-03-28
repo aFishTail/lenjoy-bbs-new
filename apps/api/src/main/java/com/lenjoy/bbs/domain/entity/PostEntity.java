@@ -24,9 +24,6 @@ public class PostEntity {
 
     private String content;
 
-    @TableField("public_content")
-    private String publicContent;
-
     @TableField("hidden_content")
     private String hiddenContent;
 

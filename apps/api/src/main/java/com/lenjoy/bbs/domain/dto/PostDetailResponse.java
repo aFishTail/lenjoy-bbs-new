@@ -15,7 +15,6 @@ public class PostDetailResponse {
     private String authorUsername;
 
     private String content;
-    private String publicContent;
     private String hiddenContent;
     private Integer price;
     private Integer bountyAmount;

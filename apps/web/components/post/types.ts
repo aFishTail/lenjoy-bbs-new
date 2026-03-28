@@ -36,7 +36,6 @@ export type PostDetail = {
   authorId: number;
   authorUsername?: string;
   content?: string;
-  publicContent?: string;
   hiddenContent?: string;
   price?: number;
   bountyAmount?: number;

@@ -11,8 +11,6 @@ public class UpdatePostRequest {
 
     private String content;
 
-    private String publicContent;
-
     private String hiddenContent;
 
     private Integer price;

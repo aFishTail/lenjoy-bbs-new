@@ -22,7 +22,6 @@ export function PostDetailClient({ postId }: Props) {
   const [loading, setLoading] = useState(false);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [publicContent, setPublicContent] = useState("");
   const [hiddenContent, setHiddenContent] = useState("");
   const [price, setPrice] = useState("");
   const [bountyAmount, setBountyAmount] = useState("");
@@ -42,7 +41,6 @@ export function PostDetailClient({ postId }: Props) {
       setPost(payload.data);
       setTitle(payload.data.title || "");
       setContent(payload.data.content || "");
-      setPublicContent(payload.data.publicContent || "");
       setHiddenContent(payload.data.hiddenContent || "");
       setPrice(payload.data.price ? String(payload.data.price) : "");
       setBountyAmount(
@@ -75,7 +73,6 @@ export function PostDetailClient({ postId }: Props) {
         body: JSON.stringify({
           title,
           content,
-          publicContent,
           hiddenContent,
           price: price ? Number(price) : null,
           bountyAmount: bountyAmount ? Number(bountyAmount) : null,
@@ -207,19 +204,6 @@ export function PostDetailClient({ postId }: Props) {
                 </div>
               )}
 
-              {post.publicContent && (
-                <div className="mb-4 p-4 rounded-xl" style={{ background: "rgba(124, 58, 237, 0.06)", border: "1px solid rgba(124, 58, 237, 0.15)" }}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                      <circle cx="12" cy="12" r="3" />
-                    </svg>
-                    <span className="font-semibold text-primary">公开内容</span>
-                  </div>
-                  <p className="whitespace-pre-wrap">{post.publicContent}</p>
-                </div>
-              )}
-
               {post.hiddenContent && (
                 <div className="mb-4 p-4 rounded-xl" style={{ background: "linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(251, 191, 36, 0.1))", border: "1px solid rgba(245, 158, 11, 0.3)" }}>
                   <div className="flex items-center gap-2 mb-2">
@@ -309,14 +293,6 @@ export function PostDetailClient({ postId }: Props) {
 
                     {post.postType === "RESOURCE" && (
                       <>
-                        <div className="form-group">
-                          <label className="form-label">公开内容</label>
-                          <textarea
-                            className="form-textarea"
-                            value={publicContent}
-                            onChange={(e) => setPublicContent(e.target.value)}
-                          />
-                        </div>
                         <div className="form-group">
                           <label className="form-label">隐藏内容</label>
                           <textarea

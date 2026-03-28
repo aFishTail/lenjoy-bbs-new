@@ -30,7 +30,6 @@ export function PostHomeClient() {
   const [postType, setPostType] = useState<PostType>("NORMAL");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [publicContent, setPublicContent] = useState("");
   const [hiddenContent, setHiddenContent] = useState("");
   const [price, setPrice] = useState("");
   const [bountyAmount, setBountyAmount] = useState("");
@@ -72,7 +71,6 @@ export function PostHomeClient() {
           postType,
           title,
           content,
-          publicContent,
           hiddenContent,
           price: price ? Number(price) : null,
           bountyAmount: bountyAmount ? Number(bountyAmount) : null,
@@ -82,7 +80,6 @@ export function PostHomeClient() {
       setSuccessText("发布成功！");
       setTitle("");
       setContent("");
-      setPublicContent("");
       setHiddenContent("");
       setPrice("");
       setBountyAmount("");
@@ -236,15 +233,6 @@ export function PostHomeClient() {
 
               {postType === "RESOURCE" && (
                 <>
-                  <div className="form-group">
-                    <label className="form-label">公开内容</label>
-                    <textarea
-                      className="form-textarea"
-                      placeholder="介绍资源价值和使用说明（公开可见）"
-                      value={publicContent}
-                      onChange={(e) => setPublicContent(e.target.value)}
-                    />
-                  </div>
                   <div className="form-group">
                     <label className="form-label">隐藏内容</label>
                     <textarea

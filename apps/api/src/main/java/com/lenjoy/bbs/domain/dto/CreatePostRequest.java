@@ -15,8 +15,6 @@ public class CreatePostRequest {
 
     private String content;
 
-    private String publicContent;
-
     private String hiddenContent;
 
     private Integer price;

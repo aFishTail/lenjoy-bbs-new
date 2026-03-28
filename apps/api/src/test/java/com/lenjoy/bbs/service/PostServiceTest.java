@@ -84,7 +84,7 @@ class PostServiceTest {
     @Test
     void detail_whenResourceAndVisitor_shouldNotExposeHiddenContent() {
         PostEntity post = buildPost(12L, 1L, "RESOURCE", "PUBLISHED", false);
-        post.setPublicContent("public");
+        post.setContent("description");
         post.setHiddenContent("secret");
         post.setPrice(9);
         when(postMapper.selectById(12L)).thenReturn(post);
@@ -92,14 +92,13 @@ class PostServiceTest {
 
         PostDetailResponse response = postService.detail(12L, 2L, false);
 
-        assertEquals("public", response.getPublicContent());
         assertNull(response.getHiddenContent());
     }
 
     @Test
     void detail_whenResourceAndAuthor_shouldExposeHiddenContent() {
         PostEntity post = buildPost(13L, 1L, "RESOURCE", "PUBLISHED", false);
-        post.setPublicContent("public");
+        post.setContent("description");
         post.setHiddenContent("secret");
         when(postMapper.selectById(13L)).thenReturn(post);
         when(userAccountMapper.selectById(1L)).thenReturn(buildUser(1L, "author", "ACTIVE"));
