@@ -2,8 +2,10 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { setCookie, deleteCookie } from "cookies-next";
 import { getStoredAuth, queryKeys } from "@/components/post/client-helpers";
 import type { AuthData } from "@/components/post/types";
+import { AUTH_STORAGE_KEY } from "@/components/post/client-helpers";
 
 type AuthContextType = {
   authData: AuthData | null;
@@ -15,42 +17,59 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const AUTH_STORAGE_KEY = "lenjoy.auth";
-
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ 
+  children, 
+  initialAuth 
+}: { 
+  children: ReactNode;
+  initialAuth: AuthData | null;
+}) {
   const queryClient = useQueryClient();
-  const [authData, setAuthData] = useState<AuthData | null>(null);
+  const [authData, setAuthData] = useState<AuthData | null>(initialAuth);
 
   useEffect(() => {
-    // Initial hydration loop to sync local storage with React state
-    setAuthData(getStoredAuth());
+    // Only fetch from client if it wasn't provided by SSR
+    if (initialAuth === undefined) {
+      setAuthData(getStoredAuth());
+    }
 
-    const handleStorageChange = () => {
-      const nextAuthData = getStoredAuth();
-      setAuthData(nextAuthData);
-      if (nextAuthData?.token) {
-        void queryClient.invalidateQueries({ queryKey: queryKeys.unreadCount });
-      } else {
-        queryClient.removeQueries({ queryKey: queryKeys.unreadCount });
+    const channel = new BroadcastChannel("lenjoy-auth-sync");
+    
+    channel.onmessage = (event) => {
+      if (event.data === "auth-changed") {
+        const nextAuthData = getStoredAuth();
+        setAuthData(nextAuthData);
+        if (nextAuthData?.token) {
+          void queryClient.invalidateQueries({ queryKey: queryKeys.unreadCount });
+        } else {
+          queryClient.removeQueries({ queryKey: queryKeys.unreadCount });
+        }
       }
     };
 
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
-  }, [queryClient]);
+    return () => channel.close();
+  }, [queryClient, initialAuth]);
 
   const clearAuth = useCallback(() => {
-    localStorage.removeItem(AUTH_STORAGE_KEY);
+    deleteCookie(AUTH_STORAGE_KEY);
     setAuthData(null);
     queryClient.removeQueries({ queryKey: queryKeys.unreadCount });
-    // Dispatch a storage event yourself so other tabs and components are made aware
-    window.dispatchEvent(new Event("storage"));
+    const channel = new BroadcastChannel("lenjoy-auth-sync");
+    channel.postMessage("auth-changed");
+    channel.close();
   }, [queryClient]);
 
   const handleSetAuth = useCallback((data: AuthData) => {
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(data));
+    const maxAgeParams = data.expiresIn ? { maxAge: data.expiresIn } : {};
+    setCookie(AUTH_STORAGE_KEY, JSON.stringify(data), {
+      path: "/",
+      ...maxAgeParams,
+      sameSite: "lax",
+    });
     setAuthData(data);
-    window.dispatchEvent(new Event("storage"));
+    const channel = new BroadcastChannel("lenjoy-auth-sync");
+    channel.postMessage("auth-changed");
+    channel.close();
   }, []);
 
   const value = {

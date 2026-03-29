@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { getAuthSession } from "@/actions/auth";
 
 const backendBase = process.env.API_SERVER_BASE_URL || "http://localhost:8080";
 
@@ -12,6 +13,16 @@ export async function serverFetchApiData<T>(
   options?: FetchOptions
 ): Promise<T | null> {
   const url = `${backendBase}${path}`;
+  
+  let authHeader = "";
+  try {
+    const session = await getAuthSession();
+    if (session?.token) {
+      authHeader = `${session.tokenType || "Bearer"} ${session.token}`;
+    }
+  } catch (e) {
+    // Ignore errors that occur if cookies() is called outside a valid request context
+  }
 
   try {
     const response = await fetch(url, {
@@ -19,7 +30,7 @@ export async function serverFetchApiData<T>(
       headers: {
         "Content-Type": "application/json",
         "Accept": "application/json",
-        "Authorization": "",
+        "Authorization": authHeader,
         ...options?.headers,
       },
       // Default to no-store for dynamic data unless overridden

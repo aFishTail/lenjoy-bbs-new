@@ -1,6 +1,8 @@
+import { deleteCookie, getCookie } from "cookies-next";
+
 import type { ApiResponse, AuthData } from "@/components/post/types";
 
-const AUTH_STORAGE_KEY = "lenjoy.auth";
+export const AUTH_STORAGE_KEY = "lenjoy.auth";
 export const MESSAGE_EVENT = "lenjoy.messages.changed";
 
 export const queryKeys = {
@@ -44,7 +46,7 @@ export function clearAuthAndRedirectToLogin(): void {
     return;
   }
 
-  localStorage.removeItem(AUTH_STORAGE_KEY);
+  deleteCookie(AUTH_STORAGE_KEY);
   window.dispatchEvent(new Event("storage"));
 
   if (window.location.pathname !== "/auth") {
@@ -60,10 +62,12 @@ export function handleForbiddenStatus(status: number): void {
 
 export function getStoredAuth(): AuthData | null {
   if (typeof window === "undefined") {
+    // Return null during SSR since client-helpers can't access cookies natively reliably without req/res context passing
+    // Instead, SSR should pass initialAuth data to AuthProvider.
     return null;
   }
-  const raw = localStorage.getItem(AUTH_STORAGE_KEY);
-  if (!raw) {
+  const raw = getCookie(AUTH_STORAGE_KEY);
+  if (!raw || typeof raw !== "string") {
     return null;
   }
   try {
