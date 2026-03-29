@@ -3,10 +3,11 @@
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 
-import { getStoredAuth, readError } from "@/components/post/client-helpers";
+import { readError } from "@/components/post/client-helpers";
 import { useCreatePostMutation } from "@/components/post/use-post-mutations";
 import type { CreatePostInput } from "@/components/post/use-post-mutations";
 import { RichTextEditor } from "@/components/editor/rich-text-editor";
+import { useAuth } from "@/components/providers/auth-provider";
 
 const postTypeOptions = [
   {
@@ -40,7 +41,7 @@ function isRichTextEmpty(value: string) {
 
 export function CreatePostClient() {
   const router = useRouter();
-  const [auth, setAuth] = useState<ReturnType<typeof getStoredAuth>>(null);
+  const { authData: auth, hasAuth } = useAuth();
   const [errorText, setErrorText] = useState("");
   const [successText, setSuccessText] = useState("");
 
@@ -59,12 +60,16 @@ export function CreatePostClient() {
   const submitting = createPostMutation.isPending;
 
   useEffect(() => {
-    const storedAuth = getStoredAuth();
-    if (!storedAuth) {
-      router.push("/auth");
-      return;
+    // If auth is null upon mount, auth might not be loaded yet, OR it's truly unauthenticated.
+    // getStoredAuth() can be checked synchronously for immediate redirection.
+    // However, since we rely on Context, auth starts as null, then populates.
+    // But if auth is explicitly verified as missing (e.g. from local storage), redirect.
+    if (typeof window !== "undefined") {
+      const storedAuth = localStorage.getItem("lenjoy.auth");
+      if (!storedAuth) {
+        router.push("/auth");
+      }
     }
-    setAuth(storedAuth);
   }, [router]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {

@@ -11,45 +11,7 @@ import {
   requestApiData,
 } from "@/components/post/client-helpers";
 
-const AUTH_STORAGE_KEY = "lenjoy.auth";
 
-export function useClientAuth() {
-  const queryClient = useQueryClient();
-  const [mounted, setMounted] = useState(false);
-  const [authData, setAuthData] = useState<AuthData | null>(null);
-
-  useEffect(() => {
-    setMounted(true);
-    setAuthData(getStoredAuth());
-
-    const handleStorageChange = () => {
-      const nextAuthData = getStoredAuth();
-      setAuthData(nextAuthData);
-      if (nextAuthData?.token) {
-        void queryClient.invalidateQueries({ queryKey: queryKeys.unreadCount });
-        return;
-      }
-      queryClient.removeQueries({ queryKey: queryKeys.unreadCount });
-    };
-
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
-  }, [queryClient]);
-
-  function clearAuth() {
-    localStorage.removeItem(AUTH_STORAGE_KEY);
-    setAuthData(null);
-    queryClient.removeQueries({ queryKey: queryKeys.unreadCount });
-  }
-
-  return {
-    mounted,
-    authData,
-    user: authData?.user ?? null,
-    hasAuth: !!authData?.token,
-    clearAuth,
-  };
-}
 
 export function useUnreadCount(enabled: boolean) {
   const queryClient = useQueryClient();

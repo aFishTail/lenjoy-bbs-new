@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { readError } from "@/components/post/client-helpers";
 import { usePostFeedQuery } from "@/components/post/use-post-queries";
+import type { PostSummary } from "@/components/post/types";
 
 type PostType = "NORMAL" | "RESOURCE" | "BOUNTY";
 
@@ -12,6 +13,7 @@ type PostTypeFeedClientProps = {
   postType: PostType;
   title: string;
   subtitle: string;
+  initialPosts?: PostSummary[] | null;
 };
 
 const navByType: Record<PostType, { href: string; label: string }> = {
@@ -46,9 +48,10 @@ export function PostTypeFeedClient({
   postType,
   title,
   subtitle,
+  initialPosts,
 }: PostTypeFeedClientProps) {
   const [errorText, setErrorText] = useState("");
-  const postsQuery = usePostFeedQuery(postType);
+  const postsQuery = usePostFeedQuery(postType, initialPosts);
 
   useEffect(() => {
     if (postsQuery.error) {

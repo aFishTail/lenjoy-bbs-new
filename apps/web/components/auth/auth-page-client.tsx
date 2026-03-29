@@ -15,17 +15,16 @@ import { AuthSessionCard } from "@/components/auth/auth-session-card";
 import { LoginForm } from "@/components/auth/login-form";
 import { RegisterForm } from "@/components/auth/register-form";
 import {
-  type AuthData,
   type CaptchaMetadata,
   type Mode,
 } from "@/components/auth/types";
+import type { AuthData } from "@/components/post/types";
 import {
   queryKeys,
   readError,
   requestApiData,
 } from "@/components/post/client-helpers";
-
-const AUTH_STORAGE_KEY = "lenjoy.auth";
+import { useAuth } from "@/components/providers/auth-provider";
 
 export function AuthPageClient() {
   const router = useRouter();
@@ -33,7 +32,7 @@ export function AuthPageClient() {
   const [captchaStamp, setCaptchaStamp] = useState<number>(Date.now());
   const [errorText, setErrorText] = useState("");
   const [successText, setSuccessText] = useState("");
-  const [auth, setAuth] = useState<AuthData | null>(null);
+  const { authData: auth, setAuth: saveAuth, clearAuth: handleClearAuth } = useAuth();
 
   const [loginForm, setLoginForm] = useState({
     account: "",
@@ -114,15 +113,7 @@ export function AuthPageClient() {
   }, [captchaQuery.data]);
 
   useEffect(() => {
-    const raw = localStorage.getItem(AUTH_STORAGE_KEY);
-    if (!raw) {
-      return;
-    }
-    try {
-      setAuth(JSON.parse(raw) as AuthData);
-    } catch {
-      localStorage.removeItem(AUTH_STORAGE_KEY);
-    }
+    // Relying on useAuth hydration instead of manual parse
   }, []);
 
   async function refreshCaptcha(options?: { clearError?: boolean }) {
@@ -137,14 +128,10 @@ export function AuthPageClient() {
     }
   }
 
-  function saveAuth(data: AuthData) {
-    setAuth(data);
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(data));
-  }
+  // saveAuth is provided by useAuth
 
   function logout() {
-    setAuth(null);
-    localStorage.removeItem(AUTH_STORAGE_KEY);
+    handleClearAuth();
     setSuccessText("已退出登录");
     setErrorText("");
   }

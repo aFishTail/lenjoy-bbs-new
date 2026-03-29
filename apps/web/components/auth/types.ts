@@ -13,18 +13,4 @@ export type CaptchaMetadata = {
   expireAt: number;
 };
 
-export type AuthUser = {
-  id: number;
-  username: string;
-  email: string | null;
-  phone: string | null;
-  avatarUrl?: string | null;
-  bio?: string | null;
-};
 
-export type AuthData = {
-  token: string;
-  tokenType: string;
-  expiresIn: number;
-  user: AuthUser;
-};

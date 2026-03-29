@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 
-import { getStoredAuth, readError } from "@/components/post/client-helpers";
+import { readError } from "@/components/post/client-helpers";
 import { usePostsQuery } from "@/components/post/use-post-queries";
 import { useCreatePostMutation } from "@/components/post/use-post-mutations";
+import { useAuth } from "@/components/providers/auth-provider";
+import type { PostSummary } from "@/components/post/types";
 
 type PostType = "NORMAL" | "RESOURCE" | "BOUNTY";
 
@@ -15,11 +17,15 @@ const typeOptions: { value: PostType; label: string; color: string }[] = [
   { value: "BOUNTY", label: "悬赏帖", color: "badge-bounty" },
 ];
 
-export function PostHomeClient() {
+type PostHomeClientProps = {
+  initialPosts?: PostSummary[] | null;
+};
+
+export function PostHomeClient({ initialPosts }: PostHomeClientProps = {}) {
   const [errorText, setErrorText] = useState("");
   const [successText, setSuccessText] = useState("");
-  const [auth, setAuth] = useState<ReturnType<typeof getStoredAuth>>(null);
-  const [authReady, setAuthReady] = useState(false);
+  const { authData: auth } = useAuth();
+  const authReady = true; // Kept for compatibility if used
 
   const [postType, setPostType] = useState<PostType>("NORMAL");
   const [title, setTitle] = useState("");
@@ -30,16 +36,11 @@ export function PostHomeClient() {
   const [bountyExpireAt, setBountyExpireAt] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
 
-  const postsQuery = usePostsQuery();
+  const postsQuery = usePostsQuery(initialPosts);
   const createPostMutation = useCreatePostMutation();
 
   const posts = postsQuery.data ?? [];
   const loading = postsQuery.isLoading;
-
-  useEffect(() => {
-    setAuth(getStoredAuth());
-    setAuthReady(true);
-  }, []);
 
   useEffect(() => {
     if (postsQuery.error) {

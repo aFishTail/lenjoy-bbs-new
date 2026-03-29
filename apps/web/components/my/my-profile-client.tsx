@@ -5,19 +5,19 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { uploadImage } from "@/lib/upload-client";
-import { getStoredAuth, readError } from "@/components/post/client-helpers";
+import { readError } from "@/components/post/client-helpers";
 import {
   useMyProfileQuery,
   useMyWalletQuery,
   useSaveProfileMutation,
 } from "@/components/my/use-my-queries";
-import type { AuthData, MyProfile } from "@/components/post/types";
+import type { MyProfile } from "@/components/post/types";
+import { useAuth } from "@/components/providers/auth-provider";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-const AUTH_STORAGE_KEY = "lenjoy.auth";
 
 function StatCard({ label, value }: { label: string; value: number }) {
   return (
@@ -31,6 +31,7 @@ function StatCard({ label, value }: { label: string; value: number }) {
 }
 
 export function MyProfileClient() {
+  const { authData: currentAuth, setAuth } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [username, setUsername] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
@@ -47,23 +48,18 @@ export function MyProfileClient() {
   const avatarPreview = avatarUrl.trim();
 
   function syncAuthUser(nextProfile: MyProfile) {
-    const current = getStoredAuth();
-    if (!current) {
+    if (!currentAuth) {
       return;
     }
-    const nextAuth: AuthData = {
-      ...current,
+    setAuth({
+      ...currentAuth,
       user: {
-        ...current.user,
+        ...currentAuth.user,
         username: nextProfile.username,
         avatarUrl: nextProfile.avatarUrl ?? null,
         bio: nextProfile.bio ?? null,
       },
-    };
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(nextAuth));
-    window.dispatchEvent(
-      new StorageEvent("storage", { key: AUTH_STORAGE_KEY }),
-    );
+    });
   }
 
   useEffect(() => {

@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import {
-  useClientAuth,
   useUnreadCount,
 } from "@/components/layout/use-auth-unread";
+import { useAuth } from "@/components/providers/auth-provider";
 import type { AuthData } from "@/components/post/types";
 
 type AuthUser = AuthData["user"];
@@ -35,8 +35,8 @@ export function UserMenu() {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const { mounted, user, hasAuth, clearAuth } = useClientAuth();
-  const unreadCountQuery = useUnreadCount(mounted && hasAuth);
+  const { user, hasAuth, clearAuth } = useAuth();
+  const unreadCountQuery = useUnreadCount(hasAuth);
   const unreadCount = unreadCountQuery.unreadCount;
 
   useEffect(() => {
@@ -65,8 +65,8 @@ export function UserMenu() {
     router.replace("/");
   }
 
-  // 未挂载或未登录时显示登录按钮
-  if (!mounted || !user) {
+  // 未登录时显示登录按钮
+  if (!user) {
     return (
       <Link href="/auth" className="btn btn-ghost btn-sm">
         登录 / 注册

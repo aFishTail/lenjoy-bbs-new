@@ -1,4 +1,4 @@
-import { AuthData } from "@/components/auth/types";
+import type { AuthData } from "@/components/post/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 

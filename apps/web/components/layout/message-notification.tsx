@@ -1,16 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import {
-  useClientAuth,
-  useUnreadCount,
-} from "@/components/layout/use-auth-unread";
+import { useUnreadCount } from "@/components/layout/use-auth-unread";
+import { useAuth } from "@/components/providers/auth-provider";
 
 export function MessageNotification() {
-  const { mounted, hasAuth } = useClientAuth();
-  const { unreadCount } = useUnreadCount(mounted && hasAuth);
+  const { hasAuth } = useAuth();
+  const { unreadCount } = useUnreadCount(hasAuth);
 
-  if (!mounted || !hasAuth) {
+  if (!hasAuth) {
     return null;
   }
 

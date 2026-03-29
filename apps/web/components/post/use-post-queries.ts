@@ -9,15 +9,16 @@ import type {
   PostSummary,
 } from "@/components/post/types";
 
-export function usePostsQuery() {
+export function usePostsQuery(initialData?: PostSummary[] | null) {
   return useQuery({
     queryKey: queryKeys.posts,
     queryFn: () =>
       requestApiData<PostSummary[]>("/api/posts", { cache: "no-store" }),
+    initialData: initialData || undefined,
   });
 }
 
-export function usePostFeedQuery(postType: "NORMAL" | "RESOURCE" | "BOUNTY") {
+export function usePostFeedQuery(postType: "NORMAL" | "RESOURCE" | "BOUNTY", initialData?: PostSummary[] | null) {
   return useQuery({
     queryKey: queryKeys.postFeed(postType),
     queryFn: () => {
@@ -26,6 +27,7 @@ export function usePostFeedQuery(postType: "NORMAL" | "RESOURCE" | "BOUNTY") {
         cache: "no-store",
       });
     },
+    initialData: initialData || undefined,
   });
 }
 
@@ -40,7 +42,7 @@ export function useMyPostsQuery() {
   });
 }
 
-export function usePostDetailQuery(postId: string) {
+export function usePostDetailQuery(postId: string, initialData?: PostDetail | null) {
   return useQuery({
     queryKey: queryKeys.postDetail(postId),
     queryFn: () =>
@@ -48,10 +50,11 @@ export function usePostDetailQuery(postId: string) {
         withAuth: true,
         cache: "no-store",
       }),
+    initialData: initialData || undefined,
   });
 }
 
-export function usePostCommentsQuery(postId: string) {
+export function usePostCommentsQuery(postId: string, initialData?: PostComment[] | null) {
   return useQuery({
     queryKey: queryKeys.postComments(postId),
     queryFn: () =>
@@ -59,6 +62,7 @@ export function usePostCommentsQuery(postId: string) {
         withAuth: true,
         cache: "no-store",
       }),
+    initialData: initialData || undefined,
   });
 }
 
