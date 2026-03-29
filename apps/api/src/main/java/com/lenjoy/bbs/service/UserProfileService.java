@@ -20,6 +20,7 @@ public class UserProfileService {
 
     private final UserAccountMapper userAccountMapper;
     private final PostMapper postMapper;
+    private final InteractionService interactionService;
 
     public MyProfileResponse getMyProfile(Long userId) {
         UserAccountEntity user = requireUser(userId);
@@ -36,8 +37,8 @@ public class UserProfileService {
         response.setAvatarUrl(user.getAvatarUrl());
         response.setBio(user.getBio());
         response.setPostCount(postCount);
-        response.setFollowingCount(0L);
-        response.setFollowerCount(0L);
+        response.setFollowingCount(interactionService.countFollowing(userId));
+        response.setFollowerCount(interactionService.countFollowers(userId));
         return response;
     }
 

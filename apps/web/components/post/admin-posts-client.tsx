@@ -4,12 +4,9 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import {
-  authHeaders,
-  readApi,
-  readError,
-} from "@/components/post/client-helpers";
-import type { PostSummary } from "@/components/post/types";
+import { readError } from "@/components/post/client-helpers";
+import { useAdminPostsQuery } from "@/components/admin/use-admin-queries";
+import { useUpdateAdminPostStatusMutation } from "@/components/admin/use-admin-mutations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -23,74 +20,49 @@ import {
 } from "@/components/ui/table";
 
 export function AdminPostsClient() {
-  const [posts, setPosts] = useState<PostSummary[]>([]);
   const [status, setStatus] = useState("");
   const [postType, setPostType] = useState("");
   const [author, setAuthor] = useState("");
-  const [loading, setLoading] = useState(true);
-
-  async function load() {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (status) {
-        params.set("status", status);
-      }
-      if (postType) {
-        params.set("postType", postType);
-      }
-      if (author.trim()) {
-        params.set("author", author.trim());
-      }
-
-      const response = await fetch(`/api/admin/posts?${params.toString()}`, {
-        headers: authHeaders(),
-        cache: "no-store",
-      });
-      const payload = await readApi<PostSummary[]>(response);
-      setPosts(payload.data);
-    } catch (error) {
-      toast.error(readError(error));
-    } finally {
-      setLoading(false);
-    }
-  }
+  const [appliedFilters, setAppliedFilters] = useState({
+    status: "",
+    postType: "",
+    author: "",
+  });
+  const [submittingPostId, setSubmittingPostId] = useState<number | null>(null);
+  const postsQuery = useAdminPostsQuery(appliedFilters);
+  const updatePostStatusMutation =
+    useUpdateAdminPostStatusMutation(appliedFilters);
 
   useEffect(() => {
-    void load();
-  }, []);
+    if (postsQuery.error) {
+      toast.error(readError(postsQuery.error));
+    }
+  }, [postsQuery.error]);
+
+  const posts = postsQuery.data ?? [];
+  const loading = postsQuery.isLoading || postsQuery.isFetching;
 
   async function offlinePost(postId: number) {
     try {
-      const response = await fetch(`/api/admin/posts/${postId}/offline`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          ...authHeaders(),
-        },
-        body: JSON.stringify({ reason: "管理员下架" }),
-      });
-      await readApi(response);
+      setSubmittingPostId(postId);
+      await updatePostStatusMutation.mutateAsync({ postId, online: false });
       toast.success(`帖子 ${postId} 已下架`);
-      await load();
     } catch (error) {
       toast.error(readError(error));
+    } finally {
+      setSubmittingPostId(null);
     }
   }
 
   async function onlinePost(postId: number) {
     try {
-      const response = await fetch(`/api/admin/posts/${postId}/online`, {
-        method: "PATCH",
-        headers: {
-          ...authHeaders(),
-        },
-      });
-      await readApi(response);
+      setSubmittingPostId(postId);
+      await updatePostStatusMutation.mutateAsync({ postId, online: true });
       toast.success(`帖子 ${postId} 已上架`);
-      await load();
     } catch (error) {
       toast.error(readError(error));
+    } finally {
+      setSubmittingPostId(null);
     }
   }
 
@@ -150,7 +122,13 @@ export function AdminPostsClient() {
           <Button
             className="admin-btn"
             type="button"
-            onClick={() => void load()}
+            onClick={() =>
+              setAppliedFilters({
+                status,
+                postType,
+                author: author.trim(),
+              })
+            }
           >
             查询帖子
           </Button>
@@ -210,7 +188,10 @@ export function AdminPostsClient() {
                           className="admin-btn is-soft"
                           onClick={() => void onlinePost(post.id)}
                           type="button"
-                          disabled={post.status !== "OFFLINE"}
+                          disabled={
+                            post.status !== "OFFLINE" ||
+                            submittingPostId === post.id
+                          }
                         >
                           上架
                         </Button>
@@ -220,7 +201,8 @@ export function AdminPostsClient() {
                           type="button"
                           disabled={
                             post.status === "OFFLINE" ||
-                            post.status === "DELETED"
+                            post.status === "DELETED" ||
+                            submittingPostId === post.id
                           }
                         >
                           下架

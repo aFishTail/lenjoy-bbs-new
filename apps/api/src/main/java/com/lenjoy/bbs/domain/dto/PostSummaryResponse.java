@@ -12,6 +12,11 @@ public class PostSummaryResponse {
     private String status;
     private Long authorId;
     private String authorUsername;
+    private Long likeCount;
+    private Long collectCount;
+    private Long commentCount;
+    private Boolean liked;
+    private Boolean collected;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

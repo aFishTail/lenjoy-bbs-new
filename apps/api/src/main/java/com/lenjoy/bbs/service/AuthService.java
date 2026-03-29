@@ -34,6 +34,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final CaptchaService captchaService;
+    private final WalletService walletService;
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
@@ -67,6 +68,7 @@ public class AuthService {
             bind.setRoleId(userRole.getId());
             userRoleMapper.insert(bind);
         }
+        walletService.grantRegisterBonus(user.getId());
         return toAuthResponse(user, List.of("USER"));
     }
 

@@ -3,13 +3,9 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 
-import {
-  authHeaders,
-  getStoredAuth,
-  readApi,
-  readError,
-} from "@/components/post/client-helpers";
-import type { PostSummary } from "@/components/post/types";
+import { getStoredAuth, readError } from "@/components/post/client-helpers";
+import { usePostsQuery } from "@/components/post/use-post-queries";
+import { useCreatePostMutation } from "@/components/post/use-post-mutations";
 
 type PostType = "NORMAL" | "RESOURCE" | "BOUNTY";
 
@@ -20,8 +16,6 @@ const typeOptions: { value: PostType; label: string; color: string }[] = [
 ];
 
 export function PostHomeClient() {
-  const [posts, setPosts] = useState<PostSummary[]>([]);
-  const [loading, setLoading] = useState(false);
   const [errorText, setErrorText] = useState("");
   const [successText, setSuccessText] = useState("");
   const [auth, setAuth] = useState<ReturnType<typeof getStoredAuth>>(null);
@@ -33,27 +27,25 @@ export function PostHomeClient() {
   const [hiddenContent, setHiddenContent] = useState("");
   const [price, setPrice] = useState("");
   const [bountyAmount, setBountyAmount] = useState("");
+  const [bountyExpireAt, setBountyExpireAt] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
 
-  async function loadPosts() {
-    setLoading(true);
-    try {
-      const response = await fetch("/api/posts", { cache: "no-store" });
-      const payload = await readApi<PostSummary[]>(response);
-      setPosts(payload.data);
-      setErrorText("");
-    } catch (error) {
-      setErrorText(readError(error));
-    } finally {
-      setLoading(false);
-    }
-  }
+  const postsQuery = usePostsQuery();
+  const createPostMutation = useCreatePostMutation();
+
+  const posts = postsQuery.data ?? [];
+  const loading = postsQuery.isLoading;
 
   useEffect(() => {
     setAuth(getStoredAuth());
     setAuthReady(true);
-    void loadPosts();
   }, []);
+
+  useEffect(() => {
+    if (postsQuery.error) {
+      setErrorText(readError(postsQuery.error));
+    }
+  }, [postsQuery.error]);
 
   async function submitCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -61,30 +53,23 @@ export function PostHomeClient() {
     setSuccessText("");
 
     try {
-      const response = await fetch("/api/posts", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...authHeaders(),
-        },
-        body: JSON.stringify({
-          postType,
-          title,
-          content,
-          hiddenContent,
-          price: price ? Number(price) : null,
-          bountyAmount: bountyAmount ? Number(bountyAmount) : null,
-        }),
+      await createPostMutation.mutateAsync({
+        postType,
+        title: title.trim(),
+        content,
+        hiddenContent: hiddenContent.trim() ? hiddenContent : undefined,
+        price: price ? Number(price) : undefined,
+        bountyAmount: bountyAmount ? Number(bountyAmount) : undefined,
+        bountyExpireAt: bountyExpireAt || undefined,
       });
-      await readApi(response);
       setSuccessText("发布成功！");
       setTitle("");
       setContent("");
       setHiddenContent("");
       setPrice("");
       setBountyAmount("");
+      setBountyExpireAt("");
       setShowCreateForm(false);
-      await loadPosts();
     } catch (error) {
       setErrorText(readError(error));
     }
@@ -175,7 +160,7 @@ export function PostHomeClient() {
           </div>
           <button
             className="btn btn-ghost btn-sm"
-            onClick={() => void loadPosts()}
+            onClick={() => void postsQuery.refetch()}
           >
             <svg
               className="icon-sm"
@@ -278,6 +263,15 @@ export function PostHomeClient() {
               {postType === "RESOURCE" && (
                 <>
                   <div className="form-group">
+                    <label className="form-label">公开内容</label>
+                    <textarea
+                      className="form-textarea"
+                      placeholder="请输入资源简介、使用说明等公开内容"
+                      value={content}
+                      onChange={(e) => setContent(e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
                     <label className="form-label">隐藏内容</label>
                     <textarea
                       className="form-textarea"
@@ -300,16 +294,27 @@ export function PostHomeClient() {
               )}
 
               {postType === "BOUNTY" && (
-                <div className="form-group">
-                  <label className="form-label">悬赏金额（金币）</label>
-                  <input
-                    className="form-input"
-                    type="number"
-                    placeholder="请输入悬赏金额"
-                    value={bountyAmount}
-                    onChange={(e) => setBountyAmount(e.target.value)}
-                  />
-                </div>
+                <>
+                  <div className="form-group">
+                    <label className="form-label">悬赏金额（金币）</label>
+                    <input
+                      className="form-input"
+                      type="number"
+                      placeholder="请输入悬赏金额"
+                      value={bountyAmount}
+                      onChange={(e) => setBountyAmount(e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">截止时间</label>
+                    <input
+                      className="form-input"
+                      type="datetime-local"
+                      value={bountyExpireAt}
+                      onChange={(e) => setBountyExpireAt(e.target.value)}
+                    />
+                  </div>
+                </>
               )}
 
               {/* Submit Button */}
@@ -317,7 +322,7 @@ export function PostHomeClient() {
                 <button
                   className="btn btn-primary"
                   type="submit"
-                  disabled={!auth}
+                  disabled={!auth || createPostMutation.isPending}
                 >
                   <svg
                     className="icon-sm"
@@ -328,7 +333,7 @@ export function PostHomeClient() {
                   >
                     <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
                   </svg>
-                  提交发布
+                  {createPostMutation.isPending ? "提交中..." : "提交发布"}
                 </button>
                 <button
                   type="button"

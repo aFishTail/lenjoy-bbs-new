@@ -35,6 +35,12 @@ class PostServiceTest {
     @Mock
     private UserAccountMapper userAccountMapper;
 
+    @Mock
+    private ResourceTradeService resourceTradeService;
+
+    @Mock
+    private BountyService bountyService;
+
     @InjectMocks
     private PostService postService;
 

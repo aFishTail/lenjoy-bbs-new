@@ -1,11 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import { AuthData, AuthUser } from "@/components/auth/types";
 
-const AUTH_STORAGE_KEY = "lenjoy.auth";
+import {
+  useClientAuth,
+  useUnreadCount,
+} from "@/components/layout/use-auth-unread";
+import type { AuthData } from "@/components/post/types";
+
+type AuthUser = AuthData["user"];
 
 function Avatar({ user, sizeClass }: { user: AuthUser; sizeClass?: string }) {
   const avatarUrl = user.avatarUrl?.trim();
@@ -28,42 +33,17 @@ function Avatar({ user, sizeClass }: { user: AuthUser; sizeClass?: string }) {
 
 export function UserMenu() {
   const router = useRouter();
-  const [user, setUser] = useState<AuthUser | null>(null);
   const [isOpen, setIsOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const { mounted, user, hasAuth, clearAuth } = useClientAuth();
+  const unreadCountQuery = useUnreadCount(mounted && hasAuth);
+  const unreadCount = unreadCountQuery.unreadCount;
 
   useEffect(() => {
-    setMounted(true);
-    // 从 localStorage 读取用户信息
-    const raw = localStorage.getItem(AUTH_STORAGE_KEY);
-    if (raw) {
-      try {
-        const authData = JSON.parse(raw) as AuthData;
-        setUser(authData.user);
-      } catch {
-        localStorage.removeItem(AUTH_STORAGE_KEY);
-      }
+    if (isOpen && user) {
+      void unreadCountQuery.refetch();
     }
-
-    // 监听 storage 变化（跨页面同步登录状态）
-    const handleStorageChange = () => {
-      const newRaw = localStorage.getItem(AUTH_STORAGE_KEY);
-      if (newRaw) {
-        try {
-          const authData = JSON.parse(newRaw) as AuthData;
-          setUser(authData.user);
-        } catch {
-          setUser(null);
-        }
-      } else {
-        setUser(null);
-      }
-    };
-
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
-  }, []);
+  }, [isOpen, unreadCountQuery, user]);
 
   // 点击外部关闭菜单
   useEffect(() => {
@@ -80,8 +60,7 @@ export function UserMenu() {
   }, [isOpen]);
 
   function handleLogout() {
-    localStorage.removeItem(AUTH_STORAGE_KEY);
-    setUser(null);
+    clearAuth();
     setIsOpen(false);
     router.replace("/");
   }
@@ -169,6 +148,103 @@ export function UserMenu() {
               <circle cx="12" cy="7" r="4" />
             </svg>
             个人中心
+          </Link>
+          <Link
+            href="/my/wallet"
+            className="user-menu-item"
+            onClick={() => setIsOpen(false)}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <rect x="2" y="6" width="20" height="12" rx="2" />
+              <path d="M16 12h.01" />
+            </svg>
+            我的钱包
+          </Link>
+          <Link
+            href="/my/ledger"
+            className="user-menu-item"
+            onClick={() => setIsOpen(false)}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M3 3v18h18" />
+              <path d="M7 13l3-3 3 2 4-5" />
+            </svg>
+            金币流水
+          </Link>
+          <Link
+            href="/my/purchases"
+            className="user-menu-item"
+            onClick={() => setIsOpen(false)}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M4 7h16" />
+              <path d="M7 3v4" />
+              <path d="M17 3v4" />
+              <rect x="3" y="5" width="18" height="16" rx="2" />
+              <path d="m9 13 2 2 4-4" />
+            </svg>
+            已购资源
+          </Link>
+          <Link
+            href="/my/sales"
+            className="user-menu-item"
+            onClick={() => setIsOpen(false)}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M3 3v18h18" />
+              <path d="m19 9-5 5-4-4-3 3" />
+            </svg>
+            销售记录
+          </Link>
+          <Link
+            href="/my/messages"
+            className="user-menu-item"
+            onClick={() => setIsOpen(false)}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+            消息中心
+            {unreadCount > 0 ? (
+              <span className="ml-auto rounded-full bg-cyan-100 px-2 py-0.5 text-xs text-cyan-700">
+                {unreadCount}
+              </span>
+            ) : null}
           </Link>
           <div className="user-menu-divider" />
           <button

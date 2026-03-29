@@ -8,6 +8,11 @@ const menus = [
   { href: "/admin", label: "总览" },
   { href: "/admin/posts", label: "帖子管理" },
   { href: "/admin/users", label: "用户管理" },
+  { href: "/admin/audit", label: "审计中心" },
+  { href: "/admin/coins", label: "金币管理" },
+  { href: "/admin/appeals", label: "资源申诉" },
+  { href: "/admin/bounties", label: "悬赏治理" },
+  { href: "/admin/reports", label: "举报管理" },
 ];
 
 export function AdminShell({ children }: PropsWithChildren) {

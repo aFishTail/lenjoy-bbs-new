@@ -3,12 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import {
-  authHeaders,
-  readApi,
-  readError,
-} from "@/components/post/client-helpers";
-import type { AdminUserSummary } from "@/components/post/types";
+import { readError } from "@/components/post/client-helpers";
+import { useAdminUsersQuery } from "@/components/admin/use-admin-queries";
+import { useUpdateAdminUserStatusMutation } from "@/components/admin/use-admin-mutations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -24,35 +21,16 @@ import {
 const statusOptions = ["", "ACTIVE", "MUTED", "BANNED"] as const;
 
 export function AdminUsersClient() {
-  const [users, setUsers] = useState<AdminUserSummary[]>([]);
-  const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("");
   const [keyword, setKeyword] = useState("");
   const [reasonById, setReasonById] = useState<Record<number, string>>({});
-
-  async function loadUsers() {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (status) {
-        params.set("status", status);
-      }
-      if (keyword.trim()) {
-        params.set("keyword", keyword.trim());
-      }
-
-      const response = await fetch(`/api/admin/users?${params.toString()}`, {
-        headers: authHeaders(),
-        cache: "no-store",
-      });
-      const payload = await readApi<AdminUserSummary[]>(response);
-      setUsers(payload.data);
-    } catch (error) {
-      toast.error(readError(error));
-    } finally {
-      setLoading(false);
-    }
-  }
+  const [appliedFilters, setAppliedFilters] = useState({
+    status: "",
+    keyword: "",
+  });
+  const [updatingUserId, setUpdatingUserId] = useState<number | null>(null);
+  const usersQuery = useAdminUsersQuery(appliedFilters);
+  const updateStatusMutation = useUpdateAdminUserStatusMutation(appliedFilters);
 
   async function updateStatus(
     userId: number,
@@ -65,19 +43,13 @@ export function AdminUsersClient() {
     }
 
     try {
-      const response = await fetch(`/api/admin/users/${userId}/status`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          ...authHeaders(),
-        },
-        body: JSON.stringify({ status: nextStatus, reason }),
-      });
-      await readApi(response);
+      setUpdatingUserId(userId);
+      await updateStatusMutation.mutateAsync({ userId, nextStatus, reason });
       toast.success(`用户 ${userId} 状态已更新为 ${nextStatus}`);
-      await loadUsers();
     } catch (error) {
       toast.error(readError(error));
+    } finally {
+      setUpdatingUserId(null);
     }
   }
 
@@ -91,8 +63,13 @@ export function AdminUsersClient() {
   );
 
   useEffect(() => {
-    void loadUsers();
-  }, []);
+    if (usersQuery.error) {
+      toast.error(readError(usersQuery.error));
+    }
+  }, [usersQuery.error]);
+
+  const users = usersQuery.data ?? [];
+  const loading = usersQuery.isLoading || usersQuery.isFetching;
 
   return (
     <main className="admin-main">
@@ -118,7 +95,9 @@ export function AdminUsersClient() {
           <Button
             className="admin-btn"
             type="button"
-            onClick={() => void loadUsers()}
+            onClick={() =>
+              setAppliedFilters({ status, keyword: keyword.trim() })
+            }
           >
             查询用户
           </Button>
@@ -188,6 +167,7 @@ export function AdminUsersClient() {
                           className="admin-btn is-soft"
                           type="button"
                           onClick={() => void updateStatus(user.id, "ACTIVE")}
+                          disabled={updatingUserId === user.id}
                         >
                           恢复
                         </Button>
@@ -195,6 +175,7 @@ export function AdminUsersClient() {
                           className="admin-btn is-warn"
                           type="button"
                           onClick={() => void updateStatus(user.id, "MUTED")}
+                          disabled={updatingUserId === user.id}
                         >
                           禁言
                         </Button>
@@ -202,6 +183,7 @@ export function AdminUsersClient() {
                           className="admin-btn is-danger"
                           type="button"
                           onClick={() => void updateStatus(user.id, "BANNED")}
+                          disabled={updatingUserId === user.id}
                         >
                           封禁
                         </Button>

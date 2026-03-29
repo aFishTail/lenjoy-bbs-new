@@ -2,6 +2,7 @@ package com.lenjoy.bbs.domain.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import java.time.LocalDateTime;
 import lombok.Data;
 
 @Data
@@ -20,4 +21,6 @@ public class CreatePostRequest {
     private Integer price;
 
     private Integer bountyAmount;
+
+    private LocalDateTime bountyExpireAt;
 }

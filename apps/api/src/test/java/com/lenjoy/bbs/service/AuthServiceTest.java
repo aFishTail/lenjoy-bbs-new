@@ -47,6 +47,8 @@ class AuthServiceTest {
     private JwtTokenProvider jwtTokenProvider;
     @Mock
     private CaptchaService captchaService;
+    @Mock
+    private WalletService walletService;
 
     @InjectMocks
     private AuthService authService;
@@ -84,6 +86,7 @@ class AuthServiceTest {
         assertEquals(1L, response.getUser().getId());
         assertEquals("alice", response.getUser().getUsername());
         verify(userRoleMapper).insert(any(UserRoleEntity.class));
+        verify(walletService).grantRegisterBonus(1L);
     }
 
     @Test

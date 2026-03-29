@@ -3,22 +3,10 @@
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 
-import {
-  authHeaders,
-  getStoredAuth,
-  readApi,
-  readError,
-} from "@/components/post/client-helpers";
+import { getStoredAuth, readError } from "@/components/post/client-helpers";
+import { useCreatePostMutation } from "@/components/post/use-post-mutations";
+import type { CreatePostInput } from "@/components/post/use-post-mutations";
 import { RichTextEditor } from "@/components/editor/rich-text-editor";
-
-type CreatePostRequest = {
-  postType: "NORMAL" | "RESOURCE" | "BOUNTY";
-  title: string;
-  content: string;
-  hiddenContent?: string;
-  price?: number;
-  bountyAmount?: number;
-};
 
 const postTypeOptions = [
   {
@@ -53,7 +41,6 @@ function isRichTextEmpty(value: string) {
 export function CreatePostClient() {
   const router = useRouter();
   const [auth, setAuth] = useState<ReturnType<typeof getStoredAuth>>(null);
-  const [submitting, setSubmitting] = useState(false);
   const [errorText, setErrorText] = useState("");
   const [successText, setSuccessText] = useState("");
 
@@ -65,6 +52,11 @@ export function CreatePostClient() {
   const [hiddenContent, setHiddenContent] = useState("");
   const [price, setPrice] = useState("");
   const [bountyAmount, setBountyAmount] = useState("");
+  const [bountyExpireAt, setBountyExpireAt] = useState("");
+
+  const createPostMutation = useCreatePostMutation();
+
+  const submitting = createPostMutation.isPending;
 
   useEffect(() => {
     const storedAuth = getStoredAuth();
@@ -103,12 +95,16 @@ export function CreatePostClient() {
       return;
     }
 
-    setSubmitting(true);
+    if (postType === "BOUNTY" && !bountyExpireAt) {
+      setErrorText("请设置悬赏截止时间");
+      return;
+    }
+
     setErrorText("");
     setSuccessText("");
 
     try {
-      const request: CreatePostRequest = {
+      const request: CreatePostInput = {
         postType,
         title: title.trim(),
         content,
@@ -116,27 +112,20 @@ export function CreatePostClient() {
           ? undefined
           : hiddenContent,
         price: price ? parseFloat(price) : undefined,
-        bountyAmount: bountyAmount ? parseFloat(bountyAmount) : undefined,
+        bountyAmount: bountyAmount ? parseInt(bountyAmount, 10) : undefined,
+        bountyExpireAt: bountyExpireAt || undefined,
       };
+      if (postType === "RESOURCE") {
+        request.price = price ? parseInt(price, 10) : undefined;
+      }
 
-      const response = await fetch("/api/posts", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...authHeaders(),
-        },
-        body: JSON.stringify(request),
-      });
-
-      const payload = await readApi<{ id: number }>(response);
+      const payload = await createPostMutation.mutateAsync(request);
       setSuccessText("发布成功！");
       setTimeout(() => {
-        router.push(`/posts/${payload.data.id}`);
+        router.push(`/posts/${payload.id}`);
       }, 1000);
     } catch (error) {
       setErrorText(readError(error));
-    } finally {
-      setSubmitting(false);
     }
   }
 
@@ -283,20 +272,20 @@ export function CreatePostClient() {
                   className="block text-sm font-medium text-[var(--text-sub)] mb-2"
                   htmlFor="price"
                 >
-                  价格 (元){" "}
+                  售价 (金币){" "}
                   <span className="text-[var(--color-danger)]">*</span>
                 </label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
-                    ¥
+                    币
                   </span>
                   <input
                     id="price"
                     className="w-full pl-8 pr-4 py-3 rounded-xl border border-[var(--border-medium)] bg-white/50 text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent transition-all"
                     type="number"
-                    step="0.01"
-                    min="0.01"
-                    placeholder="0.00"
+                    step="1"
+                    min="1"
+                    placeholder="1"
                     value={price}
                     onChange={(e) => setPrice(e.target.value)}
                   />
@@ -325,24 +314,42 @@ export function CreatePostClient() {
                   className="block text-sm font-medium text-[var(--text-sub)] mb-2"
                   htmlFor="bountyAmount"
                 >
-                  悬赏金额 (元){" "}
+                  悬赏金额 (金币){" "}
                   <span className="text-[var(--color-danger)]">*</span>
                 </label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
-                    ¥
+                    币
                   </span>
                   <input
                     id="bountyAmount"
                     className="w-full pl-8 pr-4 py-3 rounded-xl border border-[var(--border-medium)] bg-white/50 text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent transition-all"
                     type="number"
-                    step="0.01"
-                    min="0.01"
-                    placeholder="0.00"
+                    step="1"
+                    min="1"
+                    placeholder="100"
                     value={bountyAmount}
                     onChange={(e) => setBountyAmount(e.target.value)}
                   />
                 </div>
+              </div>
+              <div className="mt-4">
+                <label
+                  className="block text-sm font-medium text-[var(--text-sub)] mb-2"
+                  htmlFor="bountyExpireAt"
+                >
+                  截止时间 <span className="text-[var(--color-danger)]">*</span>
+                </label>
+                <input
+                  id="bountyExpireAt"
+                  className="w-full px-4 py-3 rounded-xl border border-[var(--border-medium)] bg-white/50 text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent transition-all"
+                  type="datetime-local"
+                  value={bountyExpireAt}
+                  onChange={(e) => setBountyExpireAt(e.target.value)}
+                />
+                <p className="mt-2 text-xs text-[var(--text-muted)]">
+                  发布成功后系统会立即冻结对应金币，到期未采纳会自动退回。
+                </p>
               </div>
             </div>
           )}

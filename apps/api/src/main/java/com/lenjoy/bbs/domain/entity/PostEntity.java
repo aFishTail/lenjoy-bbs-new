@@ -32,6 +32,18 @@ public class PostEntity {
     @TableField("bounty_amount")
     private Integer bountyAmount;
 
+    @TableField("bounty_status")
+    private String bountyStatus;
+
+    @TableField("bounty_expire_at")
+    private LocalDateTime bountyExpireAt;
+
+    @TableField("bounty_settled_at")
+    private LocalDateTime bountySettledAt;
+
+    @TableField("accepted_comment_id")
+    private Long acceptedCommentId;
+
     private String status;
 
     @TableField("offline_reason")

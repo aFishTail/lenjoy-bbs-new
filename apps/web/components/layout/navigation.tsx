@@ -2,10 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { MessageNotification } from "@/components/layout/message-notification";
 import { UserMenu } from "@/components/layout/user-menu";
 
 export function Navigation() {
   const pathname = usePathname();
+
+  const isHome = pathname === "/";
+  const isDiscussion =
+    pathname === "/discussions" || pathname.startsWith("/posts");
+  const isResource = pathname === "/resources";
+  const isBounty = pathname === "/bounties";
 
   if (pathname === "/admin" || pathname.startsWith("/admin/")) {
     return null;
@@ -30,17 +37,30 @@ export function Navigation() {
           Lenjoy
         </Link>
         <div className="nav-links">
-          <Link href="/" className="nav-link active">
+          <Link href="/" className={`nav-link ${isHome ? "active" : ""}`}>
             首页
           </Link>
-          <Link href="/posts" className="nav-link">
-            帖子
+          <Link
+            href="/discussions"
+            className={`nav-link ${isDiscussion ? "active" : ""}`}
+          >
+            讨论
           </Link>
-          <Link href="/my" className="nav-link">
-            我的
+          <Link
+            href="/resources"
+            className={`nav-link ${isResource ? "active" : ""}`}
+          >
+            资源
+          </Link>
+          <Link
+            href="/bounties"
+            className={`nav-link ${isBounty ? "active" : ""}`}
+          >
+            悬赏
           </Link>
         </div>
         <div className="nav-actions">
+          <MessageNotification />
           <UserMenu />
           <Link href="/posts/new" className="btn btn-primary btn-sm">
             <svg

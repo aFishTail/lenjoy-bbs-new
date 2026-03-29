@@ -52,6 +52,9 @@ auth:
     ttl-seconds: ${CAPTCHA_TTL_SECONDS:120}
     length: ${CAPTCHA_LENGTH:4}
 
+wallet:
+  initial-register-coins: ${INITIAL_REGISTER_COINS:100}
+
 storage:
   minio:
     endpoint: ${MINIO_ENDPOINT:http://localhost:9000}

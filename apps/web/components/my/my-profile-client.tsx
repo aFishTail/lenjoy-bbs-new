@@ -1,17 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { uploadImage } from "@/lib/upload-client";
+import { getStoredAuth, readError } from "@/components/post/client-helpers";
 import {
-  authHeaders,
-  getStoredAuth,
-  readApi,
-  readError,
-} from "@/components/post/client-helpers";
+  useMyProfileQuery,
+  useMyWalletQuery,
+  useSaveProfileMutation,
+} from "@/components/my/use-my-queries";
 import type { AuthData, MyProfile } from "@/components/post/types";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,18 +31,20 @@ function StatCard({ label, value }: { label: string; value: number }) {
 }
 
 export function MyProfileClient() {
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [profile, setProfile] = useState<MyProfile | null>(null);
   const [username, setUsername] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [bio, setBio] = useState("");
+  const profileQuery = useMyProfileQuery();
+  const walletQuery = useMyWalletQuery();
+  const saveProfileMutation = useSaveProfileMutation();
 
-  const avatarPreview = useMemo(() => {
-    const trimmed = avatarUrl.trim();
-    return trimmed || "";
-  }, [avatarUrl]);
+  const profile = profileQuery.data ?? null;
+  const wallet = walletQuery.data ?? null;
+  const loading = profileQuery.isLoading || walletQuery.isLoading;
+  const saving = saveProfileMutation.isPending;
+
+  const avatarPreview = avatarUrl.trim();
 
   function syncAuthUser(nextProfile: MyProfile) {
     const current = getStoredAuth();
@@ -63,28 +66,21 @@ export function MyProfileClient() {
     );
   }
 
-  async function loadProfile() {
-    setLoading(true);
-    try {
-      const response = await fetch("/api/users/me", {
-        headers: authHeaders(),
-        cache: "no-store",
-      });
-      const payload = await readApi<MyProfile>(response);
-      setProfile(payload.data);
-      setUsername(payload.data.username || "");
-      setAvatarUrl(payload.data.avatarUrl || "");
-      setBio(payload.data.bio || "");
-    } catch (error) {
-      toast.error(readError(error));
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (!profileQuery.data) {
+      return;
     }
-  }
+    setUsername(profileQuery.data.username || "");
+    setAvatarUrl(profileQuery.data.avatarUrl || "");
+    setBio(profileQuery.data.bio || "");
+  }, [profileQuery.data]);
 
   useEffect(() => {
-    void loadProfile();
-  }, []);
+    const error = profileQuery.error ?? walletQuery.error;
+    if (error) {
+      toast.error(readError(error));
+    }
+  }, [profileQuery.error, walletQuery.error]);
 
   async function onUploadAvatar(file: File) {
     setUploading(true);
@@ -114,31 +110,19 @@ export function MyProfileClient() {
       return;
     }
 
-    setSaving(true);
     try {
-      const response = await fetch("/api/users/me", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          ...authHeaders(),
-        },
-        body: JSON.stringify({
-          username: normalizedName,
-          avatarUrl: avatarUrl.trim(),
-          bio: bio.trim(),
-        }),
+      const nextProfile = await saveProfileMutation.mutateAsync({
+        username: normalizedName,
+        avatarUrl: avatarUrl.trim(),
+        bio: bio.trim(),
       });
-      const payload = await readApi<MyProfile>(response);
-      setProfile(payload.data);
-      setUsername(payload.data.username || "");
-      setAvatarUrl(payload.data.avatarUrl || "");
-      setBio(payload.data.bio || "");
-      syncAuthUser(payload.data);
+      syncAuthUser(nextProfile);
       toast.success("个人资料已保存");
+      setUsername(nextProfile.username || "");
+      setAvatarUrl(nextProfile.avatarUrl || "");
+      setBio(nextProfile.bio || "");
     } catch (error) {
       toast.error(readError(error));
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -170,6 +154,94 @@ export function MyProfileClient() {
         <StatCard label="发帖数" value={profile?.postCount ?? 0} />
         <StatCard label="关注数" value={profile?.followingCount ?? 0} />
         <StatCard label="粉丝数" value={profile?.followerCount ?? 0} />
+      </section>
+
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_0.9fr]">
+        <Card className="border-amber-200 bg-white/95">
+          <CardHeader>
+            <CardTitle>金币资产</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="rounded-xl bg-amber-50 px-3 py-4">
+                <p className="text-xs text-amber-700">可用</p>
+                <p className="mt-1 text-2xl font-semibold text-slate-900">
+                  {wallet?.availableCoins ?? 0}
+                </p>
+              </div>
+              <div className="rounded-xl bg-slate-50 px-3 py-4">
+                <p className="text-xs text-slate-500">冻结</p>
+                <p className="mt-1 text-2xl font-semibold text-slate-900">
+                  {wallet?.frozenCoins ?? 0}
+                </p>
+              </div>
+              <div className="rounded-xl bg-emerald-50 px-3 py-4">
+                <p className="text-xs text-emerald-700">总计</p>
+                <p className="mt-1 text-2xl font-semibold text-slate-900">
+                  {wallet?.totalCoins ?? 0}
+                </p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-500">
+              新用户默认获得 100 金币。后续资源购买和悬赏结算也会沉淀到这里。
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Link href="/my/wallet" className={buttonVariants()}>
+                钱包详情
+              </Link>
+              <Link
+                href="/my/ledger"
+                className={buttonVariants({ variant: "outline" })}
+              >
+                查看流水
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-cyan-200 bg-white/95">
+          <CardHeader>
+            <CardTitle>快捷入口</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 text-sm text-slate-600">
+            <Link
+              href="/my/posts"
+              className="rounded-xl border border-slate-200 px-4 py-3 transition hover:border-emerald-300 hover:bg-emerald-50"
+            >
+              管理我的帖子
+            </Link>
+            <Link
+              href="/my/wallet"
+              className="rounded-xl border border-slate-200 px-4 py-3 transition hover:border-amber-300 hover:bg-amber-50"
+            >
+              查看钱包概览
+            </Link>
+            <Link
+              href="/my/ledger"
+              className="rounded-xl border border-slate-200 px-4 py-3 transition hover:border-cyan-300 hover:bg-cyan-50"
+            >
+              查看金币流水
+            </Link>
+            <Link
+              href="/my/purchases"
+              className="rounded-xl border border-slate-200 px-4 py-3 transition hover:border-amber-300 hover:bg-amber-50"
+            >
+              查看已购资源
+            </Link>
+            <Link
+              href="/my/sales"
+              className="rounded-xl border border-slate-200 px-4 py-3 transition hover:border-emerald-300 hover:bg-emerald-50"
+            >
+              查看销售记录
+            </Link>
+            <Link
+              href="/my/messages"
+              className="rounded-xl border border-slate-200 px-4 py-3 transition hover:border-cyan-300 hover:bg-cyan-50"
+            >
+              进入消息中心
+            </Link>
+          </CardContent>
+        </Card>
       </section>
 
       <Card>

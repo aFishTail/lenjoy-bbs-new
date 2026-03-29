@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.lenjoy.bbs.domain.dto.CreatePostRequest;
 import com.lenjoy.bbs.domain.dto.OfflinePostRequest;
 import com.lenjoy.bbs.domain.dto.PostDetailResponse;
+import com.lenjoy.bbs.domain.entity.ResourceAppealEntity;
+import com.lenjoy.bbs.domain.entity.ResourcePurchaseEntity;
 import com.lenjoy.bbs.domain.dto.PostSummaryResponse;
 import com.lenjoy.bbs.domain.dto.UpdatePostRequest;
 import com.lenjoy.bbs.domain.entity.PostEntity;
@@ -36,6 +38,9 @@ public class PostService {
 
     private final PostMapper postMapper;
     private final UserAccountMapper userAccountMapper;
+    private final ResourceTradeService resourceTradeService;
+    private final BountyService bountyService;
+    private final InteractionService interactionService;
 
     @Transactional
     public PostDetailResponse create(Long userId, CreatePostRequest request) {
@@ -52,11 +57,18 @@ public class PostService {
         entity.setHiddenContent(blankToNull(request.getHiddenContent()));
         entity.setPrice(request.getPrice());
         entity.setBountyAmount(request.getBountyAmount());
+        entity.setBountyStatus(TYPE_BOUNTY.equals(postType) ? BountyService.BOUNTY_STATUS_ACTIVE : null);
+        entity.setBountyExpireAt(request.getBountyExpireAt());
+        entity.setBountySettledAt(null);
+        entity.setAcceptedCommentId(null);
         entity.setStatus(STATUS_PUBLISHED);
         entity.setDeleted(false);
         entity.setCreatedAt(LocalDateTime.now());
         entity.setUpdatedAt(LocalDateTime.now());
         postMapper.insert(entity);
+
+        bountyService.freezeOnCreate(entity, userId);
+        postMapper.updateById(entity);
 
         return toDetail(entity, user.getUsername(), userId, false, false);
     }
@@ -120,11 +132,17 @@ public class PostService {
         ensureEditable(entity);
         validateUpdateByType(entity.getPostType(), request);
 
+        PostEntity nextState = new PostEntity();
+        nextState.setBountyAmount(request.getBountyAmount());
+        nextState.setBountyExpireAt(request.getBountyExpireAt());
+        bountyService.adjustFreezeOnUpdate(entity, nextState, userId);
+
         entity.setTitle(request.getTitle().trim());
         entity.setContent(blankToNull(request.getContent()));
         entity.setHiddenContent(blankToNull(request.getHiddenContent()));
         entity.setPrice(request.getPrice());
         entity.setBountyAmount(request.getBountyAmount());
+        entity.setBountyExpireAt(request.getBountyExpireAt());
         entity.setUpdatedAt(LocalDateTime.now());
         postMapper.updateById(entity);
 
@@ -142,6 +160,7 @@ public class PostService {
         if (STATUS_DELETED.equals(entity.getStatus()) || Boolean.TRUE.equals(entity.getDeleted())) {
             throw new ApiException("POST_DELETED", "帖子已删除", HttpStatus.BAD_REQUEST);
         }
+        bountyService.settleOnCloseOrDelete(entity, userId, "关闭悬赏帖子退回赏金");
         entity.setStatus(STATUS_CLOSED);
         entity.setUpdatedAt(LocalDateTime.now());
         postMapper.updateById(entity);
@@ -154,6 +173,7 @@ public class PostService {
         if (STATUS_DELETED.equals(entity.getStatus()) || Boolean.TRUE.equals(entity.getDeleted())) {
             return;
         }
+        bountyService.settleOnCloseOrDelete(entity, userId, "删除悬赏帖子退回赏金");
         entity.setStatus(STATUS_DELETED);
         entity.setDeleted(true);
         entity.setUpdatedAt(LocalDateTime.now());
@@ -166,6 +186,7 @@ public class PostService {
         if (STATUS_DELETED.equals(entity.getStatus()) || Boolean.TRUE.equals(entity.getDeleted())) {
             throw new ApiException("POST_DELETED", "帖子已删除", HttpStatus.BAD_REQUEST);
         }
+        bountyService.settleOnCloseOrDelete(entity, adminUserId, request.getReason().trim());
         entity.setStatus(STATUS_OFFLINE);
         entity.setOfflineReason(request.getReason().trim());
         entity.setOfflinedAt(LocalDateTime.now());
@@ -209,6 +230,11 @@ public class PostService {
             resp.setStatus(post.getStatus());
             resp.setAuthorId(post.getAuthorId());
             resp.setAuthorUsername(usernameMap.get(post.getAuthorId()));
+            resp.setLikeCount(safeCountPostLikes(post.getId()));
+            resp.setCollectCount(safeCountPostFavorites(post.getId()));
+            resp.setCommentCount(safeCountPostComments(post.getId()));
+            resp.setLiked(false);
+            resp.setCollected(false);
             resp.setCreatedAt(post.getCreatedAt());
             resp.setUpdatedAt(post.getUpdatedAt());
             return resp;
@@ -229,15 +255,63 @@ public class PostService {
         resp.setHiddenContent(blankToNull(entity.getHiddenContent()));
         resp.setPrice(entity.getPrice());
         resp.setBountyAmount(entity.getBountyAmount());
+        resp.setBountyStatus(entity.getBountyStatus());
+        resp.setBountyExpireAt(entity.getBountyExpireAt());
+        resp.setBountySettledAt(entity.getBountySettledAt());
+        resp.setAcceptedCommentId(entity.getAcceptedCommentId());
         resp.setOfflineReason(entity.getOfflineReason());
         resp.setOfflinedAt(entity.getOfflinedAt());
         resp.setCreatedAt(entity.getCreatedAt());
         resp.setUpdatedAt(entity.getUpdatedAt());
 
-        boolean canSeeHidden = TYPE_RESOURCE.equals(entity.getPostType()) && (isAuthor || isAdmin
-                || (requesterUserId != null && requesterUserId.equals(entity.getAuthorId())));
+        ResourcePurchaseEntity purchase = TYPE_RESOURCE.equals(entity.getPostType()) && requesterUserId != null
+                ? resourceTradeService.findPurchase(entity.getId(), requesterUserId)
+                : null;
+        ResourceAppealEntity appeal = purchase == null ? null
+                : resourceTradeService.findAppealByPurchaseId(purchase.getId());
+        boolean purchased = purchase != null;
+        boolean canSeeHidden = TYPE_RESOURCE.equals(entity.getPostType())
+                && (isAuthor || isAdmin
+                        || resourceTradeService.canAccessHiddenContent(entity.getId(), requesterUserId));
+        resp.setResourceUnlocked(canSeeHidden);
+        resp.setPurchased(purchased);
+        resp.setCanPurchase(TYPE_RESOURCE.equals(entity.getPostType())
+                && !isAuthor
+                && !isAdmin
+                && requesterUserId != null
+                && STATUS_PUBLISHED.equals(entity.getStatus())
+                && !purchased);
+        resp.setPurchaseId(purchase == null ? null : purchase.getId());
+        resp.setPurchaseStatus(purchase == null ? null : purchase.getStatus());
+        resp.setRefundedAmount(purchase == null ? 0 : purchase.getRefundedAmount());
+        resp.setAppealStatus(appeal == null ? null : appeal.getStatus());
         resp.setHiddenContent(canSeeHidden ? entity.getHiddenContent() : null);
+        resp.setLikeCount(safeCountPostLikes(entity.getId()));
+        resp.setCollectCount(safeCountPostFavorites(entity.getId()));
+        resp.setCommentCount(safeCountPostComments(entity.getId()));
+        resp.setLiked(safeHasPostLiked(entity.getId(), requesterUserId));
+        resp.setCollected(safeHasPostFavorited(entity.getId(), requesterUserId));
         return resp;
+    }
+
+    private long safeCountPostLikes(Long postId) {
+        return interactionService == null ? 0L : interactionService.countPostLikes(postId);
+    }
+
+    private long safeCountPostFavorites(Long postId) {
+        return interactionService == null ? 0L : interactionService.countPostFavorites(postId);
+    }
+
+    private long safeCountPostComments(Long postId) {
+        return interactionService == null ? 0L : interactionService.countPostComments(postId);
+    }
+
+    private boolean safeHasPostLiked(Long postId, Long requesterUserId) {
+        return interactionService != null && interactionService.hasPostLiked(postId, requesterUserId);
+    }
+
+    private boolean safeHasPostFavorited(Long postId, Long requesterUserId) {
+        return interactionService != null && interactionService.hasPostFavorited(postId, requesterUserId);
     }
 
     private boolean canView(PostEntity entity, boolean isAuthor, boolean isAdmin) {
@@ -306,6 +380,9 @@ public class PostService {
             throw new ApiException("CONTENT_REQUIRED", "普通帖正文不能为空", HttpStatus.BAD_REQUEST);
         }
         if (TYPE_RESOURCE.equals(postType)) {
+            if (isBlank(request.getContent())) {
+                throw new ApiException("CONTENT_REQUIRED", "资源帖公开内容不能为空", HttpStatus.BAD_REQUEST);
+            }
             if (isBlank(request.getHiddenContent())) {
                 throw new ApiException("RESOURCE_CONTENT_REQUIRED", "资源帖隐藏内容不能为空", HttpStatus.BAD_REQUEST);
             }
@@ -319,6 +396,9 @@ public class PostService {
             }
             if (request.getBountyAmount() == null || request.getBountyAmount() <= 0) {
                 throw new ApiException("BOUNTY_INVALID", "悬赏金额必须大于 0", HttpStatus.BAD_REQUEST);
+            }
+            if (request.getBountyExpireAt() == null || !request.getBountyExpireAt().isAfter(LocalDateTime.now())) {
+                throw new ApiException("BOUNTY_EXPIRE_INVALID", "悬赏有效期必须晚于当前时间", HttpStatus.BAD_REQUEST);
             }
         }
     }
@@ -328,6 +408,9 @@ public class PostService {
             throw new ApiException("CONTENT_REQUIRED", "普通帖正文不能为空", HttpStatus.BAD_REQUEST);
         }
         if (TYPE_RESOURCE.equals(postType)) {
+            if (isBlank(request.getContent())) {
+                throw new ApiException("CONTENT_REQUIRED", "资源帖公开内容不能为空", HttpStatus.BAD_REQUEST);
+            }
             if (isBlank(request.getHiddenContent())) {
                 throw new ApiException("RESOURCE_CONTENT_REQUIRED", "资源帖隐藏内容不能为空", HttpStatus.BAD_REQUEST);
             }
@@ -341,6 +424,9 @@ public class PostService {
             }
             if (request.getBountyAmount() == null || request.getBountyAmount() <= 0) {
                 throw new ApiException("BOUNTY_INVALID", "悬赏金额必须大于 0", HttpStatus.BAD_REQUEST);
+            }
+            if (request.getBountyExpireAt() == null || !request.getBountyExpireAt().isAfter(LocalDateTime.now())) {
+                throw new ApiException("BOUNTY_EXPIRE_INVALID", "悬赏有效期必须晚于当前时间", HttpStatus.BAD_REQUEST);
             }
         }
     }
