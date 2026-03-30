@@ -37,13 +37,13 @@ export function UserMenu() {
   const menuRef = useRef<HTMLDivElement>(null);
   const { user, hasAuth, clearAuth } = useAuth();
   const unreadCountQuery = useUnreadCount(hasAuth);
-  const unreadCount = unreadCountQuery.unreadCount;
+  const { unreadCount, refetch: refetchUnreadCount } = unreadCountQuery;
 
   useEffect(() => {
     if (isOpen && user) {
-      void unreadCountQuery.refetch();
+      void refetchUnreadCount();
     }
-  }, [isOpen, unreadCountQuery, user]);
+  }, [isOpen, refetchUnreadCount, user]);
 
   // 点击外部关闭菜单
   useEffect(() => {

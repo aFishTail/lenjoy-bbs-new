@@ -11,6 +11,7 @@ type AuthContextType = {
   authData: AuthData | null;
   user: AuthData["user"] | null;
   hasAuth: boolean;
+  authReady: boolean;
   clearAuth: () => void;
   setAuth: (data: AuthData) => void;
 };
@@ -26,12 +27,13 @@ export function AuthProvider({
 }) {
   const queryClient = useQueryClient();
   const [authData, setAuthData] = useState<AuthData | null>(initialAuth);
+  const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
-    // Only fetch from client if it wasn't provided by SSR
-    if (initialAuth === undefined) {
-      setAuthData(getStoredAuth());
-    }
+    // Always sync once from the client cookie so CSR navigation sees the
+    // current auth state even when SSR could not provide a session.
+    setAuthData(getStoredAuth());
+    setAuthReady(true);
 
     const channel = new BroadcastChannel("lenjoy-auth-sync");
     
@@ -76,6 +78,7 @@ export function AuthProvider({
     authData,
     user: authData?.user ?? null,
     hasAuth: !!authData?.token,
+    authReady,
     clearAuth,
     setAuth: handleSetAuth,
   };

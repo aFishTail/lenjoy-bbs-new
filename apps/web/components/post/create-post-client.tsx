@@ -41,7 +41,7 @@ function isRichTextEmpty(value: string) {
 
 export function CreatePostClient() {
   const router = useRouter();
-  const { authData: auth, hasAuth } = useAuth();
+  const { authData: auth, hasAuth, authReady } = useAuth();
   const [errorText, setErrorText] = useState("");
   const [successText, setSuccessText] = useState("");
 
@@ -60,17 +60,10 @@ export function CreatePostClient() {
   const submitting = createPostMutation.isPending;
 
   useEffect(() => {
-    // If auth is null upon mount, auth might not be loaded yet, OR it's truly unauthenticated.
-    // getStoredAuth() can be checked synchronously for immediate redirection.
-    // However, since we rely on Context, auth starts as null, then populates.
-    // But if auth is explicitly verified as missing (e.g. from local storage), redirect.
-    if (typeof window !== "undefined") {
-      const storedAuth = localStorage.getItem("lenjoy.auth");
-      if (!storedAuth) {
-        router.push("/auth");
-      }
+    if (authReady && !hasAuth) {
+      router.replace("/auth");
     }
-  }, [router]);
+  }, [authReady, hasAuth, router]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -132,6 +125,16 @@ export function CreatePostClient() {
     } catch (error) {
       setErrorText(readError(error));
     }
+  }
+
+  if (!auth && (!authReady || hasAuth)) {
+    return (
+      <main className="page">
+        <div className="text-center py-12 text-[var(--text-sub)]">
+          正在检查登录状态...
+        </div>
+      </main>
+    );
   }
 
   if (!auth) {

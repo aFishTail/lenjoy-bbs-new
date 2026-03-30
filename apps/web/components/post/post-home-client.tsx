@@ -24,7 +24,7 @@ type PostHomeClientProps = {
 export function PostHomeClient({ initialPosts }: PostHomeClientProps = {}) {
   const [errorText, setErrorText] = useState("");
   const [successText, setSuccessText] = useState("");
-  const { authData: auth } = useAuth();
+  const { authData: auth, hasAuth } = useAuth();
   const authReady = true; // Kept for compatibility if used
 
   const [postType, setPostType] = useState<PostType>("NORMAL");
@@ -97,9 +97,9 @@ export function PostHomeClient({ initialPosts }: PostHomeClientProps = {}) {
             发现精彩内容，分享知识见解。这里有讨论区、资源贴和悬赏问答，满足你的所有需求。
           </p>
           <div className="flex gap-3 mt-6">
-            <button
+            <Link
+              href={hasAuth ? "/posts/new" : "/auth"}
               className="btn btn-cta"
-              onClick={() => setShowCreateForm(true)}
               style={{ background: "white", color: "#7C3AED" }}
             >
               <svg
@@ -111,10 +111,10 @@ export function PostHomeClient({ initialPosts }: PostHomeClientProps = {}) {
               >
                 <path d="M12 5v14M5 12h14" />
               </svg>
-              发布帖子
-            </button>
+              {hasAuth ? "发布帖子" : "登录后发帖"}
+            </Link>
             <Link
-              href="/auth"
+              href={hasAuth ? "/my" : "/auth"}
               className="btn"
               style={{
                 background: "rgba(255,255,255,0.2)",
@@ -122,7 +122,7 @@ export function PostHomeClient({ initialPosts }: PostHomeClientProps = {}) {
                 border: "1px solid rgba(255,255,255,0.3)",
               }}
             >
-              登录 / 注册
+              {hasAuth ? "个人中心" : "登录 / 注册"}
             </Link>
           </div>
         </div>

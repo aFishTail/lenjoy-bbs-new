@@ -4,9 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MessageNotification } from "@/components/layout/message-notification";
 import { UserMenu } from "@/components/layout/user-menu";
+import { useAuth } from "@/components/providers/auth-provider";
 
 export function Navigation() {
   const pathname = usePathname();
+  const { hasAuth } = useAuth();
 
   const isHome = pathname === "/";
   const isDiscussion =
@@ -62,7 +64,7 @@ export function Navigation() {
         <div className="nav-actions">
           <MessageNotification />
           <UserMenu />
-          <Link href="/posts/new" className="btn btn-primary btn-sm">
+          <Link href={hasAuth ? "/posts/new" : "/auth"} className="btn btn-primary btn-sm">
             <svg
               className="icon-sm"
               viewBox="0 0 24 24"
