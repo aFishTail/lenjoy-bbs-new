@@ -335,8 +335,8 @@ export function useCreatePostMutation() {
         body: JSON.stringify(payload),
       }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.posts });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.myPosts });
+      await queryClient.invalidateQueries({ queryKey: ["posts"] });
+      await queryClient.invalidateQueries({ queryKey: ["posts", "mine"] });
     },
   });
 }

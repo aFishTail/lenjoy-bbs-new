@@ -1,8 +1,10 @@
 package com.lenjoy.bbs.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.lenjoy.bbs.domain.dto.CreatePostRequest;
 import com.lenjoy.bbs.domain.dto.OfflinePostRequest;
+import com.lenjoy.bbs.domain.dto.PageResponse;
 import com.lenjoy.bbs.domain.dto.PostDetailResponse;
 import com.lenjoy.bbs.domain.entity.ResourceAppealEntity;
 import com.lenjoy.bbs.domain.entity.ResourcePurchaseEntity;
@@ -26,6 +28,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class PostService {
+
+    private static final int DEFAULT_PAGE = 1;
+    private static final int DEFAULT_PAGE_SIZE = 20;
+    private static final int MAX_PAGE_SIZE = 100;
 
     private static final String TYPE_NORMAL = "NORMAL";
     private static final String TYPE_RESOURCE = "RESOURCE";
@@ -73,23 +79,18 @@ public class PostService {
         return toDetail(entity, user.getUsername(), userId, false, false);
     }
 
-    public List<PostSummaryResponse> listPublic(String postType) {
-        LambdaQueryWrapper<PostEntity> query = new LambdaQueryWrapper<PostEntity>()
-                .eq(PostEntity::getDeleted, false)
-                .in(PostEntity::getStatus, List.of(STATUS_PUBLISHED, STATUS_CLOSED))
-                .orderByDesc(PostEntity::getCreatedAt);
-        if (postType != null && !postType.isBlank()) {
-            query.eq(PostEntity::getPostType, normalizeType(postType));
-        }
-        List<PostEntity> posts = postMapper.selectList(query);
-        return fillAuthorAndMap(posts);
+    public PageResponse<PostSummaryResponse> listPublic(String postType, Integer page, Integer pageSize) {
+        Page<PostEntity> result = postMapper.selectPage(
+                new Page<>(normalizePage(page), normalizePageSize(pageSize)),
+                buildPublicListQuery(postType));
+        return toPageResponse(result);
     }
 
-    public List<PostSummaryResponse> listMine(Long userId) {
-        List<PostEntity> posts = postMapper.selectList(new LambdaQueryWrapper<PostEntity>()
-                .eq(PostEntity::getAuthorId, userId)
-                .orderByDesc(PostEntity::getCreatedAt));
-        return fillAuthorAndMap(posts);
+    public PageResponse<PostSummaryResponse> listMine(Long userId, Integer page, Integer pageSize) {
+        Page<PostEntity> result = postMapper.selectPage(
+                new Page<>(normalizePage(page), normalizePageSize(pageSize)),
+                buildMineListQuery(userId));
+        return toPageResponse(result);
     }
 
     public List<PostSummaryResponse> listAdmin(String status, String postType, String authorKeyword) {
@@ -239,6 +240,18 @@ public class PostService {
             resp.setUpdatedAt(post.getUpdatedAt());
             return resp;
         }).toList();
+    }
+
+    private PageResponse<PostSummaryResponse> toPageResponse(Page<PostEntity> page) {
+        PageResponse<PostSummaryResponse> response = new PageResponse<>();
+        response.setItems(fillAuthorAndMap(page.getRecords()));
+        response.setPage(page.getCurrent());
+        response.setPageSize(page.getSize());
+        response.setTotal(page.getTotal());
+        response.setTotalPages(page.getPages());
+        response.setHasNext(page.getCurrent() < page.getPages());
+        response.setHasPrevious(page.getCurrent() > 1);
+        return response;
     }
 
     private PostDetailResponse toDetail(PostEntity entity, String authorUsername, Long requesterUserId,
@@ -441,5 +454,33 @@ public class PostService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private long normalizePage(Integer page) {
+        return page == null || page < 1 ? DEFAULT_PAGE : page;
+    }
+
+    private long normalizePageSize(Integer pageSize) {
+        if (pageSize == null || pageSize < 1) {
+            return DEFAULT_PAGE_SIZE;
+        }
+        return Math.min(pageSize, MAX_PAGE_SIZE);
+    }
+
+    private LambdaQueryWrapper<PostEntity> buildPublicListQuery(String postType) {
+        LambdaQueryWrapper<PostEntity> query = new LambdaQueryWrapper<PostEntity>()
+                .eq(PostEntity::getDeleted, false)
+                .in(PostEntity::getStatus, List.of(STATUS_PUBLISHED, STATUS_CLOSED))
+                .orderByDesc(PostEntity::getCreatedAt);
+        if (postType != null && !postType.isBlank()) {
+            query.eq(PostEntity::getPostType, normalizeType(postType));
+        }
+        return query;
+    }
+
+    private LambdaQueryWrapper<PostEntity> buildMineListQuery(Long userId) {
+        return new LambdaQueryWrapper<PostEntity>()
+                .eq(PostEntity::getAuthorId, userId)
+                .orderByDesc(PostEntity::getCreatedAt);
     }
 }

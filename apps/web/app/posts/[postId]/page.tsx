@@ -2,16 +2,27 @@ import { PostDetailClient } from "@/components/post/post-detail-client";
 import { serverFetchApiData } from "@/lib/server-api";
 import type { PostDetail, PostComment } from "@/components/post/types";
 import type { Metadata } from "next";
+import { cache } from "react";
 
 type Props = {
   params: Promise<{ postId: string }>;
 };
 
+export const dynamic = "force-dynamic";
+
+const getPostDetail = cache(async (postId: string, allowNotFound = false) =>
+  serverFetchApiData<PostDetail>(`/api/v1/posts/${postId}`, { allowNotFound }),
+);
+
+const getPostComments = cache(async (postId: string) =>
+  serverFetchApiData<PostComment[]>(`/api/v1/posts/${postId}/comments`),
+);
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { postId } = await params;
   let post: PostDetail | null = null;
   try {
-    post = await serverFetchApiData<PostDetail>(`/api/v1/posts/${postId}`, { allowNotFound: true });
+    post = await getPostDetail(postId, true);
   } catch (error) {
     console.error("Metadata fetch error:", error);
   }
@@ -37,13 +48,13 @@ export default async function PostDetailPage({ params }: Props) {
   let initialComments: PostComment[] | null = null;
 
   try {
-    initialPost = await serverFetchApiData<PostDetail>(`/api/v1/posts/${postId}`);
+    initialPost = await getPostDetail(postId);
   } catch (e) {
     console.error("Server fetch post failed, falling back to CSR:", e);
   }
 
   try {
-    initialComments = await serverFetchApiData<PostComment[]>(`/api/v1/posts/${postId}/comments`);
+    initialComments = await getPostComments(postId);
   } catch (e) {
     console.error("Server fetch comments failed, falling back to CSR:", e);
   }

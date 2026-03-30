@@ -1,0 +1,31 @@
+# cc-connect configuration
+# Docs: https://github.com/chenhg5/cc-connect
+
+[log]
+level = "info"
+
+[[projects]]
+name = "lenjoy-bbs-web"
+
+[projects.agent]
+type = "codex"   # "claudecode", "codex", "cursor", "gemini", "qoder", "opencode", or "iflow"
+
+[projects.agent.options]
+work_dir = "/d/work/lenjoy/lenjoy-bbs/apps/web"
+mode = "default"
+# model = "claude-sonnet-4-20250514"
+
+# --- Choose at least one platform below ---
+
+# Feishu / Lark (WebSocket, no public IP needed)
+[[projects.platforms]]
+type = "feishu"
+
+[projects.platforms.options]
+app_id = "cli_a94022d189389bc8"
+app_secret = "b7QugsMISjORHS66miMBzfv1bUVlIUJp"
+
+# For more platforms (DingTalk, Telegram, Slack, Discord, LINE, WeChat Work)
+# see: https://github.com/chenhg5/cc-connect/blob/main/config.example.toml
+
+admin_from = "2ebgfe9f"

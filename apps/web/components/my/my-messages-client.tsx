@@ -101,11 +101,11 @@ export function MyMessagesClient() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-emerald-200 bg-white/95">
+        <Card className="self-start border-emerald-200 bg-white/95">
           <CardHeader>
             <CardTitle className="text-base">快捷操作</CardTitle>
           </CardHeader>
-          <CardContent className="flex h-full items-center">
+          <CardContent className="pt-0">
             <button
               type="button"
               className={buttonVariants({ variant: "outline" })}

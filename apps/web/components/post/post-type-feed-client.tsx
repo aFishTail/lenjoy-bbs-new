@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { readError } from "@/components/post/client-helpers";
+import { PaginationControls } from "@/components/post/pagination-controls";
 import { usePostFeedQuery } from "@/components/post/use-post-queries";
-import type { PostSummary } from "@/components/post/types";
+import type { PaginatedResponse, PostSummary } from "@/components/post/types";
 
 type PostType = "NORMAL" | "RESOURCE" | "BOUNTY";
 
@@ -13,8 +14,10 @@ type PostTypeFeedClientProps = {
   postType: PostType;
   title: string;
   subtitle: string;
-  initialPosts?: PostSummary[] | null;
+  initialPosts?: PaginatedResponse<PostSummary> | null;
 };
+
+const PAGE_SIZE = 20;
 
 const navByType: Record<PostType, { href: string; label: string }> = {
   NORMAL: { href: "/discussions", label: "讨论" },
@@ -51,7 +54,13 @@ export function PostTypeFeedClient({
   initialPosts,
 }: PostTypeFeedClientProps) {
   const [errorText, setErrorText] = useState("");
-  const postsQuery = usePostFeedQuery(postType, initialPosts);
+  const [page, setPage] = useState(1);
+  const postsQuery = usePostFeedQuery(
+    postType,
+    page,
+    PAGE_SIZE,
+    page === 1 ? initialPosts : undefined,
+  );
 
   useEffect(() => {
     if (postsQuery.error) {
@@ -59,7 +68,8 @@ export function PostTypeFeedClient({
     }
   }, [postsQuery.error]);
 
-  const posts = postsQuery.data ?? [];
+  const postsPage = postsQuery.data;
+  const posts = postsPage?.items ?? [];
   const loading = postsQuery.isLoading;
 
   const navItems = useMemo(
@@ -91,22 +101,7 @@ export function PostTypeFeedClient({
         </div>
       </section>
 
-      {errorText && (
-        <div className="banner banner-error mb-4">
-          <svg
-            className="icon-sm"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <circle cx="12" cy="12" r="10" />
-            <line x1="15" y1="9" x2="9" y2="15" />
-            <line x1="9" y1="9" x2="15" y2="15" />
-          </svg>
-          {errorText}
-        </div>
-      )}
+      {errorText && <div className="banner banner-error mb-4">{errorText}</div>}
 
       {loading ? (
         <div className="loading">
@@ -115,84 +110,50 @@ export function PostTypeFeedClient({
         </div>
       ) : posts.length === 0 ? (
         <div className="empty">
-          <div className="empty-icon">
-            <svg
-              width="48"
-              height="48"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-            >
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-              <line x1="16" y1="13" x2="8" y2="13" />
-              <line x1="16" y1="17" x2="8" y2="17" />
-            </svg>
-          </div>
+          <div className="empty-icon">-</div>
           <p className="empty-title">暂无{title}</p>
           <p className="text-muted">当前分类还没有可展示的帖子</p>
         </div>
       ) : (
-        <div className="grid gap-3">
-          {posts.map((post) => (
-            <Link
-              key={post.id}
-              href={`/posts/${post.id}`}
-              className="post-item"
-            >
-              <div className="post-item-header">
-                <span className={getBadgeClass(post.postType)}>
-                  {getTypeText(post.postType)}
-                </span>
-                <span className="badge badge-info">{post.status}</span>
-                <span className="post-item-meta">
-                  by {post.authorUsername || post.authorId}
-                </span>
-              </div>
-              <h3 className="post-item-title">{post.title}</h3>
-              <div className="post-item-stats">
-                <span className="post-item-stat">
-                  <svg
-                    className="icon-sm"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                    <circle cx="12" cy="12" r="3" />
-                  </svg>
-                  {post.viewCount || 0}
-                </span>
-                <span className="post-item-stat">
-                  <svg
-                    className="icon-sm"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                  </svg>
-                  {post.commentCount || 0}
-                </span>
-                <span className="post-item-stat">
-                  <svg
-                    className="icon-sm"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
-                  </svg>
-                  {post.likeCount || 0}
-                </span>
-              </div>
-            </Link>
-          ))}
-        </div>
+        <>
+          <div className="grid gap-3">
+            {posts.map((post) => (
+              <Link
+                key={post.id}
+                href={`/posts/${post.id}`}
+                className="post-item"
+              >
+                <div className="post-item-header">
+                  <span className={getBadgeClass(post.postType)}>
+                    {getTypeText(post.postType)}
+                  </span>
+                  <span className="badge badge-info">{post.status}</span>
+                  <span className="post-item-meta">
+                    by {post.authorUsername || post.authorId}
+                  </span>
+                </div>
+                <h3 className="post-item-title">{post.title}</h3>
+                <div className="post-item-stats">
+                  <span className="post-item-stat">{post.viewCount || 0}</span>
+                  <span className="post-item-stat">{post.commentCount || 0}</span>
+                  <span className="post-item-stat">{post.likeCount || 0}</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+          {postsPage && (
+            <PaginationControls
+              page={postsPage.page}
+              totalPages={postsPage.totalPages}
+              total={postsPage.total}
+              pageSize={postsPage.pageSize}
+              hasNext={postsPage.hasNext}
+              hasPrevious={postsPage.hasPrevious}
+              disabled={postsQuery.isFetching}
+              onPageChange={setPage}
+            />
+          )}
+        </>
       )}
     </main>
   );

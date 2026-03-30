@@ -8,11 +8,13 @@ export const MESSAGE_EVENT = "lenjoy.messages.changed";
 export const queryKeys = {
   authSession: ["auth", "session"] as const,
   captcha: ["auth", "captcha"] as const,
-  posts: ["posts"] as const,
-  postFeed: (postType: string) => ["posts", "feed", postType] as const,
+  posts: (page: number, pageSize: number) => ["posts", page, pageSize] as const,
+  postFeed: (postType: string, page: number, pageSize: number) =>
+    ["posts", "feed", postType, page, pageSize] as const,
   postDetail: (postId: string) => ["posts", postId] as const,
   postComments: (postId: string) => ["posts", postId, "comments"] as const,
-  myPosts: ["posts", "mine"] as const,
+  myPosts: (page: number, pageSize: number) =>
+    ["posts", "mine", page, pageSize] as const,
   myProfile: ["users", "me"] as const,
   myWallet: ["users", "me", "wallet"] as const,
   mySales: ["users", "me", "resource-sales"] as const,

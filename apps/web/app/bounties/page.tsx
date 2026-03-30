@@ -1,11 +1,15 @@
 import { PostTypeFeedClient } from "@/components/post/post-type-feed-client";
 import { serverFetchApiData } from "@/lib/server-api";
-import type { PostSummary } from "@/components/post/types";
+import type { PaginatedResponse, PostSummary } from "@/components/post/types";
+
+export const dynamic = "force-dynamic";
 
 export default async function BountiesPage() {
-  let initialPosts: PostSummary[] | null = null;
+  let initialPosts: PaginatedResponse<PostSummary> | null = null;
   try {
-    initialPosts = await serverFetchApiData<PostSummary[]>("/api/v1/posts?postType=BOUNTY");
+    initialPosts = await serverFetchApiData<PaginatedResponse<PostSummary>>(
+      "/api/v1/posts?postType=BOUNTY",
+    );
   } catch (error) {
     console.error("Bounties SSR error:", error);
   }

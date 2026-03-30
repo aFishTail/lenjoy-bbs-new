@@ -4,41 +4,62 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { queryKeys, requestApiData } from "@/components/post/client-helpers";
 import type {
+  PaginatedResponse,
   PostComment,
   PostDetail,
   PostSummary,
 } from "@/components/post/types";
 
-export function usePostsQuery(initialData?: PostSummary[] | null) {
+export function usePostsQuery(
+  page: number,
+  pageSize: number,
+  initialData?: PaginatedResponse<PostSummary> | null,
+) {
   return useQuery({
-    queryKey: queryKeys.posts,
+    queryKey: queryKeys.posts(page, pageSize),
     queryFn: () =>
-      requestApiData<PostSummary[]>("/api/posts", { cache: "no-store" }),
+      requestApiData<PaginatedResponse<PostSummary>>(
+        `/api/posts?page=${page}&pageSize=${pageSize}`,
+        { cache: "no-store" },
+      ),
     initialData: initialData || undefined,
   });
 }
 
-export function usePostFeedQuery(postType: "NORMAL" | "RESOURCE" | "BOUNTY", initialData?: PostSummary[] | null) {
+export function usePostFeedQuery(
+  postType: "NORMAL" | "RESOURCE" | "BOUNTY",
+  page: number,
+  pageSize: number,
+  initialData?: PaginatedResponse<PostSummary> | null,
+) {
   return useQuery({
-    queryKey: queryKeys.postFeed(postType),
+    queryKey: queryKeys.postFeed(postType, page, pageSize),
     queryFn: () => {
-      const params = new URLSearchParams({ postType });
-      return requestApiData<PostSummary[]>(`/api/posts?${params.toString()}`, {
-        cache: "no-store",
+      const params = new URLSearchParams({
+        postType,
+        page: String(page),
+        pageSize: String(pageSize),
       });
+      return requestApiData<PaginatedResponse<PostSummary>>(
+        `/api/posts?${params.toString()}`,
+        { cache: "no-store" },
+      );
     },
     initialData: initialData || undefined,
   });
 }
 
-export function useMyPostsQuery() {
+export function useMyPostsQuery(page: number, pageSize: number) {
   return useQuery({
-    queryKey: queryKeys.myPosts,
+    queryKey: queryKeys.myPosts(page, pageSize),
     queryFn: () =>
-      requestApiData<PostSummary[]>("/api/posts/mine", {
-        withAuth: true,
-        cache: "no-store",
-      }),
+      requestApiData<PaginatedResponse<PostSummary>>(
+        `/api/posts/mine?page=${page}&pageSize=${pageSize}`,
+        {
+          withAuth: true,
+          cache: "no-store",
+        },
+      ),
   });
 }
 

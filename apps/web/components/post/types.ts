@@ -5,6 +5,16 @@ export type ApiResponse<T> = {
   data: T;
 };
 
+export type PaginatedResponse<T> = {
+  items: T[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrevious: boolean;
+};
+
 export type AuthData = {
   token: string;
   tokenType: string;
@@ -16,6 +26,7 @@ export type AuthData = {
     phone?: string;
     avatarUrl?: string | null;
     bio?: string | null;
+    roles?: string[];
   };
 };
 

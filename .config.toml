@@ -1,0 +1,77 @@
+data_dir = ""
+attachment_send = ""
+language = "zh"
+
+[[projects]]
+  name = "lenjoy-bbs-web"
+  [projects.agent]
+    type = "codex"
+    [projects.agent.options]
+      mode = "default"
+      work_dir = "/d/work/lenjoy/lenjoy-bbs/apps/web"
+
+  [[projects.platforms]]
+    type = "feishu"
+    [projects.platforms.options]
+      admin_from = "2ebgfe9f"
+      app_id = "cli_a94022d189389bc8"
+      app_secret = "b7QugsMISjORHS66miMBzfv1bUVlIUJp"
+  [projects.heartbeat]
+  [projects.auto_compress]
+
+[log]
+  level = "info"
+
+[speech]
+  enabled = false
+  provider = ""
+  language = ""
+  [speech.openai]
+    api_key = ""
+    base_url = ""
+    model = ""
+  [speech.groq]
+    api_key = ""
+    model = ""
+  [speech.qwen]
+    api_key = ""
+    base_url = ""
+    model = ""
+
+[tts]
+  enabled = false
+  provider = ""
+  voice = ""
+  tts_mode = ""
+  max_text_len = 0
+  [tts.openai]
+    api_key = ""
+    base_url = ""
+    model = ""
+  [tts.qwen]
+    api_key = ""
+    base_url = ""
+    model = ""
+  [tts.minimax]
+    api_key = ""
+    base_url = ""
+    model = ""
+
+[display]
+
+[stream_preview]
+
+[rate_limit]
+
+[relay]
+
+[cron]
+
+[webhook]
+  port = 0
+
+[bridge]
+  port = 0
+
+[management]
+  port = 0

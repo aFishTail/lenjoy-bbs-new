@@ -3,7 +3,12 @@ import { NextRequest, NextResponse } from "next/server";
 const backendBase = process.env.API_SERVER_BASE_URL || "http://localhost:8080";
 
 export async function GET(request: NextRequest) {
-  const response = await fetch(`${backendBase}/api/v1/posts/mine`, {
+  const target = new URL(`${backendBase}/api/v1/posts/mine`);
+  request.nextUrl.searchParams.forEach((value, key) => {
+    target.searchParams.set(key, value);
+  });
+
+  const response = await fetch(target.toString(), {
     method: "GET",
     headers: {
       Authorization: request.headers.get("authorization") || "",

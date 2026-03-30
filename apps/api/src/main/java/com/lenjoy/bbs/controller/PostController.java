@@ -3,6 +3,7 @@ package com.lenjoy.bbs.controller;
 import com.lenjoy.bbs.domain.dto.ApiResponse;
 import com.lenjoy.bbs.domain.dto.CreatePostRequest;
 import com.lenjoy.bbs.domain.dto.OfflinePostRequest;
+import com.lenjoy.bbs.domain.dto.PageResponse;
 import com.lenjoy.bbs.domain.dto.PostDetailResponse;
 import com.lenjoy.bbs.domain.dto.PostSummaryResponse;
 import com.lenjoy.bbs.domain.dto.UpdatePostRequest;
@@ -33,14 +34,20 @@ public class PostController {
     private final PostService postService;
 
     @GetMapping("/posts")
-    public ApiResponse<List<PostSummaryResponse>> list(@RequestParam(required = false) String postType) {
-        return ApiResponse.ok(postService.listPublic(postType));
+    public ApiResponse<PageResponse<PostSummaryResponse>> list(
+            @RequestParam(required = false) String postType,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer pageSize) {
+        return ApiResponse.ok(postService.listPublic(postType, page, pageSize));
     }
 
     @GetMapping("/posts/mine")
-    public ApiResponse<List<PostSummaryResponse>> listMine(Authentication authentication) {
+    public ApiResponse<PageResponse<PostSummaryResponse>> listMine(
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer pageSize,
+            Authentication authentication) {
         AuthUserPrincipal principal = requirePrincipal(authentication);
-        return ApiResponse.ok(postService.listMine(principal.getUserId()));
+        return ApiResponse.ok(postService.listMine(principal.getUserId(), page, pageSize));
     }
 
     @GetMapping("/posts/{postId}")

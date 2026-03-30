@@ -1,11 +1,13 @@
 import { PostHomeClient } from "@/components/post/post-home-client";
 import { serverFetchApiData } from "@/lib/server-api";
-import type { PostSummary } from "@/components/post/types";
+import type { PaginatedResponse, PostSummary } from "@/components/post/types";
+
+export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  let initialPosts: PostSummary[] | null = null;
+  let initialPosts: PaginatedResponse<PostSummary> | null = null;
   try {
-    initialPosts = await serverFetchApiData<PostSummary[]>("/api/v1/posts");
+    initialPosts = await serverFetchApiData<PaginatedResponse<PostSummary>>("/api/v1/posts");
   } catch (error) {
     console.error("Home SSR error:", error);
   }

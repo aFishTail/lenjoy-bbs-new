@@ -1,11 +1,15 @@
 import { PostTypeFeedClient } from "@/components/post/post-type-feed-client";
 import { serverFetchApiData } from "@/lib/server-api";
-import type { PostSummary } from "@/components/post/types";
+import type { PaginatedResponse, PostSummary } from "@/components/post/types";
+
+export const dynamic = "force-dynamic";
 
 export default async function ResourcesPage() {
-  let initialPosts: PostSummary[] | null = null;
+  let initialPosts: PaginatedResponse<PostSummary> | null = null;
   try {
-    initialPosts = await serverFetchApiData<PostSummary[]>("/api/v1/posts?postType=RESOURCE");
+    initialPosts = await serverFetchApiData<PaginatedResponse<PostSummary>>(
+      "/api/v1/posts?postType=RESOURCE",
+    );
   } catch (error) {
     console.error("Resources SSR error:", error);
   }
@@ -14,7 +18,7 @@ export default async function ResourcesPage() {
     <PostTypeFeedClient
       postType="RESOURCE"
       title="资源"
-      subtitle="在此发现与分享各种高价值的资源链接与内容。"
+      subtitle="在这里发现和分享高价值资源链接与内容。"
       initialPosts={initialPosts}
     />
   );
