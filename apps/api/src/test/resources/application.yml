@@ -1,0 +1,21 @@
+spring:
+  task:
+    scheduling:
+      enabled: false
+
+auth:
+  jwt:
+    secret: test-jwt-secret-at-least-32-chars
+    access-token-ttl-seconds: 3600
+  captcha:
+    ttl-seconds: 120
+    length: 4
+
+storage:
+  minio:
+    endpoint: http://127.0.0.1:9000
+    access-key: test-access-key
+    secret-key: test-secret-key
+    bucket: test-bucket
+    public-base-url: http://127.0.0.1:9000/test-bucket
+    max-file-size-bytes: 5242880

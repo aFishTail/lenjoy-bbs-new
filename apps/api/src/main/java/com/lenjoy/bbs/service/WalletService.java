@@ -8,6 +8,8 @@ import com.lenjoy.bbs.domain.dto.WalletSummaryResponse;
 import com.lenjoy.bbs.domain.entity.UserAccountEntity;
 import com.lenjoy.bbs.domain.entity.WalletEntity;
 import com.lenjoy.bbs.domain.entity.WalletLedgerEntity;
+import com.lenjoy.bbs.domain.enums.WalletAdminOperation;
+import com.lenjoy.bbs.domain.enums.WalletDirection;
 import com.lenjoy.bbs.exception.ApiException;
 import com.lenjoy.bbs.mapper.UserAccountMapper;
 import com.lenjoy.bbs.mapper.WalletLedgerMapper;
@@ -28,12 +30,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class WalletService {
 
     private static final int MAX_LEDGER_LIMIT = 100;
-    private static final String DIRECTION_INCOME = "INCOME";
-    private static final String DIRECTION_EXPENSE = "EXPENSE";
 
     private final WalletMapper walletMapper;
     private final WalletLedgerMapper walletLedgerMapper;
     private final UserAccountMapper userAccountMapper;
+    private final WalletLedgerFactory walletLedgerFactory;
 
     @Value("${wallet.initial-register-coins:100}")
     private int initialRegisterCoins;
@@ -41,7 +42,7 @@ public class WalletService {
     @Transactional
     public void grantRegisterBonus(Long userId) {
         adjustAvailableCoins(userId,
-                DIRECTION_INCOME,
+                WalletDirection.INCOME.value(),
                 initialRegisterCoins,
                 "REGISTER_BONUS",
                 "register:" + userId,
@@ -117,26 +118,25 @@ public class WalletService {
             throw new ApiException("INVALID_OPERATION", "不可调整自己的金币", HttpStatus.BAD_REQUEST);
         }
 
-        String operation = normalizeOperation(request.getOperation());
-        String bizKey = "admin:" + operatorUserId + ":" + targetUserId + ":" + operation + ":"
+        WalletAdminOperation operation = WalletAdminOperation.fromNullable(request.getOperation());
+        String bizKey = "admin:" + operatorUserId + ":" + targetUserId + ":" + operation.name() + ":"
                 + request.getAmount() + ":" + request.getReason().trim() + ":" + System.currentTimeMillis();
 
         return switch (operation) {
-            case "CREDIT" -> adjustAvailableCoins(targetUserId,
-                    DIRECTION_INCOME,
+            case CREDIT -> adjustAvailableCoins(targetUserId,
+                    WalletDirection.INCOME.value(),
                     request.getAmount(),
                     "ADMIN_CREDIT",
                     bizKey,
                     request.getReason().trim(),
                     operatorUserId);
-            case "DEBIT" -> adjustAvailableCoins(targetUserId,
-                    DIRECTION_EXPENSE,
+            case DEBIT -> adjustAvailableCoins(targetUserId,
+                    WalletDirection.EXPENSE.value(),
                     request.getAmount(),
                     "ADMIN_DEBIT",
                     bizKey,
                     request.getReason().trim(),
                     operatorUserId);
-            default -> throw new ApiException("INVALID_OPERATION", "金币操作类型不支持", HttpStatus.BAD_REQUEST);
         };
     }
 
@@ -150,23 +150,20 @@ public class WalletService {
             String remark,
             Long operatorUserId) {
         requireUser(userId);
-        if (amount <= 0) {
-            throw new ApiException("INVALID_AMOUNT", "金币数量必须大于 0", HttpStatus.BAD_REQUEST);
-        }
+        validatePositiveAmount(amount);
 
-        if (bizKey != null && !bizKey.isBlank()) {
-            WalletLedgerEntity existing = walletLedgerMapper.selectByBizKey(bizKey);
-            if (existing != null) {
-                return getWalletSummary(userId);
-            }
+        WalletLedgerEntity existing = findExistingLedger(bizKey);
+        if (existing != null) {
+            return getWalletSummary(userId);
         }
 
         WalletEntity wallet = getOrCreateWalletForUpdate(userId);
         int currentAvailable = safeCoins(wallet.getAvailableCoins());
         int currentFrozen = safeCoins(wallet.getFrozenCoins());
-        int nextAvailable = switch (direction) {
-            case DIRECTION_INCOME -> currentAvailable + amount;
-            case DIRECTION_EXPENSE -> currentAvailable - amount;
+        WalletDirection walletDirection = WalletDirection.from(direction);
+        int nextAvailable = switch (walletDirection) {
+            case INCOME -> currentAvailable + amount;
+            case EXPENSE -> currentAvailable - amount;
             default -> throw new ApiException("INVALID_DIRECTION", "钱包流水方向不支持", HttpStatus.BAD_REQUEST);
         };
 
@@ -180,19 +177,8 @@ public class WalletService {
         wallet.setUpdatedAt(now);
         walletMapper.updateById(wallet);
 
-        WalletLedgerEntity ledger = new WalletLedgerEntity();
-        ledger.setWalletId(wallet.getId());
-        ledger.setUserId(userId);
-        ledger.setDirection(direction);
-        ledger.setChangeAmount(amount);
-        ledger.setBalanceAfter(nextAvailable);
-        ledger.setFrozenAfter(currentFrozen);
-        ledger.setBizType(bizType);
-        ledger.setBizKey(blankToNull(bizKey));
-        ledger.setRemark(blankToNull(remark));
-        ledger.setOperatedBy(operatorUserId);
-        ledger.setCreatedAt(now);
-        walletLedgerMapper.insert(ledger);
+        walletLedgerMapper.insert(walletLedgerFactory.create(wallet, userId, walletDirection, amount, nextAvailable,
+                currentFrozen, bizType, bizKey, remark, operatorUserId, now));
 
         return toWalletSummary(wallet);
     }
@@ -206,14 +192,11 @@ public class WalletService {
             String remark,
             Long operatorUserId) {
         requireUser(userId);
-        if (amount <= 0) {
-            throw new ApiException("INVALID_AMOUNT", "金币数量必须大于 0", HttpStatus.BAD_REQUEST);
-        }
-        if (bizKey != null && !bizKey.isBlank()) {
-            WalletLedgerEntity existing = walletLedgerMapper.selectByBizKey(bizKey);
-            if (existing != null) {
-                return getWalletSummary(userId);
-            }
+        validatePositiveAmount(amount);
+
+        WalletLedgerEntity existing = findExistingLedger(bizKey);
+        if (existing != null) {
+            return getWalletSummary(userId);
         }
 
         WalletEntity wallet = getOrCreateWalletForUpdate(userId);
@@ -231,19 +214,8 @@ public class WalletService {
         wallet.setUpdatedAt(now);
         walletMapper.updateById(wallet);
 
-        WalletLedgerEntity ledger = new WalletLedgerEntity();
-        ledger.setWalletId(wallet.getId());
-        ledger.setUserId(userId);
-        ledger.setDirection("FREEZE");
-        ledger.setChangeAmount(amount);
-        ledger.setBalanceAfter(nextAvailable);
-        ledger.setFrozenAfter(nextFrozen);
-        ledger.setBizType(bizType);
-        ledger.setBizKey(blankToNull(bizKey));
-        ledger.setRemark(blankToNull(remark));
-        ledger.setOperatedBy(operatorUserId);
-        ledger.setCreatedAt(now);
-        walletLedgerMapper.insert(ledger);
+        walletLedgerMapper.insert(walletLedgerFactory.create(wallet, userId, WalletDirection.FREEZE, amount,
+                nextAvailable, nextFrozen, bizType, bizKey, remark, operatorUserId, now));
 
         return toWalletSummary(wallet);
     }
@@ -257,14 +229,11 @@ public class WalletService {
             String remark,
             Long operatorUserId) {
         requireUser(userId);
-        if (amount <= 0) {
-            throw new ApiException("INVALID_AMOUNT", "金币数量必须大于 0", HttpStatus.BAD_REQUEST);
-        }
-        if (bizKey != null && !bizKey.isBlank()) {
-            WalletLedgerEntity existing = walletLedgerMapper.selectByBizKey(bizKey);
-            if (existing != null) {
-                return getWalletSummary(userId);
-            }
+        validatePositiveAmount(amount);
+
+        WalletLedgerEntity existing = findExistingLedger(bizKey);
+        if (existing != null) {
+            return getWalletSummary(userId);
         }
 
         WalletEntity wallet = getOrCreateWalletForUpdate(userId);
@@ -282,19 +251,8 @@ public class WalletService {
         wallet.setUpdatedAt(now);
         walletMapper.updateById(wallet);
 
-        WalletLedgerEntity ledger = new WalletLedgerEntity();
-        ledger.setWalletId(wallet.getId());
-        ledger.setUserId(userId);
-        ledger.setDirection("UNFREEZE");
-        ledger.setChangeAmount(amount);
-        ledger.setBalanceAfter(nextAvailable);
-        ledger.setFrozenAfter(nextFrozen);
-        ledger.setBizType(bizType);
-        ledger.setBizKey(blankToNull(bizKey));
-        ledger.setRemark(blankToNull(remark));
-        ledger.setOperatedBy(operatorUserId);
-        ledger.setCreatedAt(now);
-        walletLedgerMapper.insert(ledger);
+        walletLedgerMapper.insert(walletLedgerFactory.create(wallet, userId, WalletDirection.UNFREEZE, amount,
+                nextAvailable, nextFrozen, bizType, bizKey, remark, operatorUserId, now));
 
         return toWalletSummary(wallet);
     }
@@ -371,26 +329,20 @@ public class WalletService {
         return limit;
     }
 
-    private String normalizeOperation(String operation) {
-        if (operation == null || operation.isBlank()) {
-            throw new ApiException("INVALID_OPERATION", "金币操作类型不支持", HttpStatus.BAD_REQUEST);
+    private void validatePositiveAmount(int amount) {
+        if (amount <= 0) {
+            throw new ApiException("INVALID_AMOUNT", "金币数量必须大于 0", HttpStatus.BAD_REQUEST);
         }
-        String normalized = operation.trim().toUpperCase();
-        if (!List.of("CREDIT", "DEBIT").contains(normalized)) {
-            throw new ApiException("INVALID_OPERATION", "金币操作类型不支持", HttpStatus.BAD_REQUEST);
+    }
+
+    private WalletLedgerEntity findExistingLedger(String bizKey) {
+        if (bizKey == null || bizKey.isBlank()) {
+            return null;
         }
-        return normalized;
+        return walletLedgerMapper.selectByBizKey(bizKey);
     }
 
     private int safeCoins(Integer value) {
         return value == null ? 0 : value;
-    }
-
-    private String blankToNull(String value) {
-        if (value == null) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
     }
 }

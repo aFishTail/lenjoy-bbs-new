@@ -6,7 +6,10 @@
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start -p 3000",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:report": "playwright show-report test/artifacts/playwright-report"
   },
   "dependencies": {
     "@hookform/resolvers": "5.2.2",
@@ -31,6 +34,7 @@
     "zustand": "5.0.12"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.0",
     "@tailwindcss/postcss": "4.2.2",
     "@types/node": "25.5.0",
     "@types/react": "19.2.14",

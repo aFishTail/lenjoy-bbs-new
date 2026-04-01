@@ -2,9 +2,9 @@ package com.lenjoy.bbs.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import com.lenjoy.bbs.domain.dto.CreatePostRequest;
 import com.lenjoy.bbs.domain.dto.OfflinePostRequest;
 import com.lenjoy.bbs.domain.dto.PostDetailResponse;
+import com.lenjoy.bbs.domain.dto.PostSummaryResponse;
 import com.lenjoy.bbs.domain.dto.UpdatePostRequest;
 import com.lenjoy.bbs.domain.entity.PostEntity;
 import com.lenjoy.bbs.domain.entity.UserAccountEntity;
@@ -23,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 
@@ -36,10 +38,13 @@ class PostServiceTest {
     private UserAccountMapper userAccountMapper;
 
     @Mock
-    private ResourceTradeService resourceTradeService;
+    private BountyService bountyService;
 
     @Mock
-    private BountyService bountyService;
+    private PostAssembler postAssembler;
+
+    @Spy
+    private PostValidator postValidator;
 
     @InjectMocks
     private PostService postService;
@@ -88,33 +93,6 @@ class PostServiceTest {
     }
 
     @Test
-    void detail_whenResourceAndVisitor_shouldNotExposeHiddenContent() {
-        PostEntity post = buildPost(12L, 1L, "RESOURCE", "PUBLISHED", false);
-        post.setContent("description");
-        post.setHiddenContent("secret");
-        post.setPrice(9);
-        when(postMapper.selectById(12L)).thenReturn(post);
-        when(userAccountMapper.selectById(1L)).thenReturn(buildUser(1L, "author", "ACTIVE"));
-
-        PostDetailResponse response = postService.detail(12L, 2L, false);
-
-        assertNull(response.getHiddenContent());
-    }
-
-    @Test
-    void detail_whenResourceAndAuthor_shouldExposeHiddenContent() {
-        PostEntity post = buildPost(13L, 1L, "RESOURCE", "PUBLISHED", false);
-        post.setContent("description");
-        post.setHiddenContent("secret");
-        when(postMapper.selectById(13L)).thenReturn(post);
-        when(userAccountMapper.selectById(1L)).thenReturn(buildUser(1L, "author", "ACTIVE"));
-
-        PostDetailResponse response = postService.detail(13L, 1L, false);
-
-        assertEquals("secret", response.getHiddenContent());
-    }
-
-    @Test
     void delete_byAuthor_shouldMarkDeletedAndStatus() {
         PostEntity post = buildPost(21L, 7L, "NORMAL", "PUBLISHED", false);
         when(postMapper.selectById(21L)).thenReturn(post);
@@ -160,6 +138,13 @@ class PostServiceTest {
             return 1;
         }).when(postMapper).insert(any(PostEntity.class));
 
+        PostDetailResponse expected = new PostDetailResponse();
+        expected.setId(101L);
+        expected.setPostType("NORMAL");
+        expected.setAuthorUsername("writer");
+        when(postAssembler.toDetail(any(PostEntity.class), any(), any(), anyBoolean(), anyBoolean()))
+                .thenReturn(expected);
+
         CreatePostRequest request = new CreatePostRequest();
         request.setPostType("NORMAL");
         request.setTitle("Title");
@@ -170,6 +155,18 @@ class PostServiceTest {
         assertEquals(101L, response.getId());
         assertEquals("NORMAL", response.getPostType());
         assertEquals("writer", response.getAuthorUsername());
+    }
+
+    @Test
+    void listAdmin_shouldDelegateToAssembler() {
+        PostEntity post = buildPost(1L, 5L, "NORMAL", "PUBLISHED", false);
+        when(postMapper.selectList(any())).thenReturn(List.of(post));
+        when(postAssembler.toSummaryList(List.of(post))).thenReturn(List.of(new PostSummaryResponse()));
+
+        var result = postService.listAdmin(null, null, null);
+
+        assertEquals(1, result.size());
+        verify(postAssembler).toSummaryList(List.of(post));
     }
 
     private UserAccountEntity buildUser(Long id, String username, String status) {

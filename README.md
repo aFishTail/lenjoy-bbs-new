@@ -75,7 +75,7 @@ Reset local DB data (development only):
 
 ```bash
 docker compose --env-file .env -f infra/docker/docker-compose.dev.yml down -v
-docker compose --env-file .env -f infra/docker/docker-compose.dev.yml up -d
+docker compose --env-file .env -f infra/docker/docker-compose.dev.yml up -d/u
 ```
 
 Alternative (using full compose file):

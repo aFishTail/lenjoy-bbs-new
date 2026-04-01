@@ -47,7 +47,7 @@ server:
 auth:
   jwt:
     secret: ${JWT_SECRET:lenjoy-jwt-secret-change-me-at-least-32-chars}
-    access-token-ttl-seconds: ${JWT_ACCESS_TOKEN_TTL_SECONDS:7200}
+    access-token-ttl-seconds: ${JWT_ACCESS_TOKEN_TTL_SECONDS:72000}
   captcha:
     ttl-seconds: ${CAPTCHA_TTL_SECONDS:120}
     length: ${CAPTCHA_LENGTH:4}
