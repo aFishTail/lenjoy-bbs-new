@@ -6,6 +6,7 @@ import io.minio.BucketExistsArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
+import io.minio.SetBucketPolicyArgs;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.LocalDate;
@@ -32,7 +33,7 @@ public class FileStorageService {
 
     public String uploadImage(MultipartFile file) {
         validateFile(file);
-        ensureBucketExists();
+        ensureBucketIsPubliclyReadable();
 
         String extension = resolveExtension(file.getOriginalFilename(), file.getContentType());
         String objectKey = "posts/" + LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE)
@@ -67,7 +68,7 @@ public class FileStorageService {
         }
     }
 
-    private void ensureBucketExists() {
+    private void ensureBucketIsPubliclyReadable() {
         try {
             boolean exists = minioClient.bucketExists(BucketExistsArgs.builder()
                     .bucket(minioProperties.getBucket())
@@ -77,9 +78,37 @@ public class FileStorageService {
                         .bucket(minioProperties.getBucket())
                         .build());
             }
+            minioClient.setBucketPolicy(SetBucketPolicyArgs.builder()
+                    .bucket(minioProperties.getBucket())
+                    .config(buildAnonymousReadPolicy())
+                    .build());
         } catch (Exception ex) {
             throw new ApiException("STORAGE_UNAVAILABLE", "存储服务不可用", HttpStatus.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    private String buildAnonymousReadPolicy() {
+        return """
+                {
+                  "Version": "2012-10-17",
+                  "Statement": [
+                    {
+                      "Effect": "Allow",
+                      "Principal": {
+                        "AWS": [
+                          "*"
+                        ]
+                      },
+                      "Action": [
+                        "s3:GetObject"
+                      ],
+                      "Resource": [
+                        "arn:aws:s3:::%s/*"
+                      ]
+                    }
+                  ]
+                }
+                """.formatted(minioProperties.getBucket());
     }
 
     private String resolveExtension(String originalFilename, String contentType) {

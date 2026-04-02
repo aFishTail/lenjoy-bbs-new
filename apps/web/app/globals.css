@@ -820,8 +820,6 @@ h6 {
   border-radius: 999px;
   font-size: 0.75rem;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
 }
 
 .badge-primary {
@@ -918,6 +916,119 @@ h6 {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.post-card-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.post-card-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  color: var(--text-sub);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.post-card-stat svg {
+  color: var(--text-muted);
+}
+
+.post-card-stat.is-date {
+  margin-left: auto;
+  background: rgba(124, 58, 237, 0.06);
+  color: var(--color-primary);
+}
+
+.post-card-stat.is-date svg {
+  color: var(--color-primary-light);
+}
+
+.post-action-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-light);
+}
+
+.post-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(124, 58, 237, 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.92));
+  color: var(--text-sub);
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    background 0.18s ease;
+}
+
+.post-action-btn:hover {
+  transform: translateY(-1px);
+  color: var(--color-primary);
+  border-color: rgba(124, 58, 237, 0.28);
+  box-shadow: 0 10px 24px rgba(124, 58, 237, 0.12);
+}
+
+.post-action-btn:focus-visible {
+  outline: none;
+  border-color: rgba(124, 58, 237, 0.45);
+  box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.14);
+}
+
+.post-action-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+  transform: none;
+  box-shadow: none;
+}
+
+.post-action-btn.is-active {
+  color: var(--text-main);
+  border-color: transparent;
+}
+
+.post-action-btn.is-like {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.14), rgba(251, 113, 133, 0.22));
+  color: #b91c1c;
+  box-shadow: 0 10px 24px rgba(239, 68, 68, 0.14);
+}
+
+.post-action-btn.is-favorite {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.16), rgba(250, 204, 21, 0.24));
+  color: #b45309;
+  box-shadow: 0 10px 24px rgba(245, 158, 11, 0.14);
+}
+
+.post-action-state {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 /* Hero Section */
@@ -1405,4 +1516,90 @@ h6 {
 .user-menu-logout:hover {
   background: rgba(239, 68, 68, 0.08);
   color: var(--color-danger);
+}
+
+.confirm-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(15, 23, 42, 0.52);
+  backdrop-filter: blur(10px);
+}
+
+.confirm-dialog-panel {
+  width: min(100%, 32rem);
+  padding: 1.5rem;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 1.5rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(248, 250, 252, 0.99));
+  box-shadow: 0 30px 70px rgba(15, 23, 42, 0.24);
+}
+
+.confirm-dialog-header {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.confirm-dialog-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.confirm-dialog-description {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: #475569;
+}
+
+.confirm-dialog-body {
+  margin-top: 1rem;
+}
+
+.confirm-dialog-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.confirm-dialog-field {
+  display: grid;
+  gap: 0.45rem;
+  color: #0f172a;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.confirm-dialog-textarea {
+  width: 100%;
+  min-height: 7rem;
+  resize: vertical;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid rgb(203 213 225);
+  border-radius: 0.9rem;
+  background: white;
+  color: #0f172a;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.confirm-dialog-textarea::placeholder {
+  color: #94a3b8;
+}
+
+.confirm-dialog-textarea:focus {
+  border-color: rgba(4, 120, 87, 0.9);
+  box-shadow: 0 0 0 4px rgba(4, 120, 87, 0.14);
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
 }

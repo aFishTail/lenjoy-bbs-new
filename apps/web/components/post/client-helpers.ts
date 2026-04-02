@@ -11,10 +11,21 @@ export const queryKeys = {
   posts: (page: number, pageSize: number) => ["posts", page, pageSize] as const,
   postFeed: (postType: string, page: number, pageSize: number) =>
     ["posts", "feed", postType, page, pageSize] as const,
+  postFeedFilters: (
+    postType: string,
+    filters: Record<string, string>,
+    page: number,
+    pageSize: number,
+  ) => ["posts", "feed", postType, filters, page, pageSize] as const,
   postDetail: (postId: string) => ["posts", postId] as const,
   postComments: (postId: string) => ["posts", postId, "comments"] as const,
   myPosts: (page: number, pageSize: number) =>
     ["posts", "mine", page, pageSize] as const,
+  taxonomyCategories: (contentType: string) =>
+    ["taxonomy", "categories", contentType] as const,
+  taxonomyTags: (keyword: string) => ["taxonomy", "tags", keyword] as const,
+  taxonomyHotTags: (contentType: string) =>
+    ["taxonomy", "tags", "hot", contentType] as const,
   myProfile: ["users", "me"] as const,
   myWallet: ["users", "me", "wallet"] as const,
   mySales: ["users", "me", "resource-sales"] as const,
@@ -41,6 +52,9 @@ export const queryKeys = {
     ["admin", "audit", "trades", filters] as const,
   adminPosts: (filters: Record<string, unknown>) =>
     ["admin", "posts", filters] as const,
+  adminCategories: (contentType: string) =>
+    ["admin", "categories", contentType] as const,
+  adminTags: (keyword: string) => ["admin", "tags", keyword] as const,
 };
 
 export function clearAuthAndRedirectToLogin(): void {
@@ -56,8 +70,8 @@ export function clearAuthAndRedirectToLogin(): void {
   }
 }
 
-export function handleForbiddenStatus(status: number): void {
-  if (status === 403) {
+export function handleAuthStatus(status: number): void {
+  if (status === 401) {
     clearAuthAndRedirectToLogin();
   }
 }
@@ -106,7 +120,7 @@ export async function readApi<T>(response: Response): Promise<ApiResponse<T>> {
   }
 
   if (!response.ok) {
-    handleForbiddenStatus(response.status);
+    handleAuthStatus(response.status);
     const fallback = `请求失败（HTTP ${response.status}）`;
     throw new Error(payload?.message || fallback);
   }

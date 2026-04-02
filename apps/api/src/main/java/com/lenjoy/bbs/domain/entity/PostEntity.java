@@ -20,6 +20,9 @@ public class PostEntity {
     @TableField("post_type")
     private String postType;
 
+    @TableField("category_id")
+    private Long categoryId;
+
     private String title;
 
     private String content;

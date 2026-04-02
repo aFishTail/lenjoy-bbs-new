@@ -17,6 +17,8 @@ import type {
 export type CreatePostInput = {
   postType: "NORMAL" | "RESOURCE" | "BOUNTY";
   title: string;
+  categoryId: number;
+  tagIds: number[];
   content: string;
   hiddenContent?: string;
   price?: number;
@@ -53,6 +55,8 @@ export function useUpdatePostMutation(postId: string) {
   return useMutation({
     mutationFn: (payload: {
       title: string;
+      categoryId: number;
+      tagIds: number[];
       content: string;
       hiddenContent: string;
       price: number | null;
@@ -102,9 +106,14 @@ export function useDeletePostMutation(postId: string) {
         withAuth: true,
       }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.postDetail(postId),
-      });
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["posts"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["admin", "posts"],
+        }),
+      ]);
     },
   });
 }

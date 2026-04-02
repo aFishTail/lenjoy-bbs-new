@@ -206,3 +206,120 @@ export function useUpdateAdminPostStatusMutation(filters: AdminPostsFilters) {
     },
   });
 }
+
+export function useCreateAdminCategoryMutation(contentType: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: {
+      name: string;
+      contentType: string;
+      parentId: number;
+      sort: number;
+      leaf: boolean;
+    }) =>
+      requestApi(`/api/admin/categories`, {
+        method: "POST",
+        withAuth: true,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.adminCategories(contentType),
+      });
+    },
+  });
+}
+
+export function useUpdateAdminCategoryStatusMutation(contentType: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ categoryId, status }: { categoryId: number; status: string }) =>
+      requestApi(`/api/admin/categories/${categoryId}/status`, {
+        method: "PATCH",
+        withAuth: true,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status }),
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.adminCategories(contentType),
+      });
+    },
+  });
+}
+
+export function useCreateAdminTagMutation(keyword: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: { name: string }) =>
+      requestApi(`/api/admin/tags`, {
+        method: "POST",
+        withAuth: true,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.adminTags(keyword),
+      });
+    },
+  });
+}
+
+export function useUpdateAdminTagStatusMutation(keyword: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ tagId, status }: { tagId: number; status: string }) =>
+      requestApi(`/api/admin/tags/${tagId}/status`, {
+        method: "PATCH",
+        withAuth: true,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status }),
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.adminTags(keyword),
+      });
+    },
+  });
+}
+
+export function useMergeAdminTagMutation(keyword: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      tagId,
+      targetTagId,
+    }: {
+      tagId: number;
+      targetTagId: number;
+    }) =>
+      requestApi(`/api/admin/tags/${tagId}/merge`, {
+        method: "POST",
+        withAuth: true,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ targetTagId }),
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.adminTags(keyword),
+      });
+    },
+  });
+}

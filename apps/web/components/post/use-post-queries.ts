@@ -10,6 +10,35 @@ import type {
   PostSummary,
 } from "@/components/post/types";
 
+export type PostFeedFilters = {
+  categoryId?: string;
+  tagId?: string;
+  keyword?: string;
+};
+
+function buildFeedQuery(
+  postType: "NORMAL" | "RESOURCE" | "BOUNTY",
+  page: number,
+  pageSize: number,
+  filters?: PostFeedFilters,
+) {
+  const params = new URLSearchParams({
+    postType,
+    page: String(page),
+    pageSize: String(pageSize),
+  });
+  if (filters?.categoryId) {
+    params.set("categoryId", filters.categoryId);
+  }
+  if (filters?.tagId) {
+    params.set("tagId", filters.tagId);
+  }
+  if (filters?.keyword) {
+    params.set("keyword", filters.keyword);
+  }
+  return `/api/posts?${params.toString()}`;
+}
+
 export function usePostsQuery(
   page: number,
   pageSize: number,
@@ -30,21 +59,25 @@ export function usePostFeedQuery(
   postType: "NORMAL" | "RESOURCE" | "BOUNTY",
   page: number,
   pageSize: number,
+  filters?: PostFeedFilters,
   initialData?: PaginatedResponse<PostSummary> | null,
 ) {
   return useQuery({
-    queryKey: queryKeys.postFeed(postType, page, pageSize),
-    queryFn: () => {
-      const params = new URLSearchParams({
-        postType,
-        page: String(page),
-        pageSize: String(pageSize),
-      });
-      return requestApiData<PaginatedResponse<PostSummary>>(
-        `/api/posts?${params.toString()}`,
+    queryKey: queryKeys.postFeedFilters(
+      postType,
+      {
+        categoryId: filters?.categoryId || "",
+        tagId: filters?.tagId || "",
+        keyword: filters?.keyword || "",
+      },
+      page,
+      pageSize,
+    ),
+    queryFn: () =>
+      requestApiData<PaginatedResponse<PostSummary>>(
+        buildFeedQuery(postType, page, pageSize, filters),
         { cache: "no-store" },
-      );
-    },
+      ),
     initialData: initialData || undefined,
   });
 }

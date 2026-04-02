@@ -1,6 +1,7 @@
 package com.lenjoy.bbs.domain.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import lombok.Data;
 
 @Data
@@ -13,6 +14,9 @@ public class PostDetailResponse {
 
     private Long authorId;
     private String authorUsername;
+    private Long categoryId;
+    private String categoryName;
+    private List<TagResponse> tags;
 
     private String content;
     private String hiddenContent;

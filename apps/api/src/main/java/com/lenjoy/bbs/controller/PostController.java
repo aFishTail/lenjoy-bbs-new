@@ -36,9 +36,12 @@ public class PostController {
     @GetMapping("/posts")
     public ApiResponse<PageResponse<PostSummaryResponse>> list(
             @RequestParam(required = false) String postType,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Long tagId,
+            @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer pageSize) {
-        return ApiResponse.ok(postService.listPublic(postType, page, pageSize));
+        return ApiResponse.ok(postService.listPublic(postType, categoryId, tagId, keyword, page, pageSize));
     }
 
     @GetMapping("/posts/mine")
@@ -94,9 +97,11 @@ public class PostController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String postType,
             @RequestParam(required = false) String author,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Long tagId,
             @AuthenticationPrincipal AuthUserPrincipal principal) {
         securityAccess.requireAdmin(principal);
-        return ApiResponse.ok(postService.listAdmin(status, postType, author));
+        return ApiResponse.ok(postService.listAdmin(status, postType, author, categoryId, tagId));
     }
 
     @PatchMapping("/admin/posts/{postId}/offline")

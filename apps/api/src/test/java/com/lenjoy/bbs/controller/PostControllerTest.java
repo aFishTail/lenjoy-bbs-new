@@ -40,12 +40,12 @@ class PostControllerTest {
     void list_shouldAllowAnonymous() {
         PageResponse<PostSummaryResponse> expected = new PageResponse<>();
         expected.setItems(List.of(new PostSummaryResponse()));
-        when(postService.listPublic("NORMAL", 1, 20)).thenReturn(expected);
+        when(postService.listPublic("NORMAL", null, null, null, 1, 20)).thenReturn(expected);
 
-        var response = postController.list("NORMAL", 1, 20);
+        var response = postController.list("NORMAL", null, null, null, 1, 20);
 
         assertEquals(expected, response.getData());
-        verify(postService).listPublic("NORMAL", 1, 20);
+        verify(postService).listPublic("NORMAL", null, null, null, 1, 20);
     }
 
     @Test
@@ -88,7 +88,8 @@ class PostControllerTest {
     void listAdmin_whenNonAdmin_shouldThrowForbidden() {
         AuthUserPrincipal principal = userPrincipal(1L, "user");
 
-        ApiException ex = assertThrows(ApiException.class, () -> postController.listAdmin(null, null, null, principal));
+        ApiException ex = assertThrows(ApiException.class,
+                () -> postController.listAdmin(null, null, null, null, null, principal));
 
         assertEquals("FORBIDDEN", ex.getCode());
         assertEquals(HttpStatus.FORBIDDEN, ex.getHttpStatus());
@@ -98,7 +99,7 @@ class PostControllerTest {
     void offline_whenNonAdmin_shouldThrowForbidden() {
         AuthUserPrincipal principal = userPrincipal(1L, "user");
         OfflinePostRequest request = new OfflinePostRequest();
-        request.setReason("违规");
+        request.setReason("invalid");
 
         ApiException ex = assertThrows(ApiException.class, () -> postController.offline(9L, request, principal));
 
@@ -110,7 +111,7 @@ class PostControllerTest {
     void offline_whenAdmin_shouldDelegate() {
         AuthUserPrincipal principal = adminPrincipal(9L, "admin");
         OfflinePostRequest request = new OfflinePostRequest();
-        request.setReason("违规");
+        request.setReason("invalid");
 
         var response = postController.offline(3L, request, principal);
 

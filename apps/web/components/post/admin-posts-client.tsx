@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { useAdminCategoriesQuery, useAdminPostsQuery, useAdminTagsQuery } from "@/components/admin/use-admin-queries";
 import { readError } from "@/components/post/client-helpers";
-import { useAdminPostsQuery } from "@/components/admin/use-admin-queries";
 import { useUpdateAdminPostStatusMutation } from "@/components/admin/use-admin-mutations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,13 +23,19 @@ export function AdminPostsClient() {
   const [status, setStatus] = useState("");
   const [postType, setPostType] = useState("");
   const [author, setAuthor] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [tagId, setTagId] = useState("");
   const [appliedFilters, setAppliedFilters] = useState({
     status: "",
     postType: "",
     author: "",
+    categoryId: "",
+    tagId: "",
   });
   const [submittingPostId, setSubmittingPostId] = useState<number | null>(null);
   const postsQuery = useAdminPostsQuery(appliedFilters);
+  const categoriesQuery = useAdminCategoriesQuery(postType);
+  const tagsQuery = useAdminTagsQuery("");
   const updatePostStatusMutation =
     useUpdateAdminPostStatusMutation(appliedFilters);
 
@@ -106,12 +112,39 @@ export function AdminPostsClient() {
           <Select
             className="admin-input"
             value={postType}
-            onChange={(e) => setPostType(e.target.value)}
+            onChange={(e) => {
+              setPostType(e.target.value);
+              setCategoryId("");
+            }}
           >
             <option value="">全部类型</option>
             <option value="NORMAL">NORMAL</option>
             <option value="RESOURCE">RESOURCE</option>
             <option value="BOUNTY">BOUNTY</option>
+          </Select>
+          <Select
+            className="admin-input"
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value)}
+          >
+            <option value="">全部分类</option>
+            {(categoriesQuery.data ?? []).map((category) => (
+              <option key={category.id} value={String(category.id)}>
+                {category.name}
+              </option>
+            ))}
+          </Select>
+          <Select
+            className="admin-input"
+            value={tagId}
+            onChange={(e) => setTagId(e.target.value)}
+          >
+            <option value="">全部标签</option>
+            {(tagsQuery.data ?? []).map((tag) => (
+              <option key={tag.id} value={String(tag.id)}>
+                {tag.name}
+              </option>
+            ))}
           </Select>
           <Input
             className="admin-input"
@@ -127,6 +160,8 @@ export function AdminPostsClient() {
                 status,
                 postType,
                 author: author.trim(),
+                categoryId,
+                tagId,
               })
             }
           >
@@ -138,7 +173,7 @@ export function AdminPostsClient() {
       <section className="admin-table-card">
         <div className="admin-table-head">
           <h2>帖子管理</h2>
-          <p>针对违规或不合规内容执行下架与上架处理。</p>
+          <p>查看帖子当前所属分类和标签，并执行上下架操作。</p>
         </div>
         {loading ? (
           <div className="admin-loading">加载中...</div>
@@ -153,6 +188,7 @@ export function AdminPostsClient() {
                   <TableHead>标题</TableHead>
                   <TableHead>作者</TableHead>
                   <TableHead>类型</TableHead>
+                  <TableHead>分类/标签</TableHead>
                   <TableHead>状态</TableHead>
                   <TableHead>操作</TableHead>
                 </TableRow>
@@ -176,6 +212,14 @@ export function AdminPostsClient() {
                       <span className={getBadgeClass(post.postType)}>
                         {post.postType}
                       </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">
+                        <div>{post.categoryName || "-"}</div>
+                        <div className="text-slate-500">
+                          {post.tags?.map((tag) => `#${tag.name}`).join(" ") || "-"}
+                        </div>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <span className={getStatusClass(post.status)}>
@@ -216,12 +260,6 @@ export function AdminPostsClient() {
           </div>
         )}
       </section>
-
-      <div className="admin-footer-link">
-        <Link href="/admin/users" className="admin-inline-link">
-          前往用户管理
-        </Link>
-      </div>
     </main>
   );
 }

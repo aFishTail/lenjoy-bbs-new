@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { readError } from "@/components/post/client-helpers";
+
 import { RichTextContent } from "@/components/editor/rich-text-content";
 import { RichTextEditor } from "@/components/editor/rich-text-editor";
+import { readError } from "@/components/post/client-helpers";
 import { usePostCommentsQuery, usePostDetailQuery } from "@/components/post/use-post-queries";
 import {
   useAcceptAnswerMutation,
@@ -14,6 +15,8 @@ import {
   useToggleCommentLikeMutation,
 } from "@/components/post/use-post-mutations";
 import { useAuth } from "@/components/providers/auth-provider";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Input } from "@/components/ui/input";
 
 type Props = {
   postId: string;
@@ -22,19 +25,21 @@ type Props = {
 export function PostCommentSection({ postId }: Props) {
   const router = useRouter();
   const { authData: auth } = useAuth();
-  
-  // Local state for forms and notifications
+
   const [commentText, setCommentText] = useState("");
   const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({});
   const [submittingComment, setSubmittingComment] = useState(false);
   const [acceptingCommentId, setAcceptingCommentId] = useState<number | null>(null);
-  
   const [errorText, setErrorText] = useState("");
   const [successText, setSuccessText] = useState("");
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [reportDetail, setReportDetail] = useState("");
+  const [reportTargetCommentId, setReportTargetCommentId] = useState<number | null>(null);
 
   const postQuery = usePostDetailQuery(postId);
   const commentsQuery = usePostCommentsQuery(postId);
-  
+
   const post = postQuery.data;
   const comments = commentsQuery.data ?? [];
 
@@ -56,12 +61,10 @@ export function PostCommentSection({ postId }: Props) {
     auth.user.id !== post.authorId;
 
   async function submitComment(parentId?: number) {
-    const contentValue = parentId
-      ? (replyDrafts[parentId] || "").trim()
-      : commentText.trim();
+    const contentValue = parentId ? (replyDrafts[parentId] || "").trim() : commentText.trim();
 
     if (!contentValue) {
-      setErrorText(parentId ? "请输入回复内容" : "请输入回答内容");
+      setErrorText(parentId ? "请输入回复内容" : "请输入评论内容");
       return;
     }
 
@@ -73,13 +76,14 @@ export function PostCommentSection({ postId }: Props) {
     setSubmittingComment(true);
     setErrorText("");
     setSuccessText("");
+
     try {
       await submitCommentMutation.mutateAsync({
         parentId,
         content: contentValue,
       });
-      setSuccessText(parentId ? "回复已发送" : "回答已提交");
-      
+      setSuccessText(parentId ? "回复已发送" : "评论已提交");
+
       if (parentId) {
         setReplyDrafts((prev) => ({ ...prev, [parentId]: "" }));
       } else {
@@ -96,9 +100,10 @@ export function PostCommentSection({ postId }: Props) {
     setAcceptingCommentId(commentId);
     setErrorText("");
     setSuccessText("");
+
     try {
       await acceptAnswerMutation.mutateAsync(commentId);
-      setSuccessText("已采纳该答案并完成赏金结算");
+      setSuccessText("已采纳该答案，悬赏已完成结算");
     } catch (error) {
       setErrorText(readError(error));
     } finally {
@@ -111,6 +116,7 @@ export function PostCommentSection({ postId }: Props) {
       router.push("/auth");
       return;
     }
+
     try {
       await toggleCommentLikeMutation.mutateAsync(commentId);
     } catch (error) {
@@ -123,8 +129,10 @@ export function PostCommentSection({ postId }: Props) {
       router.push("/auth");
       return;
     }
+
     setErrorText("");
     setSuccessText("");
+
     try {
       await deleteOwnCommentMutation.mutateAsync(commentId);
       setSuccessText("评论已删除");
@@ -133,22 +141,36 @@ export function PostCommentSection({ postId }: Props) {
     }
   }
 
-  async function reportComment(commentId: number) {
+  function openReportDialog(commentId: number) {
     if (!auth) {
       router.push("/auth");
       return;
     }
-    const reason = window.prompt("请输入举报原因（必填）", "违规评论");
-    if (!reason || !reason.trim()) {
+
+    setErrorText("");
+    setSuccessText("");
+    setReportTargetCommentId(commentId);
+    setReportReason("");
+    setReportDetail("");
+    setReportDialogOpen(true);
+  }
+
+  async function submitCommentReport() {
+    const trimmedReason = reportReason.trim();
+    if (!reportTargetCommentId || !trimmedReason) {
       return;
     }
-    const detail = window.prompt("补充说明（选填）", "") || "";
+
     try {
       await reportCommentMutation.mutateAsync({
-        commentId,
-        reason: reason.trim(),
-        detail: detail.trim(),
+        commentId: reportTargetCommentId,
+        reason: trimmedReason,
+        detail: reportDetail.trim(),
       });
+      setReportDialogOpen(false);
+      setReportTargetCommentId(null);
+      setReportReason("");
+      setReportDetail("");
       setSuccessText("评论举报已提交");
     } catch (error) {
       setErrorText(readError(error));
@@ -167,7 +189,7 @@ export function PostCommentSection({ postId }: Props) {
           {errorText}
         </div>
       )}
-      
+
       {successText && (
         <div className="banner banner-success mb-4">
           <svg className="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -180,12 +202,9 @@ export function PostCommentSection({ postId }: Props) {
 
       <section className="card mb-4">
         <div className="flex-between mb-4">
-          <h2 className="section-title">
-            {post.postType === "BOUNTY" ? "候选答案" : "评论区"}
-          </h2>
+          <h2 className="section-title">{post.postType === "BOUNTY" ? "候选答案" : "评论区"}</h2>
           <span className="text-sm text-slate-500">
-            {comments.length} 条一级
-            {post.postType === "BOUNTY" ? "答案" : "评论"}
+            {comments.length} 条一级{post.postType === "BOUNTY" ? "答案" : "评论"}
           </span>
         </div>
 
@@ -197,7 +216,7 @@ export function PostCommentSection({ postId }: Props) {
                 value={commentText}
                 onChange={setCommentText}
                 minHeightClassName="min-h-[180px]"
-                placeholder="直接给出可采纳的完整方案，追问讨论请用二级回复。"
+                placeholder="直接给出可采纳的完整方案，补充讨论可使用二级回复。"
               />
               <div className="mt-3 flex justify-end">
                 <button
@@ -211,9 +230,7 @@ export function PostCommentSection({ postId }: Props) {
               </div>
             </div>
           ) : !auth ? (
-            <div className="banner banner-info mb-6">
-              登录后可参与回答悬赏问题。
-            </div>
+            <div className="banner banner-info mb-6">登录后可参与回答悬赏问题。</div>
           ) : null
         ) : (
           <div className="mb-6 rounded-2xl border border-[var(--border-light)] bg-white/70 p-4">
@@ -250,19 +267,14 @@ export function PostCommentSection({ postId }: Props) {
                   <span className="font-medium text-slate-800">
                     {comment.authorUsername || comment.authorId}
                   </span>
-                  <span>
-                    {new Date(comment.createdAt).toLocaleString("zh-CN")}
-                  </span>
+                  <span>{new Date(comment.createdAt).toLocaleString("zh-CN")}</span>
                   {comment.accepted ? (
                     <span className="badge badge-success">已采纳</span>
                   ) : null}
                 </div>
+
                 <RichTextContent
-                  html={
-                    comment.deleted
-                      ? "<p>该评论已删除</p>"
-                      : comment.content
-                  }
+                  html={comment.deleted ? "<p>该评论已删除</p>" : comment.content}
                   className="leading-7"
                 />
 
@@ -285,9 +297,7 @@ export function PostCommentSection({ postId }: Props) {
                       disabled={acceptingCommentId === comment.id}
                       onClick={() => void acceptAnswer(comment.id)}
                     >
-                      {acceptingCommentId === comment.id
-                        ? "采纳中..."
-                        : "采纳答案"}
+                      {acceptingCommentId === comment.id ? "采纳中..." : "采纳答案"}
                     </button>
                   ) : null}
                   {!!auth ? (
@@ -316,7 +326,7 @@ export function PostCommentSection({ postId }: Props) {
                   <button
                     type="button"
                     className="btn btn-ghost btn-sm"
-                    onClick={() => void reportComment(comment.id)}
+                    onClick={() => openReportDialog(comment.id)}
                   >
                     举报评论
                   </button>
@@ -333,7 +343,7 @@ export function PostCommentSection({ postId }: Props) {
                         }))
                       }
                       minHeightClassName="min-h-[120px]"
-                      placeholder="继续追问或补充细节。"
+                      placeholder="继续追问，或补充更多细节。"
                     />
                     <div className="mt-3 flex justify-end gap-2">
                       <button
@@ -364,31 +374,20 @@ export function PostCommentSection({ postId }: Props) {
                 {comment.replies?.length ? (
                   <div className="mt-4 space-y-3 border-t border-[var(--border-light)] pt-4">
                     {comment.replies.map((reply) => (
-                      <div
-                        key={reply.id}
-                        className="rounded-xl bg-slate-50 p-3 text-sm"
-                      >
+                      <div key={reply.id} className="rounded-xl bg-slate-50 p-3 text-sm">
                         <div className="mb-2 flex flex-wrap items-center gap-2 text-slate-500">
                           <span className="font-medium text-slate-700">
                             {reply.authorUsername || reply.authorId}
                           </span>
-                          {reply.replyToUsername ? (
-                            <span>回复 {reply.replyToUsername}</span>
-                          ) : null}
-                          <span>
-                            {new Date(reply.createdAt).toLocaleString(
-                              "zh-CN",
-                            )}
-                          </span>
+                          {reply.replyToUsername ? <span>回复 {reply.replyToUsername}</span> : null}
+                          <span>{new Date(reply.createdAt).toLocaleString("zh-CN")}</span>
                         </div>
+
                         <RichTextContent
-                          html={
-                            reply.deleted
-                              ? "<p>该评论已删除</p>"
-                              : reply.content
-                          }
+                          html={reply.deleted ? "<p>该评论已删除</p>" : reply.content}
                           className="leading-6"
                         />
+
                         <div className="mt-2 flex flex-wrap gap-2">
                           <button
                             type="button"
@@ -402,9 +401,7 @@ export function PostCommentSection({ postId }: Props) {
                             <button
                               type="button"
                               className="btn btn-ghost btn-sm"
-                              onClick={() =>
-                                void deleteOwnComment(reply.id)
-                              }
+                              onClick={() => void deleteOwnComment(reply.id)}
                             >
                               删除
                             </button>
@@ -412,7 +409,7 @@ export function PostCommentSection({ postId }: Props) {
                           <button
                             type="button"
                             className="btn btn-ghost btn-sm"
-                            onClick={() => void reportComment(reply.id)}
+                            onClick={() => openReportDialog(reply.id)}
                           >
                             举报
                           </button>
@@ -426,6 +423,48 @@ export function PostCommentSection({ postId }: Props) {
           )}
         </div>
       </section>
+
+      <ConfirmDialog
+        open={reportDialogOpen}
+        title="举报评论"
+        description="请填写举报原因。内容会提交给后台审核。"
+        confirmLabel="提交举报"
+        confirmDisabled={!reportReason.trim() || !reportTargetCommentId}
+        confirmBusy={reportCommentMutation.isPending}
+        onConfirm={() => void submitCommentReport()}
+        onOpenChange={(open) => {
+          setReportDialogOpen(open);
+          if (!open) {
+            setReportTargetCommentId(null);
+            setReportReason("");
+            setReportDetail("");
+          }
+        }}
+      >
+        <div className="confirm-dialog-form">
+          <label className="confirm-dialog-field">
+            <span>举报原因</span>
+            <Input
+              value={reportReason}
+              onChange={(event) => setReportReason(event.target.value)}
+              placeholder="例如：辱骂、人身攻击、广告、刷屏"
+              maxLength={80}
+              autoFocus
+            />
+          </label>
+          <label className="confirm-dialog-field">
+            <span>补充说明</span>
+            <textarea
+              className="confirm-dialog-textarea"
+              value={reportDetail}
+              onChange={(event) => setReportDetail(event.target.value)}
+              placeholder="选填，补充违规位置或上下文"
+              rows={4}
+              maxLength={300}
+            />
+          </label>
+        </div>
+      </ConfirmDialog>
     </>
   );
 }

@@ -15,6 +15,26 @@ export type PaginatedResponse<T> = {
   hasPrevious: boolean;
 };
 
+export type CategorySummary = {
+  id: number;
+  name: string;
+  slug: string;
+  parentId: number;
+  contentType: "NORMAL" | "RESOURCE" | "BOUNTY";
+  sort: number;
+  status: "ACTIVE" | "INACTIVE";
+  leaf: boolean;
+};
+
+export type TagSummary = {
+  id: number;
+  name: string;
+  slug: string;
+  status: "ACTIVE" | "INACTIVE" | "MERGED";
+  source: "SYSTEM" | "CUSTOM";
+  usageCount?: number;
+};
+
 export type AuthData = {
   token: string;
   tokenType: string;
@@ -68,6 +88,9 @@ export type PostSummary = {
   status: "PUBLISHED" | "CLOSED" | "OFFLINE" | "DELETED";
   authorId: number;
   authorUsername?: string;
+  categoryId?: number | null;
+  categoryName?: string | null;
+  tags?: TagSummary[];
   viewCount?: number;
   likeCount?: number;
   collectCount?: number;
@@ -85,6 +108,9 @@ export type PostDetail = {
   status: "PUBLISHED" | "CLOSED" | "OFFLINE" | "DELETED";
   authorId: number;
   authorUsername?: string;
+  categoryId?: number | null;
+  categoryName?: string | null;
+  tags?: TagSummary[];
   content?: string;
   hiddenContent?: string;
   price?: number;

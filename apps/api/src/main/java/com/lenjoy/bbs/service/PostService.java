@@ -17,6 +17,8 @@ import com.lenjoy.bbs.mapper.PostMapper;
 import com.lenjoy.bbs.mapper.UserAccountMapper;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -35,6 +37,7 @@ public class PostService {
     private final BountyService bountyService;
     private final PostValidator postValidator;
     private final PostAssembler postAssembler;
+    private final TaxonomyService taxonomyService;
 
     @Transactional
     public PostDetailResponse create(Long userId, CreatePostRequest request) {
@@ -42,10 +45,13 @@ public class PostService {
         postValidator.ensureCanPost(user);
         PostType postType = PostType.fromNullable(request.getPostType());
         postValidator.validateCreate(postType, request);
+        taxonomyService.requireActiveCategoryForPost(postType.value(), request.getCategoryId());
+        taxonomyService.requireActiveTags(request.getTagIds());
 
         PostEntity entity = new PostEntity();
         entity.setAuthorId(userId);
         entity.setPostType(postType.value());
+        entity.setCategoryId(request.getCategoryId());
         entity.setTitle(request.getTitle().trim());
         entity.setContent(blankToNull(request.getContent()));
         entity.setHiddenContent(blankToNull(request.getHiddenContent()));
@@ -60,6 +66,7 @@ public class PostService {
         entity.setCreatedAt(LocalDateTime.now());
         entity.setUpdatedAt(LocalDateTime.now());
         postMapper.insert(entity);
+        taxonomyService.replacePostTags(entity.getId(), request.getTagIds());
 
         bountyService.freezeOnCreate(entity, userId);
         postMapper.updateById(entity);
@@ -67,10 +74,11 @@ public class PostService {
         return postAssembler.toDetail(entity, user.getUsername(), userId, true, false);
     }
 
-    public PageResponse<PostSummaryResponse> listPublic(String postType, Integer page, Integer pageSize) {
+    public PageResponse<PostSummaryResponse> listPublic(String postType, Long categoryId, Long tagId, String keyword,
+            Integer page, Integer pageSize) {
         Page<PostEntity> result = postMapper.selectPage(
                 new Page<>(normalizePage(page), normalizePageSize(pageSize)),
-                buildPublicListQuery(postType));
+                buildPublicListQuery(postType, categoryId, tagId, keyword));
         return postAssembler.toPageResponse(result);
     }
 
@@ -81,7 +89,8 @@ public class PostService {
         return postAssembler.toPageResponse(result);
     }
 
-    public List<PostSummaryResponse> listAdmin(String status, String postType, String authorKeyword) {
+    public List<PostSummaryResponse> listAdmin(String status, String postType, String authorKeyword, Long categoryId,
+            Long tagId) {
         LambdaQueryWrapper<PostEntity> query = new LambdaQueryWrapper<PostEntity>()
                 .orderByDesc(PostEntity::getCreatedAt);
 
@@ -90,6 +99,16 @@ public class PostService {
         }
         if (postType != null && !postType.isBlank()) {
             query.eq(PostEntity::getPostType, PostType.fromNullable(postType).value());
+        }
+        if (categoryId != null) {
+            query.eq(PostEntity::getCategoryId, categoryId);
+        }
+        if (tagId != null) {
+            Set<Long> matchedPostIds = taxonomyService.findPostIdsByTagIds(List.of(tagId)).get(tagId);
+            if (matchedPostIds == null || matchedPostIds.isEmpty()) {
+                return List.of();
+            }
+            query.in(PostEntity::getId, matchedPostIds);
         }
         if (authorKeyword != null && !authorKeyword.isBlank()) {
             List<UserAccountEntity> users = userAccountMapper.selectList(new LambdaQueryWrapper<UserAccountEntity>()
@@ -108,7 +127,7 @@ public class PostService {
         UserAccountEntity author = requireUser(entity.getAuthorId());
         boolean isAuthor = requesterUserId != null && requesterUserId.equals(entity.getAuthorId());
         if (!postValidator.canView(entity, isAuthor, requesterIsAdmin)) {
-            throw new ApiException("POST_NOT_FOUND", "帖子不存在", HttpStatus.NOT_FOUND);
+            throw new ApiException("POST_NOT_FOUND", "Post not found", HttpStatus.NOT_FOUND);
         }
         return postAssembler.toDetail(entity, author.getUsername(), requesterUserId, isAuthor, requesterIsAdmin);
     }
@@ -118,13 +137,17 @@ public class PostService {
         PostEntity entity = requirePost(postId);
         postValidator.ensureAuthor(entity, userId);
         postValidator.ensureEditable(entity);
-        postValidator.validateUpdate(PostType.fromNullable(entity.getPostType()), request);
+        PostType postType = PostType.fromNullable(entity.getPostType());
+        postValidator.validateUpdate(postType, request);
+        taxonomyService.requireActiveCategoryForPost(entity.getPostType(), request.getCategoryId());
+        taxonomyService.requireActiveTags(request.getTagIds());
 
         PostEntity nextState = new PostEntity();
         nextState.setBountyAmount(request.getBountyAmount());
         nextState.setBountyExpireAt(request.getBountyExpireAt());
         bountyService.adjustFreezeOnUpdate(entity, nextState, userId);
 
+        entity.setCategoryId(request.getCategoryId());
         entity.setTitle(request.getTitle().trim());
         entity.setContent(blankToNull(request.getContent()));
         entity.setHiddenContent(blankToNull(request.getHiddenContent()));
@@ -133,6 +156,7 @@ public class PostService {
         entity.setBountyExpireAt(request.getBountyExpireAt());
         entity.setUpdatedAt(LocalDateTime.now());
         postMapper.updateById(entity);
+        taxonomyService.replacePostTags(entity.getId(), request.getTagIds());
 
         UserAccountEntity author = requireUser(entity.getAuthorId());
         return postAssembler.toDetail(entity, author.getUsername(), userId, true, false);
@@ -143,12 +167,12 @@ public class PostService {
         PostEntity entity = requirePost(postId);
         postValidator.ensureAuthor(entity, userId);
         if (PostStatus.OFFLINE.value().equals(entity.getStatus())) {
-            throw new ApiException("POST_OFFLINE", "帖子已被下架，无法关闭", HttpStatus.BAD_REQUEST);
+            throw new ApiException("POST_OFFLINE", "Offline post cannot be closed", HttpStatus.BAD_REQUEST);
         }
         if (PostStatus.DELETED.value().equals(entity.getStatus()) || Boolean.TRUE.equals(entity.getDeleted())) {
-            throw new ApiException("POST_DELETED", "帖子已删除", HttpStatus.BAD_REQUEST);
+            throw new ApiException("POST_DELETED", "Deleted post cannot be closed", HttpStatus.BAD_REQUEST);
         }
-        bountyService.settleOnCloseOrDelete(entity, userId, "关闭悬赏帖子退回赏金");
+        bountyService.settleOnCloseOrDelete(entity, userId, "Close bounty post");
         entity.setStatus(PostStatus.CLOSED.value());
         entity.setUpdatedAt(LocalDateTime.now());
         postMapper.updateById(entity);
@@ -161,7 +185,7 @@ public class PostService {
         if (PostStatus.DELETED.value().equals(entity.getStatus()) || Boolean.TRUE.equals(entity.getDeleted())) {
             return;
         }
-        bountyService.settleOnCloseOrDelete(entity, userId, "删除悬赏帖子退回赏金");
+        bountyService.settleOnCloseOrDelete(entity, userId, "Delete bounty post");
         entity.setStatus(PostStatus.DELETED.value());
         entity.setDeleted(true);
         entity.setUpdatedAt(LocalDateTime.now());
@@ -172,7 +196,7 @@ public class PostService {
     public void offline(Long postId, Long adminUserId, OfflinePostRequest request) {
         PostEntity entity = requirePost(postId);
         if (PostStatus.DELETED.value().equals(entity.getStatus()) || Boolean.TRUE.equals(entity.getDeleted())) {
-            throw new ApiException("POST_DELETED", "帖子已删除", HttpStatus.BAD_REQUEST);
+            throw new ApiException("POST_DELETED", "Post deleted", HttpStatus.BAD_REQUEST);
         }
         bountyService.settleOnCloseOrDelete(entity, adminUserId, request.getReason().trim());
         entity.setStatus(PostStatus.OFFLINE.value());
@@ -187,10 +211,10 @@ public class PostService {
     public void online(Long postId, Long adminUserId) {
         PostEntity entity = requirePost(postId);
         if (PostStatus.DELETED.value().equals(entity.getStatus()) || Boolean.TRUE.equals(entity.getDeleted())) {
-            throw new ApiException("POST_DELETED", "帖子已删除", HttpStatus.BAD_REQUEST);
+            throw new ApiException("POST_DELETED", "Post deleted", HttpStatus.BAD_REQUEST);
         }
         if (!PostStatus.OFFLINE.value().equals(entity.getStatus())) {
-            throw new ApiException("POST_STATUS_INVALID", "仅下架帖子可执行上架", HttpStatus.BAD_REQUEST);
+            throw new ApiException("POST_STATUS_INVALID", "Only offline posts can be restored", HttpStatus.BAD_REQUEST);
         }
 
         entity.setStatus(PostStatus.PUBLISHED.value());
@@ -204,7 +228,7 @@ public class PostService {
     private UserAccountEntity requireUser(Long userId) {
         UserAccountEntity user = userAccountMapper.selectById(userId);
         if (user == null) {
-            throw new ApiException("USER_NOT_FOUND", "用户不存在", HttpStatus.NOT_FOUND);
+            throw new ApiException("USER_NOT_FOUND", "User not found", HttpStatus.NOT_FOUND);
         }
         return user;
     }
@@ -212,7 +236,7 @@ public class PostService {
     private PostEntity requirePost(Long postId) {
         PostEntity entity = postMapper.selectById(postId);
         if (entity == null) {
-            throw new ApiException("POST_NOT_FOUND", "帖子不存在", HttpStatus.NOT_FOUND);
+            throw new ApiException("POST_NOT_FOUND", "Post not found", HttpStatus.NOT_FOUND);
         }
         return entity;
     }
@@ -236,13 +260,29 @@ public class PostService {
         return Math.min(pageSize, MAX_PAGE_SIZE);
     }
 
-    private LambdaQueryWrapper<PostEntity> buildPublicListQuery(String postType) {
+    private LambdaQueryWrapper<PostEntity> buildPublicListQuery(String postType, Long categoryId, Long tagId,
+            String keyword) {
         LambdaQueryWrapper<PostEntity> query = new LambdaQueryWrapper<PostEntity>()
                 .eq(PostEntity::getDeleted, false)
                 .in(PostEntity::getStatus, List.of(PostStatus.PUBLISHED.value(), PostStatus.CLOSED.value()))
                 .orderByDesc(PostEntity::getCreatedAt);
         if (postType != null && !postType.isBlank()) {
             query.eq(PostEntity::getPostType, PostType.fromNullable(postType).value());
+        }
+        if (categoryId != null) {
+            query.eq(PostEntity::getCategoryId, categoryId);
+        }
+        if (keyword != null && !keyword.isBlank()) {
+            query.like(PostEntity::getTitle, keyword.trim());
+        }
+        if (tagId != null) {
+            Map<Long, Set<Long>> tagMap = taxonomyService.findPostIdsByTagIds(List.of(tagId));
+            Set<Long> postIds = tagMap.get(tagId);
+            if (postIds == null || postIds.isEmpty()) {
+                query.eq(PostEntity::getId, -1L);
+            } else {
+                query.in(PostEntity::getId, postIds);
+            }
         }
         return query;
     }

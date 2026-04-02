@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { readError } from "@/components/post/client-helpers";
+import { PostCardStats } from "@/components/post/post-card-stats";
 import { PaginationControls } from "@/components/post/pagination-controls";
 import { useMyPostsQuery } from "@/components/post/use-post-queries";
 
@@ -93,11 +94,12 @@ export function MyPostsClient() {
                   <span className="badge badge-info">{post.status}</span>
                 </div>
                 <h3 className="post-item-title">{post.title}</h3>
-                <div className="post-item-stats">
-                  <span className="post-item-stat">{post.viewCount || 0}</span>
-                  <span className="post-item-stat">{post.commentCount || 0}</span>
-                  <span className="post-item-stat">{post.likeCount || 0}</span>
-                </div>
+                <PostCardStats
+                  viewCount={post.viewCount}
+                  commentCount={post.commentCount}
+                  likeCount={post.likeCount}
+                  createdAt={post.createdAt}
+                />
               </Link>
             ))}
           </div>

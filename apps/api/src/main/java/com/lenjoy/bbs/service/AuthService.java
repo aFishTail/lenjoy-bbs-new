@@ -156,6 +156,7 @@ public class AuthService {
         summary.setPhone(user.getPhone());
         summary.setAvatarUrl(user.getAvatarUrl());
         summary.setBio(user.getBio());
+        summary.setRoles(roles);
         resp.setUser(summary);
         return resp;
     }

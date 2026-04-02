@@ -27,4 +27,25 @@ test.describe("PRD admin flow", () => {
       await adminPage.close();
     }
   });
+
+  test("guest and non-admin cannot see admin shell", async ({ browser, baseURL }) => {
+    test.skip(!baseURL, "baseURL is required");
+
+    const user = requireSession("user_a");
+
+    for (const path of ADMIN_ROUTES) {
+      const guestPage = await browser.newPage();
+      await guestPage.goto(path, { waitUntil: "domcontentloaded" });
+      await expect(guestPage).toHaveURL(/\/auth$/);
+      await expect(guestPage.locator(".admin-shell")).toHaveCount(0);
+      await guestPage.close();
+
+      const userPage = await browser.newPage();
+      await applySession(userPage.context(), baseURL, user);
+      await userPage.goto(path, { waitUntil: "domcontentloaded" });
+      await expect(userPage).toHaveURL(/\/auth$/);
+      await expect(userPage.locator(".admin-shell")).toHaveCount(0);
+      await userPage.close();
+    }
+  });
 });

@@ -7,6 +7,8 @@ import { PropsWithChildren } from "react";
 const menus = [
   { href: "/admin", label: "总览" },
   { href: "/admin/posts", label: "帖子管理" },
+  { href: "/admin/categories", label: "分类管理" },
+  { href: "/admin/tags", label: "标签管理" },
   { href: "/admin/users", label: "用户管理" },
   { href: "/admin/audit", label: "审计中心" },
   { href: "/admin/coins", label: "金币管理" },
@@ -53,7 +55,7 @@ export function AdminShell({ children }: PropsWithChildren) {
       <section className="admin-content-wrap">
         <header className="admin-topbar">
           <h1>管理后台</h1>
-          <p>内容治理与用户管理</p>
+          <p>内容治理与运营配置</p>
         </header>
         {children}
       </section>

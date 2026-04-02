@@ -1,5 +1,6 @@
 package com.lenjoy.bbs.domain.dto;
 
+import java.util.List;
 import lombok.Data;
 
 @Data
@@ -18,5 +19,6 @@ public class AuthResponse {
         private String phone;
         private String avatarUrl;
         private String bio;
+        private List<String> roles;
     }
 }

@@ -14,6 +14,7 @@ import com.lenjoy.bbs.domain.dto.OfflinePostRequest;
 import com.lenjoy.bbs.domain.dto.PostDetailResponse;
 import com.lenjoy.bbs.domain.dto.PostSummaryResponse;
 import com.lenjoy.bbs.domain.dto.UpdatePostRequest;
+import com.lenjoy.bbs.domain.entity.CategoryEntity;
 import com.lenjoy.bbs.domain.entity.PostEntity;
 import com.lenjoy.bbs.domain.entity.UserAccountEntity;
 import com.lenjoy.bbs.exception.ApiException;
@@ -43,6 +44,9 @@ class PostServiceTest {
     @Mock
     private PostAssembler postAssembler;
 
+    @Mock
+    private TaxonomyService taxonomyService;
+
     @Spy
     private PostValidator postValidator;
 
@@ -57,6 +61,7 @@ class PostServiceTest {
         CreatePostRequest request = new CreatePostRequest();
         request.setPostType("NORMAL");
         request.setTitle("hello");
+        request.setCategoryId(1L);
         request.setContent("body");
 
         ApiException ex = assertThrows(ApiException.class, () -> postService.create(1L, request));
@@ -72,6 +77,7 @@ class PostServiceTest {
 
         UpdatePostRequest request = new UpdatePostRequest();
         request.setTitle("new");
+        request.setCategoryId(1L);
         request.setContent("new body");
 
         ApiException ex = assertThrows(ApiException.class, () -> postService.update(9L, 200L, request));
@@ -111,7 +117,7 @@ class PostServiceTest {
         when(postMapper.selectById(33L)).thenReturn(post);
 
         OfflinePostRequest request = new OfflinePostRequest();
-        request.setReason("违规");
+        request.setReason("invalid");
 
         ApiException ex = assertThrows(ApiException.class, () -> postService.offline(33L, 99L, request));
 
@@ -123,7 +129,7 @@ class PostServiceTest {
     void listAdmin_whenAuthorFilterNoMatch_shouldReturnEmpty() {
         when(userAccountMapper.selectList(any())).thenReturn(List.of());
 
-        var list = postService.listAdmin(null, null, "nobody");
+        var list = postService.listAdmin(null, null, "nobody", null, null);
 
         assertEquals(0, list.size());
     }
@@ -132,6 +138,8 @@ class PostServiceTest {
     void create_success_shouldPersistAndReturnDetail() {
         UserAccountEntity user = buildUser(5L, "writer", "ACTIVE");
         when(userAccountMapper.selectById(5L)).thenReturn(user);
+        when(taxonomyService.requireActiveCategoryForPost("NORMAL", 1L)).thenReturn(new CategoryEntity());
+        when(taxonomyService.requireActiveTags(any())).thenReturn(List.of());
         doAnswer(invocation -> {
             PostEntity entity = invocation.getArgument(0);
             entity.setId(101L);
@@ -148,6 +156,7 @@ class PostServiceTest {
         CreatePostRequest request = new CreatePostRequest();
         request.setPostType("NORMAL");
         request.setTitle("Title");
+        request.setCategoryId(1L);
         request.setContent("Body");
 
         PostDetailResponse response = postService.create(5L, request);
@@ -155,6 +164,7 @@ class PostServiceTest {
         assertEquals(101L, response.getId());
         assertEquals("NORMAL", response.getPostType());
         assertEquals("writer", response.getAuthorUsername());
+        verify(taxonomyService).replacePostTags(101L, null);
     }
 
     @Test
@@ -163,7 +173,7 @@ class PostServiceTest {
         when(postMapper.selectList(any())).thenReturn(List.of(post));
         when(postAssembler.toSummaryList(List.of(post))).thenReturn(List.of(new PostSummaryResponse()));
 
-        var result = postService.listAdmin(null, null, null);
+        var result = postService.listAdmin(null, null, null, null, null);
 
         assertEquals(1, result.size());
         verify(postAssembler).toSummaryList(List.of(post));
@@ -182,6 +192,7 @@ class PostServiceTest {
         post.setId(id);
         post.setAuthorId(authorId);
         post.setPostType(type);
+        post.setCategoryId(1L);
         post.setTitle("title");
         post.setStatus(status);
         post.setDeleted(deleted);

@@ -1,25 +1,33 @@
 "use client";
 
-import { useState, useEffect, FormEvent } from "react";
-import { readError } from "@/components/post/client-helpers";
+import { useRouter } from "next/navigation";
+import { FormEvent, useEffect, useState } from "react";
+
 import { RichTextEditor } from "@/components/editor/rich-text-editor";
+import { readError } from "@/components/post/client-helpers";
+import { TagPicker } from "@/components/post/tag-picker";
 import {
   useClosePostMutation,
   useDeletePostMutation,
   useUpdatePostMutation,
 } from "@/components/post/use-post-mutations";
 import { usePostDetailQuery } from "@/components/post/use-post-queries";
+import { useCategoriesQuery, useTagsQuery } from "@/components/post/use-taxonomy-queries";
+import { Select } from "@/components/ui/select";
 
 type Props = {
   postId: string;
 };
 
 export function PostAuthorActions({ postId }: Props) {
+  const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [errorText, setErrorText] = useState("");
   const [successText, setSuccessText] = useState("");
-  
+
   const [title, setTitle] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
   const [content, setContent] = useState("");
   const [hiddenContent, setHiddenContent] = useState("");
   const [price, setPrice] = useState("");
@@ -29,6 +37,8 @@ export function PostAuthorActions({ postId }: Props) {
   const postQuery = usePostDetailQuery(postId);
   const post = postQuery.data;
 
+  const categoriesQuery = useCategoriesQuery(post?.postType || "NORMAL");
+  const tagsQuery = useTagsQuery("");
   const updatePostMutation = useUpdatePostMutation(postId);
   const closePostMutation = useClosePostMutation(postId);
   const deletePostMutation = useDeletePostMutation(postId);
@@ -40,6 +50,8 @@ export function PostAuthorActions({ postId }: Props) {
   useEffect(() => {
     if (!post) return;
     setTitle(post.title || "");
+    setCategoryId(post.categoryId ? String(post.categoryId) : "");
+    setSelectedTagIds(post.tags?.map((tag) => tag.id) || []);
     setContent(post.content || "");
     setHiddenContent(post.hiddenContent || "");
     setPrice(post.price ? String(post.price) : "");
@@ -56,6 +68,8 @@ export function PostAuthorActions({ postId }: Props) {
     try {
       await updatePostMutation.mutateAsync({
         title,
+        categoryId: Number(categoryId),
+        tagIds: selectedTagIds,
         content,
         hiddenContent,
         price: price ? Number(price) : null,
@@ -85,7 +99,8 @@ export function PostAuthorActions({ postId }: Props) {
     setSuccessText("");
     try {
       await deletePostMutation.mutateAsync();
-      setSuccessText("帖子已删除");
+      router.replace("/");
+      router.refresh();
     } catch (error) {
       setErrorText(readError(error));
     }
@@ -93,23 +108,8 @@ export function PostAuthorActions({ postId }: Props) {
 
   return (
     <>
-      {errorText && (
-        <div className="banner banner-error mb-4">
-          <svg className="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10" />
-          </svg>
-          {errorText}
-        </div>
-      )}
-      
-      {successText && (
-        <div className="banner banner-success mb-4">
-          <svg className="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-          </svg>
-          {successText}
-        </div>
-      )}
+      {errorText ? <div className="banner banner-error mb-4">{errorText}</div> : null}
+      {successText ? <div className="banner banner-success mb-4">{successText}</div> : null}
 
       <section className="card">
         <div className="flex-between mb-4">
@@ -135,24 +135,36 @@ export function PostAuthorActions({ postId }: Props) {
                 />
               </div>
 
-              {(post.postType === "NORMAL" ||
-                post.postType === "BOUNTY") && (
-                <div className="form-group">
-                  <label className="form-label">正文</label>
-                  <RichTextEditor value={content} onChange={setContent} />
-                </div>
-              )}
+              <div className="form-group">
+                <label className="form-label">分类</label>
+                <Select
+                  value={categoryId}
+                  onChange={(event) => setCategoryId(event.target.value)}
+                >
+                  {(categoriesQuery.data ?? []).map((category) => (
+                    <option key={category.id} value={String(category.id)}>
+                      {category.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
 
-              {post.postType === "RESOURCE" && (
+              <div className="form-group">
+                <label className="form-label">标签</label>
+                <TagPicker
+                  tags={tagsQuery.data ?? []}
+                  selectedTagIds={selectedTagIds}
+                  onChange={setSelectedTagIds}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">正文</label>
+                <RichTextEditor value={content} onChange={setContent} />
+              </div>
+
+              {post.postType === "RESOURCE" ? (
                 <>
-                  <div className="form-group">
-                    <label className="form-label">公开内容</label>
-                    <RichTextEditor
-                      value={content}
-                      onChange={setContent}
-                      minHeightClassName="min-h-[160px]"
-                    />
-                  </div>
                   <div className="form-group">
                     <label className="form-label">隐藏内容</label>
                     <RichTextEditor
@@ -173,9 +185,9 @@ export function PostAuthorActions({ postId }: Props) {
                     />
                   </div>
                 </>
-              )}
+              ) : null}
 
-              {post.postType === "BOUNTY" && (
+              {post.postType === "BOUNTY" ? (
                 <>
                   <div className="form-group">
                     <label className="form-label">悬赏金额</label>
@@ -198,7 +210,7 @@ export function PostAuthorActions({ postId }: Props) {
                     />
                   </div>
                 </>
-              )}
+              ) : null}
 
               <div className="flex gap-3">
                 <button className="btn btn-primary" type="submit">

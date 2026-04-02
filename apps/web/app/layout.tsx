@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Navigation } from "@/components/layout/navigation";
+import { RouteFeedback } from "@/components/layout/route-feedback";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { AuthProvider } from "@/components/providers/auth-provider";
 import { Toaster } from "@/components/ui/toaster";
@@ -26,6 +27,7 @@ export default async function RootLayout({
             <Navigation />
             {children}
             <Toaster />
+            <RouteFeedback />
           </AuthProvider>
         </QueryProvider>
       </body>

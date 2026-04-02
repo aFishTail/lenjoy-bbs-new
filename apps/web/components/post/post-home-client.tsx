@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { readError } from "@/components/post/client-helpers";
 import { PaginationControls } from "@/components/post/pagination-controls";
+import { PostCardStats } from "@/components/post/post-card-stats";
 import { usePostsQuery } from "@/components/post/use-post-queries";
 import { useAuth } from "@/components/providers/auth-provider";
 import type { PaginatedResponse, PostSummary } from "@/components/post/types";
@@ -150,11 +151,12 @@ export function PostHomeClient({ initialPosts }: PostHomeClientProps = {}) {
                     </span>
                   </div>
                   <h3 className="post-item-title">{post.title}</h3>
-                  <div className="post-item-stats">
-                    <span className="post-item-stat">{post.viewCount || 0}</span>
-                    <span className="post-item-stat">{post.commentCount || 0}</span>
-                    <span className="post-item-stat">{post.likeCount || 0}</span>
-                  </div>
+                  <PostCardStats
+                    viewCount={post.viewCount}
+                    commentCount={post.commentCount}
+                    likeCount={post.likeCount}
+                    createdAt={post.createdAt}
+                  />
                 </Link>
               ))}
             </div>

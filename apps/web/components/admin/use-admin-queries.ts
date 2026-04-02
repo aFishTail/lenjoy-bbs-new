@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { queryKeys, requestApiData } from "@/components/post/client-helpers";
 import type {
   AdminBountySummary,
+  CategorySummary,
   AdminCoinUserSummary,
   AdminDashboardMetrics,
   AdminUserSummary,
@@ -13,6 +14,7 @@ import type {
   ReportItem,
   ResourceTradeAuditItem,
   ResourceAppeal,
+  TagSummary,
   WalletLedgerItem,
 } from "@/components/post/types";
 
@@ -25,6 +27,8 @@ export type AdminPostsFilters = {
   status: string;
   postType: string;
   author: string;
+  categoryId: string;
+  tagId: string;
 };
 
 export type AdminReportsFilters = {
@@ -122,6 +126,34 @@ export function useAdminPostsQuery(filters: AdminPostsFilters) {
         },
       );
     },
+  });
+}
+
+export function useAdminCategoriesQuery(contentType: string) {
+  return useQuery({
+    queryKey: queryKeys.adminCategories(contentType),
+    queryFn: () =>
+      requestApiData<CategorySummary[]>(
+        `/api/admin/categories${contentType ? `?contentType=${contentType}` : ""}`,
+        {
+          withAuth: true,
+          cache: "no-store",
+        },
+      ),
+  });
+}
+
+export function useAdminTagsQuery(keyword: string) {
+  return useQuery({
+    queryKey: queryKeys.adminTags(keyword),
+    queryFn: () =>
+      requestApiData<TagSummary[]>(
+        `/api/admin/tags${keyword ? `?keyword=${encodeURIComponent(keyword)}` : ""}`,
+        {
+          withAuth: true,
+          cache: "no-store",
+        },
+      ),
   });
 }
 
