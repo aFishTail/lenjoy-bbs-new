@@ -1,15 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import {
   useCreateAdminCategoryMutation,
+  useDeleteAdminCategoryMutation,
+  useUpdateAdminCategoryMutation,
   useUpdateAdminCategoryStatusMutation,
 } from "@/components/admin/use-admin-mutations";
 import { useAdminCategoriesQuery } from "@/components/admin/use-admin-queries";
 import { readError } from "@/components/post/client-helpers";
+import type { CategorySummary } from "@/components/post/types";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import {
@@ -21,14 +25,29 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+type CategoryFormState = {
+  name: string;
+  contentType: "RESOURCE" | "NORMAL" | "BOUNTY";
+  sort: string;
+};
+
+const DEFAULT_FORM: CategoryFormState = {
+  name: "",
+  contentType: "RESOURCE",
+  sort: "0",
+};
+
 export function AdminCategoriesClient() {
-  const [contentType, setContentType] = useState("RESOURCE");
-  const [name, setName] = useState("");
-  const [sort, setSort] = useState("0");
+  const [contentType, setContentType] = useState<CategoryFormState["contentType"]>("RESOURCE");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<CategorySummary | null>(null);
+  const [form, setForm] = useState<CategoryFormState>(DEFAULT_FORM);
 
   const categoriesQuery = useAdminCategoriesQuery(contentType);
   const createCategoryMutation = useCreateAdminCategoryMutation(contentType);
+  const updateCategoryMutation = useUpdateAdminCategoryMutation(contentType);
   const updateStatusMutation = useUpdateAdminCategoryStatusMutation(contentType);
+  const deleteCategoryMutation = useDeleteAdminCategoryMutation(contentType);
 
   useEffect(() => {
     if (categoriesQuery.error) {
@@ -36,18 +55,75 @@ export function AdminCategoriesClient() {
     }
   }, [categoriesQuery.error]);
 
-  async function createCategory() {
+  const dialogBusy = createCategoryMutation.isPending || updateCategoryMutation.isPending;
+  const dialogTitle = editingCategory ? "编辑分类" : "新建分类";
+  const dialogConfirmLabel = editingCategory ? "保存修改" : "创建分类";
+  const categories = categoriesQuery.data ?? [];
+
+  const sortedContentTypes = useMemo(
+    () => [
+      { label: "RESOURCE", value: "RESOURCE" },
+      { label: "NORMAL", value: "NORMAL" },
+      { label: "BOUNTY", value: "BOUNTY" },
+    ] as const,
+    [],
+  );
+
+  function resetDialogState(nextContentType: CategoryFormState["contentType"] = contentType) {
+    setEditingCategory(null);
+    setForm({
+      ...DEFAULT_FORM,
+      contentType: nextContentType,
+    });
+  }
+
+  function openCreateDialog() {
+    resetDialogState();
+    setDialogOpen(true);
+  }
+
+  function openEditDialog(category: CategorySummary) {
+    setEditingCategory(category);
+    setForm({
+      name: category.name,
+      contentType: category.contentType,
+      sort: String(category.sort ?? 0),
+    });
+    setDialogOpen(true);
+  }
+
+  function closeDialog(open: boolean) {
+    if (!open && !dialogBusy) {
+      setDialogOpen(false);
+      resetDialogState();
+      return;
+    }
+    setDialogOpen(open);
+  }
+
+  async function submitCategory() {
+    const payload = {
+      name: form.name,
+      contentType: form.contentType,
+      parentId: 0,
+      sort: Number(form.sort || 0),
+      leaf: true,
+    };
+
     try {
-      await createCategoryMutation.mutateAsync({
-        name,
-        contentType,
-        parentId: 0,
-        sort: Number(sort || 0),
-        leaf: true,
-      });
-      setName("");
-      setSort("0");
-      toast.success("分类已创建");
+      if (editingCategory) {
+        await updateCategoryMutation.mutateAsync({
+          categoryId: editingCategory.id,
+          payload,
+        });
+        toast.success("分类已更新");
+      } else {
+        await createCategoryMutation.mutateAsync(payload);
+        toast.success("分类已创建");
+      }
+      setContentType(form.contentType);
+      setDialogOpen(false);
+      resetDialogState(form.contentType);
     } catch (error) {
       toast.error(readError(error));
     }
@@ -62,29 +138,38 @@ export function AdminCategoriesClient() {
     }
   }
 
-  const categories = categoriesQuery.data ?? [];
+  async function deleteCategory(categoryId: number, categoryName: string) {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const confirmed = window.confirm(`确认删除分类 "${categoryName}" 吗？`);
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await deleteCategoryMutation.mutateAsync(categoryId);
+      toast.success("分类已删除");
+    } catch (error) {
+      toast.error(readError(error));
+    }
+  }
 
   return (
     <main className="admin-main">
       <section className="admin-toolbar">
         <div className="admin-filter-grid">
-          <Select value={contentType} onChange={(e) => setContentType(e.target.value)}>
-            <option value="RESOURCE">RESOURCE</option>
-            <option value="NORMAL">NORMAL</option>
-            <option value="BOUNTY">BOUNTY</option>
+          <Select
+            value={contentType}
+            onChange={(e) => setContentType(e.target.value as CategoryFormState["contentType"])}
+          >
+            {sortedContentTypes.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
           </Select>
-          <Input
-            placeholder="新分类名称"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <Input
-            placeholder="排序"
-            type="number"
-            value={sort}
-            onChange={(e) => setSort(e.target.value)}
-          />
-          <Button type="button" onClick={() => void createCategory()}>
+          <Button type="button" onClick={() => openCreateDialog()}>
             新建分类
           </Button>
         </div>
@@ -93,7 +178,7 @@ export function AdminCategoriesClient() {
       <section className="admin-table-card">
         <div className="admin-table-head">
           <h2>分类管理</h2>
-          <p>按帖子类型维护独立分类体系。</p>
+          <p>按帖子类型维护分类，并通过弹框统一完成创建和编辑。</p>
         </div>
         <div className="admin-table-wrap">
           <Table className="admin-table">
@@ -116,18 +201,30 @@ export function AdminCategoriesClient() {
                   <TableCell>{category.sort}</TableCell>
                   <TableCell>{category.status}</TableCell>
                   <TableCell>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() =>
-                        void toggleStatus(
-                          category.id,
-                          category.status === "ACTIVE" ? "INACTIVE" : "ACTIVE",
-                        )
-                      }
-                    >
-                      {category.status === "ACTIVE" ? "停用" : "启用"}
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button type="button" variant="outline" onClick={() => openEditDialog(category)}>
+                        编辑
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() =>
+                          void toggleStatus(
+                            category.id,
+                            category.status === "ACTIVE" ? "INACTIVE" : "ACTIVE",
+                          )
+                        }
+                      >
+                        {category.status === "ACTIVE" ? "停用" : "启用"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => void deleteCategory(category.id, category.name)}
+                      >
+                        删除
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -135,6 +232,46 @@ export function AdminCategoriesClient() {
           </Table>
         </div>
       </section>
+
+      <ConfirmDialog
+        open={dialogOpen}
+        title={dialogTitle}
+        description="填写分类信息后提交，创建与编辑共用同一弹框。"
+        confirmLabel={dialogConfirmLabel}
+        confirmBusy={dialogBusy}
+        confirmDisabled={!form.name.trim()}
+        onConfirm={() => void submitCategory()}
+        onOpenChange={closeDialog}
+      >
+        <div className="space-y-3">
+          <Input
+            placeholder="分类名称"
+            value={form.name}
+            onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+          />
+          <Select
+            value={form.contentType}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                contentType: e.target.value as CategoryFormState["contentType"],
+              }))
+            }
+          >
+            {sortedContentTypes.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </Select>
+          <Input
+            placeholder="排序"
+            type="number"
+            value={form.sort}
+            onChange={(e) => setForm((prev) => ({ ...prev, sort: e.target.value }))}
+          />
+        </div>
+      </ConfirmDialog>
     </main>
   );
 }

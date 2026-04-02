@@ -9,11 +9,13 @@ import com.lenjoy.bbs.domain.dto.PostDetailResponse;
 import com.lenjoy.bbs.domain.dto.PostSummaryResponse;
 import com.lenjoy.bbs.domain.dto.UpdatePostRequest;
 import com.lenjoy.bbs.domain.entity.PostEntity;
+import com.lenjoy.bbs.domain.entity.ResourcePurchaseEntity;
 import com.lenjoy.bbs.domain.entity.UserAccountEntity;
 import com.lenjoy.bbs.domain.enums.PostStatus;
 import com.lenjoy.bbs.domain.enums.PostType;
 import com.lenjoy.bbs.exception.ApiException;
 import com.lenjoy.bbs.mapper.PostMapper;
+import com.lenjoy.bbs.mapper.ResourcePurchaseMapper;
 import com.lenjoy.bbs.mapper.UserAccountMapper;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -34,6 +36,7 @@ public class PostService {
 
     private final PostMapper postMapper;
     private final UserAccountMapper userAccountMapper;
+    private final ResourcePurchaseMapper resourcePurchaseMapper;
     private final BountyService bountyService;
     private final PostValidator postValidator;
     private final PostAssembler postAssembler;
@@ -185,6 +188,7 @@ public class PostService {
         if (PostStatus.DELETED.value().equals(entity.getStatus()) || Boolean.TRUE.equals(entity.getDeleted())) {
             return;
         }
+        ensureDeletable(entity);
         bountyService.settleOnCloseOrDelete(entity, userId, "Delete bounty post");
         entity.setStatus(PostStatus.DELETED.value());
         entity.setDeleted(true);
@@ -239,6 +243,17 @@ public class PostService {
             throw new ApiException("POST_NOT_FOUND", "Post not found", HttpStatus.NOT_FOUND);
         }
         return entity;
+    }
+
+    private void ensureDeletable(PostEntity entity) {
+        if (!PostType.RESOURCE.value().equals(entity.getPostType())) {
+            return;
+        }
+        long purchaseCount = resourcePurchaseMapper.selectCount(new LambdaQueryWrapper<ResourcePurchaseEntity>()
+                .eq(ResourcePurchaseEntity::getPostId, entity.getId()));
+        if (purchaseCount > 0) {
+            throw new ApiException("POST_HAS_PAID_PURCHASES", "已有用户付费的帖子不可删除", HttpStatus.BAD_REQUEST);
+        }
     }
 
     private String blankToNull(String value) {

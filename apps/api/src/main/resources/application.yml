@@ -52,6 +52,13 @@ auth:
     ttl-seconds: ${CAPTCHA_TTL_SECONDS:120}
     length: ${CAPTCHA_LENGTH:4}
 
+admin:
+  bootstrap:
+    enabled: ${ADMIN_BOOTSTRAP_ENABLED:false}
+    username: ${ADMIN_BOOTSTRAP_USERNAME:}
+    password: ${ADMIN_BOOTSTRAP_PASSWORD:}
+    email: ${ADMIN_BOOTSTRAP_EMAIL:}
+
 wallet:
   initial-register-coins: ${INITIAL_REGISTER_COINS:100}
 

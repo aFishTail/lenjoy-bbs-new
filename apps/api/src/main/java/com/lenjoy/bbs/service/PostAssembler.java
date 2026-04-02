@@ -84,8 +84,9 @@ public class PostAssembler {
         response.setBountyExpireAt(entity.getBountyExpireAt());
         response.setBountySettledAt(entity.getBountySettledAt());
         response.setAcceptedCommentId(entity.getAcceptedCommentId());
-        response.setOfflineReason(entity.getOfflineReason());
-        response.setOfflinedAt(entity.getOfflinedAt());
+        boolean isOffline = PostStatus.OFFLINE.value().equals(entity.getStatus());
+        response.setOfflineReason(isOffline ? blankToNull(entity.getOfflineReason()) : null);
+        response.setOfflinedAt(isOffline ? entity.getOfflinedAt() : null);
         response.setCreatedAt(entity.getCreatedAt());
         response.setUpdatedAt(entity.getUpdatedAt());
 

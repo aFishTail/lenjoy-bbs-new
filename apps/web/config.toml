@@ -1,0 +1,54 @@
+language = "zh"
+data_dir = "./.cc-connect-data"
+
+[log]
+level = "info"
+
+[[projects]]
+name = "lenjoy-bbs-web"
+
+[projects.agent]
+type = "codex"
+
+[projects.agent.options]
+work_dir = "D:/work/lenjoy/lenjoy-bbs/apps/web"
+mode = "full-auto"
+
+# 选择一个平台块取消注释并填入凭据后即可启动 cc-connect。
+# 更多平台示例可执行：cc-connect config-example
+
+# Telegram
+# [[projects.platforms]]
+# type = "telegram"
+#
+# [projects.platforms.options]
+# token = "your-telegram-bot-token"
+
+[[projects.platforms]]
+type = "feishu"
+
+[projects.platforms.options]
+app_id = "cli_a9402963c878dbd3"
+app_secret = "Sb8jsN3QzPnWDCK5w1YkhfWpcYVbCLNF"
+allow_from = "*"
+
+# Weixin personal (ilink)
+# 也可以直接运行：
+#   cc-connect weixin setup --config ./config.toml --project lenjoy-bbs-web
+# 终端会显示二维码，扫码后自动写入 token。
+# [[projects.platforms]]
+# type = "weixin"
+#
+# [projects.platforms.options]
+# token = "your-ilink-bot-bearer-token"
+# allow_from = "*"
+
+# WeChat Work / 企业微信
+# [[projects.platforms]]
+# type = "wecom"
+#
+# [projects.platforms.options]
+# mode = "websocket"
+# bot_id = "your-wecom-bot-id"
+# bot_secret = "your-wecom-bot-secret"
+# allow_from = "*"

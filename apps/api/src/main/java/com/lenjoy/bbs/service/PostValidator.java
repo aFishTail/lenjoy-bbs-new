@@ -16,10 +16,10 @@ public class PostValidator {
 
     public void ensureCanPost(UserAccountEntity user) {
         if ("MUTED".equalsIgnoreCase(user.getStatus())) {
-            throw new ApiException("USER_MUTED", "Muted users cannot post", HttpStatus.FORBIDDEN);
+            throw new ApiException("USER_MUTED", "禁言用户不可发帖", HttpStatus.FORBIDDEN);
         }
         if (!"ACTIVE".equalsIgnoreCase(user.getStatus())) {
-            throw new ApiException("USER_DISABLED", "User cannot post in current status", HttpStatus.FORBIDDEN);
+            throw new ApiException("USER_DISABLED", "当前账号状态不可发帖", HttpStatus.FORBIDDEN);
         }
     }
 

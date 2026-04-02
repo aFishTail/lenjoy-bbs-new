@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { toast } from "sonner";
 
 import { RichTextContent } from "@/components/editor/rich-text-content";
 import { readError } from "@/components/post/client-helpers";
@@ -25,8 +26,7 @@ export function PostContentSection({ postId }: Props) {
   const router = useRouter();
   const { authData: auth } = useAuth();
   const [purchasing, setPurchasing] = useState(false);
-  const [errorText, setErrorText] = useState("");
-  const [successText, setSuccessText] = useState("");
+  const [purchaseDialogOpen, setPurchaseDialogOpen] = useState(false);
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [reportReason, setReportReason] = useState("");
   const [reportDetail, setReportDetail] = useState("");
@@ -87,7 +87,7 @@ export function PostContentSection({ postId }: Props) {
     try {
       await togglePostLikeMutation.mutateAsync();
     } catch (error) {
-      setErrorText(readError(error));
+      toast.error(readError(error));
     }
   }
 
@@ -100,7 +100,7 @@ export function PostContentSection({ postId }: Props) {
     try {
       await togglePostFavoriteMutation.mutateAsync();
     } catch (error) {
-      setErrorText(readError(error));
+      toast.error(readError(error));
     }
   }
 
@@ -110,8 +110,6 @@ export function PostContentSection({ postId }: Props) {
       return;
     }
 
-    setErrorText("");
-    setSuccessText("");
     setReportReason("");
     setReportDetail("");
     setReportDialogOpen(true);
@@ -131,9 +129,9 @@ export function PostContentSection({ postId }: Props) {
       setReportDialogOpen(false);
       setReportReason("");
       setReportDetail("");
-      setSuccessText("举报已提交");
+      toast.success("举报已提交");
     } catch (error) {
-      setErrorText(readError(error));
+      toast.error(readError(error));
     }
   }
 
@@ -144,14 +142,13 @@ export function PostContentSection({ postId }: Props) {
     }
 
     setPurchasing(true);
-    setErrorText("");
-    setSuccessText("");
 
     try {
       await purchaseResourceMutation.mutateAsync();
-      setSuccessText("购买成功，隐藏内容已解锁");
+      setPurchaseDialogOpen(false);
+      toast.success("购买成功，隐藏内容已解锁");
     } catch (error) {
-      setErrorText(readError(error));
+      toast.error(readError(error));
     } finally {
       setPurchasing(false);
     }
@@ -159,9 +156,6 @@ export function PostContentSection({ postId }: Props) {
 
   return (
     <>
-      {errorText ? <div className="banner banner-error mb-4">{errorText}</div> : null}
-      {successText ? <div className="banner banner-success mb-4">{successText}</div> : null}
-
       <section className="card mb-4">
         <div className="mb-3 flex flex-wrap gap-2">
           <span className={getBadgeClass(post.postType)}>
@@ -175,12 +169,16 @@ export function PostContentSection({ postId }: Props) {
           {post.categoryName ? (
             <span className="badge badge-warning">{post.categoryName}</span>
           ) : null}
-          {post.price ? <span className="badge badge-warning">{post.price} 金币</span> : null}
+          {post.price ? (
+            <span className="badge badge-warning">{post.price} 金币</span>
+          ) : null}
           {post.bountyAmount ? (
             <span className="badge badge-warning">{post.bountyAmount} 金币</span>
           ) : null}
           {post.postType === "BOUNTY" && post.bountyStatus ? (
-            <span className="badge badge-info">悬赏 {bountyStatusLabel(post.bountyStatus)}</span>
+            <span className="badge badge-info">
+              悬赏 {bountyStatusLabel(post.bountyStatus)}
+            </span>
           ) : null}
         </div>
 
@@ -193,7 +191,7 @@ export function PostContentSection({ postId }: Props) {
             {post.authorUsername?.charAt(0).toUpperCase() || "U"}
           </div>
           <span>{post.authorUsername || post.authorId}</span>
-          <span>·</span>
+          <span>•</span>
           <span>{new Date(post.createdAt).toLocaleString("zh-CN")}</span>
         </div>
 
@@ -241,7 +239,7 @@ export function PostContentSection({ postId }: Props) {
                 <button
                   type="button"
                   className="btn btn-primary"
-                  onClick={() => void purchaseResource()}
+                  onClick={() => setPurchaseDialogOpen(true)}
                   disabled={purchasing}
                 >
                   {purchasing ? "购买中..." : `支付 ${post.price || 0} 金币购买`}
@@ -256,7 +254,7 @@ export function PostContentSection({ postId }: Props) {
             </div>
           ) : null}
 
-          {post.offlineReason ? (
+          {post.status === "OFFLINE" && post.offlineReason ? (
             <div className="banner banner-warning">下架原因：{post.offlineReason}</div>
           ) : null}
         </div>
@@ -303,6 +301,16 @@ export function PostContentSection({ postId }: Props) {
           </button>
         </div>
       </section>
+
+      <ConfirmDialog
+        open={purchaseDialogOpen}
+        title="确认购买资源"
+        description={`购买后将扣除 ${post.price || 0} 金币，并立即解锁隐藏内容。请确认继续。`}
+        confirmLabel={`确认支付 ${post.price || 0} 金币`}
+        confirmBusy={purchasing}
+        onConfirm={() => void purchaseResource()}
+        onOpenChange={setPurchaseDialogOpen}
+      />
 
       <ConfirmDialog
         open={reportDialogOpen}

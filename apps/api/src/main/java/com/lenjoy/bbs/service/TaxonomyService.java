@@ -171,6 +171,14 @@ public class TaxonomyService {
     }
 
     @Transactional
+    public void deleteCategory(Long categoryId) {
+        requireCategory(categoryId);
+        ensureCategoryHasNoChildren(categoryId);
+        ensureCategoryHasNoPosts(categoryId);
+        categoryMapper.deleteById(categoryId);
+    }
+
+    @Transactional
     public TagResponse createTag(UpsertTagRequest request) {
         ensureTagNameAvailable(request.getName(), null);
         TagEntity entity = new TagEntity();
@@ -202,6 +210,13 @@ public class TaxonomyService {
         entity.setUpdatedAt(LocalDateTime.now());
         tagMapper.updateById(entity);
         return toTagResponse(entity);
+    }
+
+    @Transactional
+    public void deleteTag(Long tagId) {
+        requireTag(tagId);
+        ensureTagHasNoPosts(tagId);
+        tagMapper.deleteById(tagId);
     }
 
     @Transactional
@@ -377,6 +392,34 @@ public class TaxonomyService {
             throw new ApiException("TAG_NOT_FOUND", "Tag not found", HttpStatus.NOT_FOUND);
         }
         return entity;
+    }
+
+    private void ensureCategoryHasNoChildren(Long categoryId) {
+        Long childCount = categoryMapper.selectCount(new LambdaQueryWrapper<CategoryEntity>()
+                .eq(CategoryEntity::getParentId, categoryId));
+        if (childCount != null && childCount > 0) {
+            throw new ApiException("CATEGORY_HAS_CHILDREN", "Category has child categories and cannot be deleted",
+                    HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    private void ensureCategoryHasNoPosts(Long categoryId) {
+        Long postCount = postMapper.selectCount(new LambdaQueryWrapper<PostEntity>()
+                .eq(PostEntity::getCategoryId, categoryId)
+                .eq(PostEntity::getDeleted, false));
+        if (postCount != null && postCount > 0) {
+            throw new ApiException("CATEGORY_IN_USE", "Category is in use by posts and cannot be deleted",
+                    HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    private void ensureTagHasNoPosts(Long tagId) {
+        Long relationCount = postTagMapper.selectCount(new LambdaQueryWrapper<PostTagEntity>()
+                .eq(PostTagEntity::getTagId, tagId));
+        if (relationCount != null && relationCount > 0) {
+            throw new ApiException("TAG_IN_USE", "Tag is in use by posts and cannot be deleted",
+                    HttpStatus.BAD_REQUEST);
+        }
     }
 
     private void ensureCategoryNameAvailable(String name, String contentType, Long currentId) {

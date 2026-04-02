@@ -1,12 +1,16 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { toast } from "sonner";
 
 import { RichTextContent } from "@/components/editor/rich-text-content";
 import { RichTextEditor } from "@/components/editor/rich-text-editor";
 import { readError } from "@/components/post/client-helpers";
-import { usePostCommentsQuery, usePostDetailQuery } from "@/components/post/use-post-queries";
+import {
+  usePostCommentsQuery,
+  usePostDetailQuery,
+} from "@/components/post/use-post-queries";
 import {
   useAcceptAnswerMutation,
   useDeleteOwnCommentMutation,
@@ -30,8 +34,8 @@ export function PostCommentSection({ postId }: Props) {
   const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({});
   const [submittingComment, setSubmittingComment] = useState(false);
   const [acceptingCommentId, setAcceptingCommentId] = useState<number | null>(null);
-  const [errorText, setErrorText] = useState("");
-  const [successText, setSuccessText] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteTargetCommentId, setDeleteTargetCommentId] = useState<number | null>(null);
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [reportReason, setReportReason] = useState("");
   const [reportDetail, setReportDetail] = useState("");
@@ -61,10 +65,12 @@ export function PostCommentSection({ postId }: Props) {
     auth.user.id !== post.authorId;
 
   async function submitComment(parentId?: number) {
-    const contentValue = parentId ? (replyDrafts[parentId] || "").trim() : commentText.trim();
+    const contentValue = parentId
+      ? (replyDrafts[parentId] || "").trim()
+      : commentText.trim();
 
     if (!contentValue) {
-      setErrorText(parentId ? "请输入回复内容" : "请输入评论内容");
+      toast.error(parentId ? "请输入回复内容" : "请输入评论内容");
       return;
     }
 
@@ -74,15 +80,13 @@ export function PostCommentSection({ postId }: Props) {
     }
 
     setSubmittingComment(true);
-    setErrorText("");
-    setSuccessText("");
 
     try {
       await submitCommentMutation.mutateAsync({
         parentId,
         content: contentValue,
       });
-      setSuccessText(parentId ? "回复已发送" : "评论已提交");
+      toast.success(parentId ? "回复已发送" : "评论已提交");
 
       if (parentId) {
         setReplyDrafts((prev) => ({ ...prev, [parentId]: "" }));
@@ -90,7 +94,7 @@ export function PostCommentSection({ postId }: Props) {
         setCommentText("");
       }
     } catch (error) {
-      setErrorText(readError(error));
+      toast.error(readError(error));
     } finally {
       setSubmittingComment(false);
     }
@@ -98,14 +102,12 @@ export function PostCommentSection({ postId }: Props) {
 
   async function acceptAnswer(commentId: number) {
     setAcceptingCommentId(commentId);
-    setErrorText("");
-    setSuccessText("");
 
     try {
       await acceptAnswerMutation.mutateAsync(commentId);
-      setSuccessText("已采纳该答案，悬赏已完成结算");
+      toast.success("已采纳该答案，悬赏已完成结算");
     } catch (error) {
-      setErrorText(readError(error));
+      toast.error(readError(error));
     } finally {
       setAcceptingCommentId(null);
     }
@@ -120,7 +122,7 @@ export function PostCommentSection({ postId }: Props) {
     try {
       await toggleCommentLikeMutation.mutateAsync(commentId);
     } catch (error) {
-      setErrorText(readError(error));
+      toast.error(readError(error));
     }
   }
 
@@ -130,15 +132,24 @@ export function PostCommentSection({ postId }: Props) {
       return;
     }
 
-    setErrorText("");
-    setSuccessText("");
-
     try {
       await deleteOwnCommentMutation.mutateAsync(commentId);
-      setSuccessText("评论已删除");
+      setDeleteDialogOpen(false);
+      setDeleteTargetCommentId(null);
+      toast.success("评论已删除");
     } catch (error) {
-      setErrorText(readError(error));
+      toast.error(readError(error));
     }
+  }
+
+  function openDeleteDialog(commentId: number) {
+    if (!auth) {
+      router.push("/auth");
+      return;
+    }
+
+    setDeleteTargetCommentId(commentId);
+    setDeleteDialogOpen(true);
   }
 
   function openReportDialog(commentId: number) {
@@ -147,8 +158,6 @@ export function PostCommentSection({ postId }: Props) {
       return;
     }
 
-    setErrorText("");
-    setSuccessText("");
     setReportTargetCommentId(commentId);
     setReportReason("");
     setReportDetail("");
@@ -171,38 +180,19 @@ export function PostCommentSection({ postId }: Props) {
       setReportTargetCommentId(null);
       setReportReason("");
       setReportDetail("");
-      setSuccessText("评论举报已提交");
+      toast.success("评论举报已提交");
     } catch (error) {
-      setErrorText(readError(error));
+      toast.error(readError(error));
     }
   }
 
   return (
     <>
-      {errorText && (
-        <div className="banner banner-error mb-4">
-          <svg className="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="15" y1="9" x2="9" y2="15" />
-            <line x1="9" y1="9" x2="15" y2="15" />
-          </svg>
-          {errorText}
-        </div>
-      )}
-
-      {successText && (
-        <div className="banner banner-success mb-4">
-          <svg className="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-            <polyline points="22 4 12 14.01 9 11.01" />
-          </svg>
-          {successText}
-        </div>
-      )}
-
       <section className="card mb-4">
         <div className="flex-between mb-4">
-          <h2 className="section-title">{post.postType === "BOUNTY" ? "候选答案" : "评论区"}</h2>
+          <h2 className="section-title">
+            {post.postType === "BOUNTY" ? "候选答案" : "评论区"}
+          </h2>
           <span className="text-sm text-slate-500">
             {comments.length} 条一级{post.postType === "BOUNTY" ? "答案" : "评论"}
           </span>
@@ -318,7 +308,7 @@ export function PostCommentSection({ postId }: Props) {
                     <button
                       type="button"
                       className="btn btn-ghost btn-sm"
-                      onClick={() => void deleteOwnComment(comment.id)}
+                      onClick={() => openDeleteDialog(comment.id)}
                     >
                       删除评论
                     </button>
@@ -379,7 +369,9 @@ export function PostCommentSection({ postId }: Props) {
                           <span className="font-medium text-slate-700">
                             {reply.authorUsername || reply.authorId}
                           </span>
-                          {reply.replyToUsername ? <span>回复 {reply.replyToUsername}</span> : null}
+                          {reply.replyToUsername ? (
+                            <span>回复 {reply.replyToUsername}</span>
+                          ) : null}
                           <span>{new Date(reply.createdAt).toLocaleString("zh-CN")}</span>
                         </div>
 
@@ -401,7 +393,7 @@ export function PostCommentSection({ postId }: Props) {
                             <button
                               type="button"
                               className="btn btn-ghost btn-sm"
-                              onClick={() => void deleteOwnComment(reply.id)}
+                              onClick={() => openDeleteDialog(reply.id)}
                             >
                               删除
                             </button>
@@ -423,6 +415,25 @@ export function PostCommentSection({ postId }: Props) {
           )}
         </div>
       </section>
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title="确认删除评论"
+        description="删除后该评论内容将不可恢复，原位置只保留已删除状态。请确认继续。"
+        confirmLabel="确认删除"
+        confirmBusy={deleteOwnCommentMutation.isPending}
+        onConfirm={() => {
+          if (deleteTargetCommentId) {
+            void deleteOwnComment(deleteTargetCommentId);
+          }
+        }}
+        onOpenChange={(open) => {
+          setDeleteDialogOpen(open);
+          if (!open) {
+            setDeleteTargetCommentId(null);
+          }
+        }}
+      />
 
       <ConfirmDialog
         open={reportDialogOpen}

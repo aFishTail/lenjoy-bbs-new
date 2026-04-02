@@ -2,17 +2,21 @@
 
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
+import { toast } from "sonner";
 
 import { RichTextEditor } from "@/components/editor/rich-text-editor";
 import { readError } from "@/components/post/client-helpers";
 import { TagPicker } from "@/components/post/tag-picker";
 import {
-  useClosePostMutation,
   useDeletePostMutation,
   useUpdatePostMutation,
 } from "@/components/post/use-post-mutations";
 import { usePostDetailQuery } from "@/components/post/use-post-queries";
-import { useCategoriesQuery, useTagsQuery } from "@/components/post/use-taxonomy-queries";
+import {
+  useCategoriesQuery,
+  useTagsQuery,
+} from "@/components/post/use-taxonomy-queries";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Select } from "@/components/ui/select";
 
 type Props = {
@@ -22,8 +26,7 @@ type Props = {
 export function PostAuthorActions({ postId }: Props) {
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
-  const [errorText, setErrorText] = useState("");
-  const [successText, setSuccessText] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const [title, setTitle] = useState("");
   const [categoryId, setCategoryId] = useState("");
@@ -40,8 +43,33 @@ export function PostAuthorActions({ postId }: Props) {
   const categoriesQuery = useCategoriesQuery(post?.postType || "NORMAL");
   const tagsQuery = useTagsQuery("");
   const updatePostMutation = useUpdatePostMutation(postId);
-  const closePostMutation = useClosePostMutation(postId);
   const deletePostMutation = useDeletePostMutation(postId);
+
+  function getPostTypeLabel(type: string) {
+    switch (type) {
+      case "RESOURCE":
+        return "资源帖";
+      case "BOUNTY":
+        return "悬赏帖";
+      default:
+        return "讨论帖";
+    }
+  }
+
+  function getPostStatusLabel(status: string) {
+    switch (status) {
+      case "PUBLISHED":
+        return "已发布";
+      case "CLOSED":
+        return "已关闭";
+      case "OFFLINE":
+        return "已下架";
+      case "DELETED":
+        return "已删除";
+      default:
+        return status;
+    }
+  }
 
   function formatDateTimeInput(value?: string | null) {
     return value ? value.slice(0, 16) : "";
@@ -63,8 +91,6 @@ export function PostAuthorActions({ postId }: Props) {
 
   async function submitUpdate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setErrorText("");
-    setSuccessText("");
     try {
       await updatePostMutation.mutateAsync({
         title,
@@ -76,54 +102,62 @@ export function PostAuthorActions({ postId }: Props) {
         bountyAmount: bountyAmount ? Number(bountyAmount) : null,
         bountyExpireAt: bountyExpireAt || null,
       });
-      setSuccessText("更新成功");
+      toast.success("更新成功");
       setIsEditing(false);
     } catch (error) {
-      setErrorText(readError(error));
-    }
-  }
-
-  async function closePost() {
-    setErrorText("");
-    setSuccessText("");
-    try {
-      await closePostMutation.mutateAsync();
-      setSuccessText("帖子已关闭");
-    } catch (error) {
-      setErrorText(readError(error));
+      toast.error(readError(error));
     }
   }
 
   async function deletePost() {
-    setErrorText("");
-    setSuccessText("");
     try {
       await deletePostMutation.mutateAsync();
+      setDeleteDialogOpen(false);
+      toast.success("帖子已删除");
       router.replace("/");
       router.refresh();
     } catch (error) {
-      setErrorText(readError(error));
+      toast.error(readError(error));
     }
   }
 
   return (
     <>
-      {errorText ? <div className="banner banner-error mb-4">{errorText}</div> : null}
-      {successText ? <div className="banner banner-success mb-4">{successText}</div> : null}
-
-      <section className="card">
-        <div className="flex-between mb-4">
-          <h2 className="section-title">作者操作</h2>
-          <button
-            className="btn btn-ghost btn-sm"
-            onClick={() => setIsEditing(!isEditing)}
-          >
-            {isEditing ? "收起编辑" : "编辑帖子"}
-          </button>
+      <section className="card author-actions-card">
+        <div className="author-actions-header">
+          <div>
+            <p className="author-actions-eyebrow">AUTHOR TOOLS</p>
+            <h2 className="section-title">作者操作</h2>
+          </div>
+          <div className="author-actions-toolbar">
+            <button
+              type="button"
+              className={`btn btn-ghost ${isEditing ? "author-tool-active" : ""}`}
+              onClick={() => setIsEditing((value) => !value)}
+            >
+              {isEditing ? "收起编辑" : "编辑帖子"}
+            </button>
+            <button
+              type="button"
+              className="btn btn-danger"
+              onClick={() => setDeleteDialogOpen(true)}
+            >
+              删除帖子
+            </button>
+          </div>
         </div>
 
         {isEditing ? (
-          <form onSubmit={submitUpdate}>
+          <form onSubmit={submitUpdate} className="author-actions-editor">
+            <div className="author-actions-editor-head">
+              <div>
+                <h3 className="author-actions-editor-title">编辑内容</h3>
+                <p className="author-actions-editor-copy">
+                  在同一块区域完成内容维护，保存后直接回到作者操作概览。
+                </p>
+              </div>
+            </div>
+
             <div className="grid gap-4">
               <div className="form-group">
                 <label className="form-label">标题</label>
@@ -212,46 +246,47 @@ export function PostAuthorActions({ postId }: Props) {
                 </>
               ) : null}
 
-              <div className="flex gap-3">
+              <div className="author-actions-submit-row">
                 <button className="btn btn-primary" type="submit">
                   保存修改
                 </button>
                 <button
                   type="button"
-                  className="btn btn-warn"
-                  onClick={() => void closePost()}
+                  className="btn btn-ghost"
+                  onClick={() => setIsEditing(false)}
                 >
-                  关闭帖子
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-danger"
-                  onClick={() => void deletePost()}
-                >
-                  删除帖子
+                  取消
                 </button>
               </div>
             </div>
           </form>
         ) : (
-          <div className="flex gap-3">
-            <button
-              type="button"
-              className="btn btn-warn"
-              onClick={() => void closePost()}
-            >
-              关闭帖子
-            </button>
-            <button
-              type="button"
-              className="btn btn-danger"
-              onClick={() => void deletePost()}
-            >
-              删除帖子
-            </button>
+          <div className="author-actions-summary">
+            <div className="author-actions-summary-item">
+              <span className="author-actions-summary-label">当前状态</span>
+              <strong>{getPostStatusLabel(post.status)}</strong>
+            </div>
+            <div className="author-actions-summary-item">
+              <span className="author-actions-summary-label">内容类型</span>
+              <strong>{getPostTypeLabel(post.postType)}</strong>
+            </div>
+            <div className="author-actions-summary-item">
+              <span className="author-actions-summary-label">最近更新</span>
+              <strong>{new Date(post.updatedAt).toLocaleString("zh-CN")}</strong>
+            </div>
           </div>
         )}
       </section>
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title="确认删除帖子"
+        description="删除后帖子内容、评论入口和详情页访问都会失效，且无法恢复。请确认继续。"
+        confirmLabel="确认删除"
+        confirmBusy={deletePostMutation.isPending}
+        onConfirm={() => void deletePost()}
+        onOpenChange={setDeleteDialogOpen}
+      />
     </>
   );
 }

@@ -234,6 +234,39 @@ export function useCreateAdminCategoryMutation(contentType: string) {
   });
 }
 
+export function useUpdateAdminCategoryMutation(contentType: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      categoryId,
+      payload,
+    }: {
+      categoryId: number;
+      payload: {
+        name: string;
+        contentType: string;
+        parentId: number;
+        sort: number;
+        leaf: boolean;
+      };
+    }) =>
+      requestApi(`/api/admin/categories/${categoryId}`, {
+        method: "PUT",
+        withAuth: true,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.adminCategories(contentType),
+      });
+    },
+  });
+}
+
 export function useUpdateAdminCategoryStatusMutation(contentType: string) {
   const queryClient = useQueryClient();
 
@@ -255,6 +288,23 @@ export function useUpdateAdminCategoryStatusMutation(contentType: string) {
   });
 }
 
+export function useDeleteAdminCategoryMutation(contentType: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (categoryId: number) =>
+      requestApi(`/api/admin/categories/${categoryId}`, {
+        method: "DELETE",
+        withAuth: true,
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.adminCategories(contentType),
+      });
+    },
+  });
+}
+
 export function useCreateAdminTagMutation(keyword: string) {
   const queryClient = useQueryClient();
 
@@ -262,6 +312,27 @@ export function useCreateAdminTagMutation(keyword: string) {
     mutationFn: (payload: { name: string }) =>
       requestApi(`/api/admin/tags`, {
         method: "POST",
+        withAuth: true,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.adminTags(keyword),
+      });
+    },
+  });
+}
+
+export function useUpdateAdminTagMutation(keyword: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ tagId, payload }: { tagId: number; payload: { name: string } }) =>
+      requestApi(`/api/admin/tags/${tagId}`, {
+        method: "PUT",
         withAuth: true,
         headers: {
           "Content-Type": "application/json",
@@ -315,6 +386,23 @@ export function useMergeAdminTagMutation(keyword: string) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ targetTagId }),
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.adminTags(keyword),
+      });
+    },
+  });
+}
+
+export function useDeleteAdminTagMutation(keyword: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (tagId: number) =>
+      requestApi(`/api/admin/tags/${tagId}`, {
+        method: "DELETE",
+        withAuth: true,
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({

@@ -14,6 +14,7 @@ import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -62,6 +63,14 @@ public class AdminTaxonomyController {
         return ApiResponse.ok(taxonomyService.updateCategoryStatus(categoryId, request));
     }
 
+    @DeleteMapping("/categories/{categoryId}")
+    public ApiResponse<Void> deleteCategory(@PathVariable Long categoryId,
+            @AuthenticationPrincipal AuthUserPrincipal principal) {
+        securityAccess.requireAdmin(principal);
+        taxonomyService.deleteCategory(categoryId);
+        return ApiResponse.ok(null);
+    }
+
     @GetMapping("/tags")
     public ApiResponse<List<TagResponse>> listTags(@RequestParam(required = false) String keyword,
             @AuthenticationPrincipal AuthUserPrincipal principal) {
@@ -90,6 +99,14 @@ public class AdminTaxonomyController {
             @AuthenticationPrincipal AuthUserPrincipal principal) {
         securityAccess.requireAdmin(principal);
         return ApiResponse.ok(taxonomyService.updateTagStatus(tagId, request));
+    }
+
+    @DeleteMapping("/tags/{tagId}")
+    public ApiResponse<Void> deleteTag(@PathVariable Long tagId,
+            @AuthenticationPrincipal AuthUserPrincipal principal) {
+        securityAccess.requireAdmin(principal);
+        taxonomyService.deleteTag(tagId);
+        return ApiResponse.ok(null);
     }
 
     @PostMapping("/tags/{tagId}/merge")

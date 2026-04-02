@@ -1,20 +1,37 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MessageNotification } from "@/components/layout/message-notification";
 import { UserMenu } from "@/components/layout/user-menu";
+import { queryKeys, requestApiData } from "@/components/post/client-helpers";
+import type { PostDetail } from "@/components/post/types";
 import { useAuth } from "@/components/providers/auth-provider";
 
 export function Navigation() {
   const pathname = usePathname();
   const { hasAuth } = useAuth();
+  const detailPostId = pathname.match(/^\/posts\/([^/]+)$/)?.[1] ?? null;
+  const detailPostTypeQuery = useQuery({
+    queryKey: detailPostId ? queryKeys.postDetail(detailPostId) : ["posts", "detail-nav"],
+    queryFn: () =>
+      requestApiData<PostDetail>(`/api/posts/${detailPostId}`, {
+        withAuth: true,
+        cache: "no-store",
+      }),
+    enabled: !!detailPostId,
+  });
+  const detailPostType = detailPostTypeQuery.data?.postType;
 
   const isHome = pathname === "/";
   const isDiscussion =
-    pathname === "/discussions" || pathname.startsWith("/posts");
-  const isResource = pathname === "/resources";
-  const isBounty = pathname === "/bounties";
+    pathname === "/discussions" ||
+    (!!detailPostId && (!detailPostType || detailPostType === "NORMAL"));
+  const isResource =
+    pathname === "/resources" || (!!detailPostId && detailPostType === "RESOURCE");
+  const isBounty =
+    pathname === "/bounties" || (!!detailPostId && detailPostType === "BOUNTY");
 
   if (pathname === "/admin" || pathname.startsWith("/admin/")) {
     return null;

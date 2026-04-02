@@ -5,12 +5,16 @@ import { toast } from "sonner";
 
 import {
   useCreateAdminTagMutation,
+  useDeleteAdminTagMutation,
   useMergeAdminTagMutation,
+  useUpdateAdminTagMutation,
   useUpdateAdminTagStatusMutation,
 } from "@/components/admin/use-admin-mutations";
 import { useAdminTagsQuery } from "@/components/admin/use-admin-queries";
 import { readError } from "@/components/post/client-helpers";
+import type { TagSummary } from "@/components/post/types";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -23,13 +27,17 @@ import {
 
 export function AdminTagsClient() {
   const [keyword, setKeyword] = useState("");
-  const [name, setName] = useState("");
   const [mergeTarget, setMergeTarget] = useState<Record<number, string>>({});
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingTag, setEditingTag] = useState<TagSummary | null>(null);
+  const [name, setName] = useState("");
 
   const tagsQuery = useAdminTagsQuery(keyword);
   const createTagMutation = useCreateAdminTagMutation(keyword);
+  const updateTagMutation = useUpdateAdminTagMutation(keyword);
   const updateStatusMutation = useUpdateAdminTagStatusMutation(keyword);
   const mergeTagMutation = useMergeAdminTagMutation(keyword);
+  const deleteTagMutation = useDeleteAdminTagMutation(keyword);
 
   useEffect(() => {
     if (tagsQuery.error) {
@@ -37,11 +45,48 @@ export function AdminTagsClient() {
     }
   }, [tagsQuery.error]);
 
-  async function createTag() {
+  const tags = tagsQuery.data ?? [];
+  const dialogBusy = createTagMutation.isPending || updateTagMutation.isPending;
+
+  function resetDialogState() {
+    setEditingTag(null);
+    setName("");
+  }
+
+  function openCreateDialog() {
+    resetDialogState();
+    setDialogOpen(true);
+  }
+
+  function openEditDialog(tag: TagSummary) {
+    setEditingTag(tag);
+    setName(tag.name);
+    setDialogOpen(true);
+  }
+
+  function closeDialog(open: boolean) {
+    if (!open && !dialogBusy) {
+      setDialogOpen(false);
+      resetDialogState();
+      return;
+    }
+    setDialogOpen(open);
+  }
+
+  async function submitTag() {
     try {
-      await createTagMutation.mutateAsync({ name });
-      setName("");
-      toast.success("标签已创建");
+      if (editingTag) {
+        await updateTagMutation.mutateAsync({
+          tagId: editingTag.id,
+          payload: { name },
+        });
+        toast.success("标签已更新");
+      } else {
+        await createTagMutation.mutateAsync({ name });
+        toast.success("标签已创建");
+      }
+      setDialogOpen(false);
+      resetDialogState();
     } catch (error) {
       toast.error(readError(error));
     }
@@ -59,7 +104,7 @@ export function AdminTagsClient() {
   async function mergeTag(tagId: number) {
     const targetTagId = Number(mergeTarget[tagId] || "");
     if (!targetTagId) {
-      toast.error("请输入合并目标标签 ID");
+      toast.error("请输入目标标签 ID");
       return;
     }
     try {
@@ -70,7 +115,21 @@ export function AdminTagsClient() {
     }
   }
 
-  const tags = tagsQuery.data ?? [];
+  async function deleteTag(tagId: number, tagName: string) {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const confirmed = window.confirm(`确认删除标签 "${tagName}" 吗？`);
+    if (!confirmed) {
+      return;
+    }
+    try {
+      await deleteTagMutation.mutateAsync(tagId);
+      toast.success("标签已删除");
+    } catch (error) {
+      toast.error(readError(error));
+    }
+  }
 
   return (
     <main className="admin-main">
@@ -81,12 +140,7 @@ export function AdminTagsClient() {
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
           />
-          <Input
-            placeholder="新标签名称"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <Button type="button" onClick={() => void createTag()}>
+          <Button type="button" onClick={() => openCreateDialog()}>
             新建标签
           </Button>
         </div>
@@ -95,7 +149,7 @@ export function AdminTagsClient() {
       <section className="admin-table-card">
         <div className="admin-table-head">
           <h2>标签管理</h2>
-          <p>标签是全站统一话题，可停用、合并、查看使用量。</p>
+          <p>标签支持弹框创建、编辑、删除，合并操作保留独立入口。</p>
         </div>
         <div className="admin-table-wrap">
           <Table className="admin-table">
@@ -117,6 +171,9 @@ export function AdminTagsClient() {
                   <TableCell>{tag.usageCount || 0}</TableCell>
                   <TableCell>
                     <div className="flex gap-2">
+                      <Button type="button" variant="outline" onClick={() => openEditDialog(tag)}>
+                        编辑
+                      </Button>
                       <Button
                         type="button"
                         variant="outline"
@@ -128,6 +185,13 @@ export function AdminTagsClient() {
                         }
                       >
                         {tag.status === "ACTIVE" ? "停用" : "启用"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => void deleteTag(tag.id, tag.name)}
+                      >
+                        删除
                       </Button>
                       <Input
                         placeholder="目标标签 ID"
@@ -150,6 +214,19 @@ export function AdminTagsClient() {
           </Table>
         </div>
       </section>
+
+      <ConfirmDialog
+        open={dialogOpen}
+        title={editingTag ? "编辑标签" : "新建标签"}
+        description="创建与编辑共用同一弹框。"
+        confirmLabel={editingTag ? "保存修改" : "创建标签"}
+        confirmBusy={dialogBusy}
+        confirmDisabled={!name.trim()}
+        onConfirm={() => void submitTag()}
+        onOpenChange={closeDialog}
+      >
+        <Input placeholder="标签名称" value={name} onChange={(e) => setName(e.target.value)} />
+      </ConfirmDialog>
     </main>
   );
 }

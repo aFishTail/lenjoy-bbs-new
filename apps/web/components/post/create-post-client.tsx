@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import { RichTextEditor } from "@/components/editor/rich-text-editor";
 import { readError } from "@/components/post/client-helpers";
@@ -30,8 +31,6 @@ function isRichTextEmpty(value: string) {
 export function CreatePostClient() {
   const router = useRouter();
   const { authData: auth, hasAuth, authReady } = useAuth();
-  const [errorText, setErrorText] = useState("");
-  const [successText, setSuccessText] = useState("");
 
   const [postType, setPostType] = useState<"NORMAL" | "RESOURCE" | "BOUNTY">(
     "NORMAL",
@@ -78,42 +77,39 @@ export function CreatePostClient() {
     event.preventDefault();
 
     if (!title.trim()) {
-      setErrorText("请输入标题");
+      toast.error("请输入标题");
       return;
     }
 
     if (!categoryId) {
-      setErrorText("请选择分类");
+      toast.error("请选择分类");
       return;
     }
 
     if (isRichTextEmpty(content)) {
-      setErrorText("请输入正文");
+      toast.error("请输入正文");
       return;
     }
 
     if (postType === "RESOURCE" && isRichTextEmpty(hiddenContent)) {
-      setErrorText("请填写资源隐藏内容");
+      toast.error("请填写资源隐藏内容");
       return;
     }
 
     if (postType === "RESOURCE" && !price) {
-      setErrorText("请设置资源售价");
+      toast.error("请设置资源售价");
       return;
     }
 
     if (postType === "BOUNTY" && !bountyAmount) {
-      setErrorText("请设置悬赏金额");
+      toast.error("请设置悬赏金额");
       return;
     }
 
     if (postType === "BOUNTY" && !bountyExpireAt) {
-      setErrorText("请设置截止时间");
+      toast.error("请设置截止时间");
       return;
     }
-
-    setErrorText("");
-    setSuccessText("");
 
     try {
       const request: CreatePostInput = {
@@ -131,12 +127,12 @@ export function CreatePostClient() {
       };
 
       const payload = await createPostMutation.mutateAsync(request);
-      setSuccessText("发布成功");
+      toast.success("发布成功");
       setTimeout(() => {
         router.push(`/posts/${payload.id}`);
       }, 800);
     } catch (error) {
-      setErrorText(readError(error));
+      toast.error(readError(error));
     }
   }
 
@@ -329,17 +325,6 @@ export function CreatePostClient() {
             {submitting ? "发布中..." : "发布帖子"}
           </button>
 
-          {errorText && (
-            <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700">
-              {errorText}
-            </div>
-          )}
-
-          {successText && (
-            <div className="p-4 rounded-xl bg-green-50 border border-green-200 text-green-700">
-              {successText}
-            </div>
-          )}
         </form>
       </div>
     </main>

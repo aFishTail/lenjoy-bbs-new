@@ -19,6 +19,7 @@ import com.lenjoy.bbs.domain.entity.PostEntity;
 import com.lenjoy.bbs.domain.entity.UserAccountEntity;
 import com.lenjoy.bbs.exception.ApiException;
 import com.lenjoy.bbs.mapper.PostMapper;
+import com.lenjoy.bbs.mapper.ResourcePurchaseMapper;
 import com.lenjoy.bbs.mapper.UserAccountMapper;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -37,6 +38,9 @@ class PostServiceTest {
 
     @Mock
     private UserAccountMapper userAccountMapper;
+
+    @Mock
+    private ResourcePurchaseMapper resourcePurchaseMapper;
 
     @Mock
     private BountyService bountyService;
@@ -109,6 +113,18 @@ class PostServiceTest {
         assertEquals(Boolean.TRUE, post.getDeleted());
         assertNotNull(post.getUpdatedAt());
         verify(postMapper).updateById(post);
+    }
+
+    @Test
+    void delete_resourcePostWithPaidPurchases_shouldThrowBadRequest() {
+        PostEntity post = buildPost(22L, 7L, "RESOURCE", "PUBLISHED", false);
+        when(postMapper.selectById(22L)).thenReturn(post);
+        when(resourcePurchaseMapper.selectCount(any())).thenReturn(1L);
+
+        ApiException ex = assertThrows(ApiException.class, () -> postService.delete(22L, 7L));
+
+        assertEquals("POST_HAS_PAID_PURCHASES", ex.getCode());
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getHttpStatus());
     }
 
     @Test

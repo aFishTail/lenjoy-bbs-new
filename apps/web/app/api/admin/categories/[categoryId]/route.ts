@@ -29,3 +29,24 @@ export async function PUT(request: NextRequest, { params }: Params) {
     },
   });
 }
+
+export async function DELETE(request: NextRequest, { params }: Params) {
+  const { categoryId } = await params;
+  const response = await fetch(`${backendBase}/api/v1/admin/categories/${categoryId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: request.headers.get("authorization") || "",
+    },
+    cache: "no-store",
+  });
+  const text = await response.text();
+  return new NextResponse(text, {
+    status: response.status,
+    headers: {
+      "Content-Type":
+        response.headers.get("Content-Type") ||
+        "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+    },
+  });
+}

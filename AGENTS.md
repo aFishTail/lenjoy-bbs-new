@@ -26,6 +26,11 @@ Use the existing style in each app instead of introducing a new one.
 - Java uses 4-space indentation, package-by-feature under `com.lenjoy.bbs`, and class names like `AuthController`, `CaptchaService`, and `RegisterRequest`.
 - Database migrations follow Flyway naming: `V13__short_description.sql`.
 
+## UI Feedback Conventions
+- Use toast notifications for user action feedback across the frontend. Prefer the existing `sonner`-based `toast` flow over `alert`, inline success/error banners, or ad hoc status text.
+- Apply toast feedback to create, update, delete, purchase, report, auth, and similar mutation flows unless a screen explicitly requires persistent inline messaging.
+- Only use another feedback pattern when the requirement is stated explicitly or the message must remain visible as page state.
+
 ## Testing Guidelines
 - Backend tests use JUnit 5 with Spring Boot test support and Testcontainers where needed. Mirror production packages under `apps/api/src/test/java` and name files `*Test.java`.
 - Frontend E2E tests use Playwright and live in `apps/web/test` with names like `smoke.e2e.spec.ts`.
