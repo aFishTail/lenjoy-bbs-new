@@ -1,6 +1,7 @@
 package com.lenjoy.bbs.service;
 
 import com.lenjoy.bbs.domain.dto.CreatePostRequest;
+import com.lenjoy.bbs.domain.dto.PostWritePayload;
 import com.lenjoy.bbs.domain.dto.UpdatePostRequest;
 import com.lenjoy.bbs.domain.entity.PostEntity;
 import com.lenjoy.bbs.domain.entity.UserAccountEntity;
@@ -49,19 +50,23 @@ public class PostValidator {
     }
 
     public void validateCreate(PostType postType, CreatePostRequest request) {
-        if (request.getCategoryId() == null) {
-            throw new ApiException("CATEGORY_REQUIRED", "Category is required", HttpStatus.BAD_REQUEST);
-        }
-        validateByType(postType, request.getContent(), request.getHiddenContent(), request.getPrice(),
-                request.getBountyAmount(), request.getBountyExpireAt());
+        validatePayload(postType, request);
     }
 
     public void validateUpdate(PostType postType, UpdatePostRequest request) {
-        if (request.getCategoryId() == null) {
+        validatePayload(postType, request);
+    }
+
+    public void validateCreateCommand(PostCreateCommand command) {
+        validatePayload(command.postType(), command);
+    }
+
+    private void validatePayload(PostType postType, PostWritePayload payload) {
+        if (payload.getCategoryId() == null) {
             throw new ApiException("CATEGORY_REQUIRED", "Category is required", HttpStatus.BAD_REQUEST);
         }
-        validateByType(postType, request.getContent(), request.getHiddenContent(), request.getPrice(),
-                request.getBountyAmount(), request.getBountyExpireAt());
+        validateByType(postType, payload.getContent(), payload.getHiddenContent(), payload.getPrice(),
+                payload.getBountyAmount(), payload.getBountyExpireAt());
     }
 
     private void validateByType(PostType postType, String content, String hiddenContent, Integer price,

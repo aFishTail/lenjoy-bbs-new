@@ -9,7 +9,9 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.lenjoy.bbs.domain.dto.CreateNormalPostRequest;
 import com.lenjoy.bbs.domain.dto.CreatePostRequest;
+import com.lenjoy.bbs.domain.dto.CreateResourcePostRequest;
 import com.lenjoy.bbs.domain.dto.OfflinePostRequest;
 import com.lenjoy.bbs.domain.dto.PostDetailResponse;
 import com.lenjoy.bbs.domain.dto.PostSummaryResponse;
@@ -62,11 +64,10 @@ class PostServiceTest {
         UserAccountEntity user = buildUser(1L, "author", "MUTED");
         when(userAccountMapper.selectById(1L)).thenReturn(user);
 
-        CreatePostRequest request = new CreatePostRequest();
-        request.setPostType("NORMAL");
+        CreatePostRequest request = new CreateNormalPostRequest();
         request.setTitle("hello");
         request.setCategoryId(1L);
-        request.setContent("body");
+        ((CreateNormalPostRequest) request).setContent("body");
 
         ApiException ex = assertThrows(ApiException.class, () -> postService.create(1L, request));
 
@@ -169,11 +170,10 @@ class PostServiceTest {
         when(postAssembler.toDetail(any(PostEntity.class), any(), any(), anyBoolean(), anyBoolean()))
                 .thenReturn(expected);
 
-        CreatePostRequest request = new CreatePostRequest();
-        request.setPostType("NORMAL");
+        CreatePostRequest request = new CreateNormalPostRequest();
         request.setTitle("Title");
         request.setCategoryId(1L);
-        request.setContent("Body");
+        ((CreateNormalPostRequest) request).setContent("Body");
 
         PostDetailResponse response = postService.create(5L, request);
 
@@ -181,6 +181,37 @@ class PostServiceTest {
         assertEquals("NORMAL", response.getPostType());
         assertEquals("writer", response.getAuthorUsername());
         verify(taxonomyService).replacePostTags(101L, null);
+    }
+
+    @Test
+    void create_resourcePost_shouldPersistHiddenContentAndPrice() {
+        UserAccountEntity user = buildUser(6L, "seller", "ACTIVE");
+        when(userAccountMapper.selectById(6L)).thenReturn(user);
+        when(taxonomyService.requireActiveCategoryForPost("RESOURCE", 2L)).thenReturn(new CategoryEntity());
+        when(taxonomyService.requireActiveTags(any())).thenReturn(List.of());
+        doAnswer(invocation -> {
+            PostEntity entity = invocation.getArgument(0);
+            entity.setId(102L);
+            return 1;
+        }).when(postMapper).insert(any(PostEntity.class));
+
+        PostDetailResponse expected = new PostDetailResponse();
+        expected.setId(102L);
+        expected.setPostType("RESOURCE");
+        when(postAssembler.toDetail(any(PostEntity.class), any(), any(), anyBoolean(), anyBoolean()))
+                .thenReturn(expected);
+
+        CreateResourcePostRequest request = new CreateResourcePostRequest();
+        request.setTitle("Checklist");
+        request.setCategoryId(2L);
+        request.setContent("Preview");
+        request.setHiddenContent("Download link");
+        request.setPrice(99);
+
+        PostDetailResponse response = postService.create(6L, request);
+
+        assertEquals(102L, response.getId());
+        verify(postMapper).updateById(any(PostEntity.class));
     }
 
     @Test

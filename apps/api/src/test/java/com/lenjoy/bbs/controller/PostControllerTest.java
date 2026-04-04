@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.lenjoy.bbs.domain.dto.CreateNormalPostRequest;
 import com.lenjoy.bbs.domain.dto.CreatePostRequest;
 import com.lenjoy.bbs.domain.dto.OfflinePostRequest;
 import com.lenjoy.bbs.domain.dto.PageResponse;
@@ -62,7 +63,7 @@ class PostControllerTest {
 
     @Test
     void create_whenUnauthenticated_shouldThrowUnauthorized() {
-        CreatePostRequest request = new CreatePostRequest();
+        CreatePostRequest request = new CreateNormalPostRequest();
 
         ApiException ex = assertThrows(ApiException.class, () -> postController.create(request, null));
 
@@ -75,7 +76,7 @@ class PostControllerTest {
         AuthUserPrincipal principal = userPrincipal(5L, "u1");
         PostDetailResponse detail = new PostDetailResponse();
         detail.setId(77L);
-        CreatePostRequest request = new CreatePostRequest();
+        CreatePostRequest request = new CreateNormalPostRequest();
         when(postService.create(5L, request)).thenReturn(detail);
 
         var response = postController.create(request, principal);

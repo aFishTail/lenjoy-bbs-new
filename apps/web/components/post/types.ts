@@ -307,3 +307,29 @@ export type AdminBountySummary = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type OpenApiClientSummary = {
+  id: number;
+  name: string;
+  apiKeyMasked: string;
+  apiKeyPlaintext: string;
+  status: "ACTIVE" | "INACTIVE";
+  remark?: string | null;
+  bindingCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type OpenApiBindingSummary = {
+  id: number;
+  clientId: number;
+  bindingCode: string;
+  status: "ACTIVE" | "INACTIVE";
+  remark?: string | null;
+  userId: number;
+  username?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};

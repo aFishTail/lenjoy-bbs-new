@@ -41,6 +41,11 @@ management:
       exposure:
         include: health,info
 
+logging:
+  level:
+    root: ${LOG_LEVEL_ROOT:INFO}
+    com.lenjoy.bbs: ${LOG_LEVEL_APP:INFO}
+
 server:
   port: ${SERVER_PORT:8080}
 
@@ -70,3 +75,7 @@ storage:
     bucket: ${MINIO_BUCKET:lenjoy-bbs}
     public-base-url: ${MINIO_PUBLIC_BASE_URL:http://localhost:9000/lenjoy-bbs}
     max-file-size-bytes: ${MINIO_MAX_FILE_SIZE_BYTES:5242880}
+
+app:
+  logging:
+    path: ${LOG_PATH:./logs}

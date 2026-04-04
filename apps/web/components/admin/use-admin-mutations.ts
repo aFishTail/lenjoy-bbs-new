@@ -7,7 +7,13 @@ import {
   requestApi,
   requestApiData,
 } from "@/components/post/client-helpers";
-import type { ResourceAppeal, ReportItem, WalletSummary } from "@/components/post/types";
+import type {
+  OpenApiBindingSummary,
+  OpenApiClientSummary,
+  ResourceAppeal,
+  ReportItem,
+  WalletSummary,
+} from "@/components/post/types";
 import type {
   AdminBountiesFilters,
   AdminReportsFilters,
@@ -407,6 +413,239 @@ export function useDeleteAdminTagMutation(keyword: string) {
     onSuccess: async () => {
       await queryClient.invalidateQueries({
         queryKey: queryKeys.adminTags(keyword),
+      });
+    },
+  });
+}
+
+export function useCreateOpenApiClientMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: { name: string; remark?: string; status: string }) =>
+      requestApiData<OpenApiClientSummary>("/api/admin/open-api/clients", {
+        method: "POST",
+        withAuth: true,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.adminOpenApiClients,
+      });
+    },
+  });
+}
+
+export function useUpdateOpenApiClientMutation(clientId?: number) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      clientId: currentClientId,
+      payload,
+    }: {
+      clientId: number;
+      payload: { name: string; remark?: string; status: string };
+    }) =>
+      requestApiData<OpenApiClientSummary>(
+        `/api/admin/open-api/clients/${currentClientId}`,
+        {
+          method: "PUT",
+          withAuth: true,
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        },
+      ),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.adminOpenApiClients,
+      });
+      if (clientId != null) {
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.adminOpenApiClient(clientId),
+        });
+      }
+    },
+  });
+}
+
+export function useUpdateOpenApiClientStatusMutation(clientId?: number) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      clientId: currentClientId,
+      status,
+    }: {
+      clientId: number;
+      status: "ACTIVE" | "INACTIVE";
+    }) =>
+      requestApiData<OpenApiClientSummary>(
+        `/api/admin/open-api/clients/${currentClientId}/status`,
+        {
+          method: "PATCH",
+          withAuth: true,
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ status }),
+        },
+      ),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.adminOpenApiClients,
+      });
+      if (clientId != null) {
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.adminOpenApiClient(clientId),
+        });
+      }
+    },
+  });
+}
+
+export function useDeleteOpenApiClientMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (clientId: number) =>
+      requestApi(`/api/admin/open-api/clients/${clientId}`, {
+        method: "DELETE",
+        withAuth: true,
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.adminOpenApiClients,
+      });
+    },
+  });
+}
+
+export function useCreateOpenApiBindingMutation(clientId: number) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: {
+      bindingCode: string;
+      userId?: number;
+      username?: string;
+      remark?: string;
+      status: string;
+    }) =>
+      requestApiData<OpenApiBindingSummary>(
+        `/api/admin/open-api/clients/${clientId}/bindings`,
+        {
+          method: "POST",
+          withAuth: true,
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        },
+      ),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.adminOpenApiBindings(clientId),
+      });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.adminOpenApiClient(clientId),
+      });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.adminOpenApiClients,
+      });
+    },
+  });
+}
+
+export function useUpdateOpenApiBindingMutation(clientId: number) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      bindingId,
+      payload,
+    }: {
+      bindingId: number;
+      payload: {
+        bindingCode: string;
+        userId?: number;
+        username?: string;
+        remark?: string;
+        status: string;
+      };
+    }) =>
+      requestApiData<OpenApiBindingSummary>(
+        `/api/admin/open-api/clients/${clientId}/bindings/${bindingId}`,
+        {
+          method: "PUT",
+          withAuth: true,
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        },
+      ),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.adminOpenApiBindings(clientId),
+      });
+    },
+  });
+}
+
+export function useUpdateOpenApiBindingStatusMutation(clientId: number) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      bindingId,
+      status,
+    }: {
+      bindingId: number;
+      status: "ACTIVE" | "INACTIVE";
+    }) =>
+      requestApiData<OpenApiBindingSummary>(
+        `/api/admin/open-api/clients/${clientId}/bindings/${bindingId}/status`,
+        {
+          method: "PATCH",
+          withAuth: true,
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ status }),
+        },
+      ),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.adminOpenApiBindings(clientId),
+      });
+    },
+  });
+}
+
+export function useDeleteOpenApiBindingMutation(clientId: number) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (bindingId: number) =>
+      requestApi(`/api/admin/open-api/clients/${clientId}/bindings/${bindingId}`, {
+        method: "DELETE",
+        withAuth: true,
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.adminOpenApiBindings(clientId),
+      });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.adminOpenApiClient(clientId),
+      });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.adminOpenApiClients,
       });
     },
   });

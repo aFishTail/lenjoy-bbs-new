@@ -44,24 +44,28 @@ public class PostService {
 
     @Transactional
     public PostDetailResponse create(Long userId, CreatePostRequest request) {
-        UserAccountEntity user = requireUser(userId);
+        return create(PostCreateCommand.from(userId, request));
+    }
+
+    @Transactional
+    PostDetailResponse create(PostCreateCommand command) {
+        UserAccountEntity user = requireUser(command.authorId());
         postValidator.ensureCanPost(user);
-        PostType postType = PostType.fromNullable(request.getPostType());
-        postValidator.validateCreate(postType, request);
-        taxonomyService.requireActiveCategoryForPost(postType.value(), request.getCategoryId());
-        taxonomyService.requireActiveTags(request.getTagIds());
+        postValidator.validateCreateCommand(command);
+        taxonomyService.requireActiveCategoryForPost(command.postType().value(), command.categoryId());
+        taxonomyService.requireActiveTags(command.tagIds());
 
         PostEntity entity = new PostEntity();
-        entity.setAuthorId(userId);
-        entity.setPostType(postType.value());
-        entity.setCategoryId(request.getCategoryId());
-        entity.setTitle(request.getTitle().trim());
-        entity.setContent(blankToNull(request.getContent()));
-        entity.setHiddenContent(blankToNull(request.getHiddenContent()));
-        entity.setPrice(request.getPrice());
-        entity.setBountyAmount(request.getBountyAmount());
-        entity.setBountyStatus(postType == PostType.BOUNTY ? BountyService.BOUNTY_STATUS_ACTIVE : null);
-        entity.setBountyExpireAt(request.getBountyExpireAt());
+        entity.setAuthorId(command.authorId());
+        entity.setPostType(command.postType().value());
+        entity.setCategoryId(command.categoryId());
+        entity.setTitle(command.title().trim());
+        entity.setContent(blankToNull(command.content()));
+        entity.setHiddenContent(blankToNull(command.hiddenContent()));
+        entity.setPrice(command.price());
+        entity.setBountyAmount(command.bountyAmount());
+        entity.setBountyStatus(command.postType() == PostType.BOUNTY ? BountyService.BOUNTY_STATUS_ACTIVE : null);
+        entity.setBountyExpireAt(command.bountyExpireAt());
         entity.setBountySettledAt(null);
         entity.setAcceptedCommentId(null);
         entity.setStatus(PostStatus.PUBLISHED.value());
@@ -69,12 +73,12 @@ public class PostService {
         entity.setCreatedAt(LocalDateTime.now());
         entity.setUpdatedAt(LocalDateTime.now());
         postMapper.insert(entity);
-        taxonomyService.replacePostTags(entity.getId(), request.getTagIds());
+        taxonomyService.replacePostTags(entity.getId(), command.tagIds());
 
-        bountyService.freezeOnCreate(entity, userId);
+        bountyService.freezeOnCreate(entity, command.authorId());
         postMapper.updateById(entity);
 
-        return postAssembler.toDetail(entity, user.getUsername(), userId, true, false);
+        return postAssembler.toDetail(entity, user.getUsername(), command.authorId(), true, false);
     }
 
     public PageResponse<PostSummaryResponse> listPublic(String postType, Long categoryId, Long tagId, String keyword,

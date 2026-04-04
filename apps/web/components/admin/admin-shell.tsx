@@ -15,6 +15,7 @@ const menus = [
   { href: "/admin/appeals", label: "资源申诉" },
   { href: "/admin/bounties", label: "悬赏治理" },
   { href: "/admin/reports", label: "举报管理" },
+  { href: "/admin/open-api", label: "Open API" },
 ];
 
 export function AdminShell({ children }: PropsWithChildren) {

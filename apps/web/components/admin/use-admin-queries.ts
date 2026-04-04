@@ -9,6 +9,8 @@ import type {
   AdminCoinUserSummary,
   AdminDashboardMetrics,
   AdminUserSummary,
+  OpenApiBindingSummary,
+  OpenApiClientSummary,
   PostSummary,
   PostComment,
   ReportItem,
@@ -154,6 +156,44 @@ export function useAdminTagsQuery(keyword: string) {
           cache: "no-store",
         },
       ),
+  });
+}
+
+export function useAdminOpenApiClientsQuery() {
+  return useQuery({
+    queryKey: queryKeys.adminOpenApiClients,
+    queryFn: () =>
+      requestApiData<OpenApiClientSummary[]>("/api/admin/open-api/clients", {
+        withAuth: true,
+        cache: "no-store",
+      }),
+  });
+}
+
+export function useAdminOpenApiClientQuery(clientId: number | null) {
+  return useQuery({
+    queryKey: queryKeys.adminOpenApiClient(clientId),
+    queryFn: () =>
+      requestApiData<OpenApiClientSummary>(`/api/admin/open-api/clients/${clientId}`, {
+        withAuth: true,
+        cache: "no-store",
+      }),
+    enabled: clientId != null,
+  });
+}
+
+export function useAdminOpenApiBindingsQuery(clientId: number | null) {
+  return useQuery({
+    queryKey: queryKeys.adminOpenApiBindings(clientId),
+    queryFn: () =>
+      requestApiData<OpenApiBindingSummary[]>(
+        `/api/admin/open-api/clients/${clientId}/bindings`,
+        {
+          withAuth: true,
+          cache: "no-store",
+        },
+      ),
+    enabled: clientId != null,
   });
 }
 

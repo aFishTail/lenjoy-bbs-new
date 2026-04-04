@@ -7,6 +7,8 @@ import com.lenjoy.bbs.domain.dto.LoginRequest;
 import com.lenjoy.bbs.domain.dto.RegisterRequest;
 import com.lenjoy.bbs.service.AuthService;
 import com.lenjoy.bbs.service.CaptchaService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
+@Tag(name = "Auth")
 public class AuthController {
 
     private final AuthService authService;
@@ -49,6 +52,8 @@ public class AuthController {
     }
 
     @PostMapping("/login")
+    @Operation(summary = "Login and obtain a Bearer token",
+            description = "Use the returned token as `Authorization: Bearer <token>` when calling authenticated APIs such as `POST /api/v1/posts`.")
     public ApiResponse<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         return ApiResponse.ok(authService.login(request));
     }

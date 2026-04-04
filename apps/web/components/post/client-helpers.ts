@@ -55,6 +55,11 @@ export const queryKeys = {
   adminCategories: (contentType: string) =>
     ["admin", "categories", contentType] as const,
   adminTags: (keyword: string) => ["admin", "tags", keyword] as const,
+  adminOpenApiClients: ["admin", "open-api", "clients"] as const,
+  adminOpenApiClient: (clientId: number | null) =>
+    ["admin", "open-api", "client", clientId] as const,
+  adminOpenApiBindings: (clientId: number | null) =>
+    ["admin", "open-api", "client", clientId, "bindings"] as const,
 };
 
 export function clearAuthAndRedirectToLogin(): void {

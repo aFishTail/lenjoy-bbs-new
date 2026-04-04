@@ -10,6 +10,9 @@ import com.lenjoy.bbs.domain.dto.UpdatePostRequest;
 import com.lenjoy.bbs.security.AuthUserPrincipal;
 import com.lenjoy.bbs.security.SecurityAccess;
 import com.lenjoy.bbs.service.PostService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1")
+@Tag(name = "Posts")
 public class PostController {
 
     private final PostService postService;
@@ -62,6 +66,11 @@ public class PostController {
     }
 
     @PostMapping("/posts")
+    @Operation(
+            summary = "Create a post",
+            description = "External callers should first log in via `/api/v1/auth/login` to obtain a Bearer token. "
+                    + "The post author is always the currently authenticated account.",
+            security = @SecurityRequirement(name = "bearerAuth"))
     public ApiResponse<PostDetailResponse> create(@Valid @RequestBody CreatePostRequest request,
             @AuthenticationPrincipal AuthUserPrincipal principal) {
         AuthUserPrincipal currentUser = securityAccess.requireAuthenticated(principal);

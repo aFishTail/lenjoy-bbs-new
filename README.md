@@ -143,6 +143,9 @@ Environment variables:
 - `DB_USER`
 - `DB_PASSWORD`
 - `SERVER_PORT`
+- `LOG_PATH`
+- `LOG_LEVEL_ROOT`
+- `LOG_LEVEL_APP`
 - `MINIO_ENDPOINT`
 - `MINIO_ACCESS_KEY`
 - `MINIO_SECRET_KEY`
@@ -151,6 +154,16 @@ Environment variables:
 - `UPLOAD_MAX_FILE_SIZE`
 - `UPLOAD_MAX_REQUEST_SIZE`
 - `MINIO_MAX_FILE_SIZE_BYTES`
+
+### API Logging
+
+`apps/api` now writes local log files by default when the service starts.
+
+- Main log: `${LOG_PATH:-./logs}/app.log`
+- Error log: `${LOG_PATH:-./logs}/error.log`
+- Rotated archives: `${LOG_PATH:-./logs}/archive/`
+
+Each API request gets an `X-Trace-Id` response header. Use that trace ID to search both request logs and exception stacks for the same failing call.
 
 ## Auth API (US-A02)
 
