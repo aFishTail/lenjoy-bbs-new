@@ -1,6 +1,7 @@
 "use client";
 
-import DOMPurify from "dompurify";
+import purify from "dompurify";
+const DOMPurify = (purify as any).default || purify;
 import { useMemo } from "react";
 
 type Props = {

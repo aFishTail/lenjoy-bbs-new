@@ -3,6 +3,8 @@ node_modules/
 .next/
 .next-build
 .next-dev
+package-lock.json
+yarn.lock
 
 # Java
 apps/api/target/
@@ -10,6 +12,7 @@ apps/api/target/
 # IDE and OS
 .vscode/
 .idea/
+.zread/
 *.iml
 .DS_Store
 Thumbs.db

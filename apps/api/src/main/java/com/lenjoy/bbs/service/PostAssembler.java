@@ -47,17 +47,18 @@ public class PostAssembler {
         if (posts.isEmpty()) {
             return List.of();
         }
-        Set<Long> authorIds = posts.stream().map(PostEntity::getAuthorId).collect(Collectors.toSet());
-        Map<Long, String> usernameMap = userAccountMapper
+        Set<Long> authorIds = posts.stream().map(PostEntity::getAuthorId).filter(java.util.Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, String> usernameMap = authorIds.isEmpty() ? Map.of() : userAccountMapper
                 .selectList(new LambdaQueryWrapper<UserAccountEntity>().in(UserAccountEntity::getId, authorIds))
                 .stream()
                 .collect(Collectors.toMap(UserAccountEntity::getId, UserAccountEntity::getUsername));
-        Map<Long, CategoryEntity> categories = taxonomyService.findCategoryMap(
-                posts.stream().map(PostEntity::getCategoryId).collect(Collectors.toSet()));
+        Set<Long> categoryIds = posts.stream().map(PostEntity::getCategoryId).filter(java.util.Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, CategoryEntity> categories = taxonomyService.findCategoryMap(categoryIds);
         Map<Long, List<TagEntity>> tagsByPostId = taxonomyService.findTagsByPostIds(
                 posts.stream().map(PostEntity::getId).collect(Collectors.toSet()));
         return posts.stream()
-                .map(post -> toSummary(post, usernameMap.get(post.getAuthorId()), categories.get(post.getCategoryId()),
+                .map(post -> toSummary(post, post.getAuthorId() != null ? usernameMap.get(post.getAuthorId()) : null,
+                        post.getCategoryId() != null ? categories.get(post.getCategoryId()) : null,
                         tagsByPostId.getOrDefault(post.getId(), List.of())))
                 .toList();
     }
@@ -71,7 +72,9 @@ public class PostAssembler {
         response.setStatus(entity.getStatus());
         response.setAuthorId(entity.getAuthorId());
         response.setAuthorUsername(authorUsername);
-        CategoryEntity category = taxonomyService.findCategoryMap(List.of(entity.getCategoryId())).get(entity.getCategoryId());
+        Map<Long, CategoryEntity> categoryMap = taxonomyService.findCategoryMap(
+                entity.getCategoryId() != null ? List.of(entity.getCategoryId()) : List.of());
+        CategoryEntity category = entity.getCategoryId() != null ? categoryMap.get(entity.getCategoryId()) : null;
         response.setCategoryId(entity.getCategoryId());
         response.setCategoryName(category == null ? null : category.getName());
         response.setTags(toTagResponses(taxonomyService.findTagsByPostIds(List.of(entity.getId()))
