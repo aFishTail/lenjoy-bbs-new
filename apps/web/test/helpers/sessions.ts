@@ -28,7 +28,7 @@ export type JwtClaims = {
 };
 
 export function readJwtClaims(auth: AuthData): JwtClaims | null {
-  const parts = auth.token.split(".");
+  const parts = auth.accessToken.split(".");
   if (parts.length < 2) {
     return null;
   }
@@ -36,7 +36,9 @@ export function readJwtClaims(auth: AuthData): JwtClaims | null {
   try {
     const normalized = parts[1].replace(/-/g, "+").replace(/_/g, "/");
     const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
-    return JSON.parse(Buffer.from(padded, "base64").toString("utf8")) as JwtClaims;
+    return JSON.parse(
+      Buffer.from(padded, "base64").toString("utf8"),
+    ) as JwtClaims;
   } catch {
     return null;
   }

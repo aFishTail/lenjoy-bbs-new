@@ -1,9 +1,20 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+  useCallback,
+} from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { setCookie, deleteCookie } from "cookies-next";
-import { getStoredAuth, queryKeys } from "@/components/post/client-helpers";
+import {
+  getStoredAuth,
+  normalizeAuthData,
+  queryKeys,
+} from "@/components/post/client-helpers";
 import type { AuthData } from "@/components/post/types";
 import { AUTH_STORAGE_KEY } from "@/components/post/client-helpers";
 
@@ -18,15 +29,17 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ 
-  children, 
-  initialAuth 
-}: { 
+export function AuthProvider({
+  children,
+  initialAuth,
+}: {
   children: ReactNode;
   initialAuth: AuthData | null;
 }) {
   const queryClient = useQueryClient();
-  const [authData, setAuthData] = useState<AuthData | null>(initialAuth);
+  const [authData, setAuthData] = useState<AuthData | null>(
+    normalizeAuthData(initialAuth),
+  );
   const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
@@ -36,13 +49,15 @@ export function AuthProvider({
     setAuthReady(true);
 
     const channel = new BroadcastChannel("lenjoy-auth-sync");
-    
+
     channel.onmessage = (event) => {
       if (event.data === "auth-changed") {
         const nextAuthData = getStoredAuth();
         setAuthData(nextAuthData);
-        if (nextAuthData?.token) {
-          void queryClient.invalidateQueries({ queryKey: queryKeys.unreadCount });
+        if (nextAuthData?.accessToken) {
+          void queryClient.invalidateQueries({
+            queryKey: queryKeys.unreadCount,
+          });
         } else {
           queryClient.removeQueries({ queryKey: queryKeys.unreadCount });
         }
@@ -50,7 +65,7 @@ export function AuthProvider({
     };
 
     return () => channel.close();
-  }, [queryClient, initialAuth]);
+  }, [queryClient]);
 
   const clearAuth = useCallback(() => {
     deleteCookie(AUTH_STORAGE_KEY);
@@ -62,13 +77,20 @@ export function AuthProvider({
   }, [queryClient]);
 
   const handleSetAuth = useCallback((data: AuthData) => {
-    const maxAgeParams = data.expiresIn ? { maxAge: data.expiresIn } : {};
-    setCookie(AUTH_STORAGE_KEY, JSON.stringify(data), {
+    const nextAuthData = normalizeAuthData(data);
+    if (!nextAuthData) {
+      return;
+    }
+
+    const maxAgeParams = nextAuthData.expiresIn
+      ? { maxAge: nextAuthData.expiresIn }
+      : {};
+    setCookie(AUTH_STORAGE_KEY, JSON.stringify(nextAuthData), {
       path: "/",
       ...maxAgeParams,
       sameSite: "lax",
     });
-    setAuthData(data);
+    setAuthData(nextAuthData);
     const channel = new BroadcastChannel("lenjoy-auth-sync");
     channel.postMessage("auth-changed");
     channel.close();
@@ -77,7 +99,7 @@ export function AuthProvider({
   const value = {
     authData,
     user: authData?.user ?? null,
-    hasAuth: !!authData?.token,
+    hasAuth: !!authData?.accessToken,
     authReady,
     clearAuth,
     setAuth: handleSetAuth,

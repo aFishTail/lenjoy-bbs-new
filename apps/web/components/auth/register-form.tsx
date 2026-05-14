@@ -45,8 +45,10 @@ export function RegisterForm({
             className="form-input"
             required
             minLength={3}
-            maxLength={32}
-            placeholder="3-32 位，不可重复"
+            maxLength={64}
+            pattern="[A-Za-z0-9_-]+"
+            title="用户名只能包含字母、数字、下划线和短横线"
+            placeholder="3-64 位，仅支持字母、数字、下划线和短横线"
             value={value.username}
             onChange={(e) => onChange({ ...value, username: e.target.value })}
           />
@@ -61,9 +63,9 @@ export function RegisterForm({
             className="form-input"
             required
             type="password"
-            minLength={6}
-            maxLength={64}
-            placeholder="至少 6 位"
+            minLength={8}
+            maxLength={128}
+            placeholder="8-128 位"
             value={value.password}
             onChange={(e) => onChange({ ...value, password: e.target.value })}
           />
@@ -90,6 +92,7 @@ export function RegisterForm({
           <input
             id="phone"
             className="form-input"
+            maxLength={32}
             placeholder="可选，邮箱或手机号至少填一项"
             value={value.phone}
             onChange={(e) => onChange({ ...value, phone: e.target.value })}
@@ -115,12 +118,21 @@ export function RegisterForm({
         >
           {submitting ? (
             <>
-              <div className="spinner" style={{ width: "16px", height: "16px" }}></div>
+              <div
+                className="spinner"
+                style={{ width: "16px", height: "16px" }}
+              ></div>
               注册中...
             </>
           ) : (
             <>
-              <svg className="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <svg
+                className="icon-sm"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+              >
                 <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                 <circle cx="8.5" cy="7" r="4" />
                 <line x1="20" y1="8" x2="20" y2="14" />

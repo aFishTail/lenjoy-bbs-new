@@ -3,14 +3,14 @@
 This repository follows the agreed V1 technical stack:
 
 - Web: Next.js + TypeScript
-- API: Java 21 + Spring Boot + MyBatis-Plus + Flyway
+- API: FastAPI + SQLAlchemy async + Alembic
 - Infra: PostgreSQL + Redis + Nginx + Docker Compose
 
 ## Project Structure
 
 ```text
 apps/
-  api/        Spring Boot API service
+  api/        FastAPI API service
   web/        Next.js web and admin UI
 infra/
   docker/     Docker Compose files
@@ -33,7 +33,7 @@ docker compose -f infra/docker/docker-compose.yml up --build
 
 - Web: <http://localhost:8080/>
 - API health: <http://localhost:8080/api/v1/health>
-- Swagger: <http://localhost:8080/swagger-ui/index.html>
+- OpenAPI docs: <http://localhost:8080/docs>
 - MinIO API: <http://localhost:9000>
 - MinIO Console: <http://localhost:9001>
 
@@ -88,8 +88,8 @@ docker compose -f infra/docker/docker-compose.yml up -d postgres redis minio min
 
 Requirements:
 
-- Java 21
-- Maven 3.9+
+- Python 3.12
+- `uv`
 - PostgreSQL 16
 - Redis 7
 
@@ -97,55 +97,23 @@ Run:
 
 ```bash
 cd apps/api
-mvn spring-boot:run
+uv sync
+uv run alembic upgrade head
+uv run uvicorn lenjoy_bbs.main:app --host 0.0.0.0 --port 8080 --reload
 ```
-
-### Backend Hot Reload
-
-`apps/api` now includes `spring-boot-devtools`.
-
-For terminal development:
-
-1. Run API with `mvn spring-boot:run`.
-2. After code changes, trigger compile in your IDE (or save if auto-build is enabled).
-3. DevTools restarts the Spring context automatically.
-
-For IntelliJ IDEA, enable:
-
-1. `Build project automatically` in compiler settings.
-2. `Advanced Settings -> Allow auto-make to start even if developed application is currently running`.
-
-### Run API in IntelliJ IDEA
-
-`docker compose --env-file .env ...` only affects Docker containers.
-When you run Spring Boot directly in IDEA, `.env` is not auto-loaded by default.
-
-Set environment variables in IDEA Run Configuration:
-
-1. Open `Run | Edit Configurations...`.
-2. Select your Spring Boot run config (`BbsApiApplication`).
-3. In `Environment variables`, add:
-
-```text
-DB_URL=jdbc:postgresql://localhost:5432/lenjoy_bbs;DB_USER=lenjoy;DB_PASSWORD=your_password;SERVER_PORT=8080
-```
-
-1. Apply and run.
-
-Optional:
-
-- Use IDEA EnvFile plugin to load variables from `.env` automatically.
-- Or run API from terminal after exporting env vars in shell.
 
 Environment variables:
 
+- `APP_ENV`
+- `DATABASE_URL`
 - `DB_URL`
 - `DB_USER`
 - `DB_PASSWORD`
 - `SERVER_PORT`
-- `LOG_PATH`
-- `LOG_LEVEL_ROOT`
-- `LOG_LEVEL_APP`
+- `LOG_LEVEL`
+- `LOG_FORMAT`
+- `SLOW_REQUEST_MS`
+- `SQL_LOG_ENABLED`
 - `MINIO_ENDPOINT`
 - `MINIO_ACCESS_KEY`
 - `MINIO_SECRET_KEY`
@@ -157,13 +125,22 @@ Environment variables:
 
 ### API Logging
 
-`apps/api` now writes local log files by default when the service starts.
+`apps/api` uses structured application logs on stdout by default.
 
-- Main log: `${LOG_PATH:-./logs}/app.log`
-- Error log: `${LOG_PATH:-./logs}/error.log`
-- Rotated archives: `${LOG_PATH:-./logs}/archive/`
+- Default format: JSON, one line per event
+- Main correlation header: `X-Request-Id`
+- Primary fields: `timestamp`, `level`, `logger`, `event`, `request_id`, `method`, `path`, `status_code`, `duration_ms`, `user_id`
+- High-value business events are logged for auth, posts, uploads, admin actions, and Open API calls
+- External dependency failures from Redis and MinIO are logged as structured errors
 
-Each API request gets an `X-Trace-Id` response header. Use that trace ID to search both request logs and exception stacks for the same failing call.
+Useful env vars:
+
+- `LOG_LEVEL`
+- `LOG_FORMAT=json|text`
+- `SLOW_REQUEST_MS`
+- `SQL_LOG_ENABLED`
+
+Each API request gets an `X-Request-Id` response header. Use that value to correlate request summaries, business events, and exception stacks for the same call.
 
 ## Auth API (US-A02)
 

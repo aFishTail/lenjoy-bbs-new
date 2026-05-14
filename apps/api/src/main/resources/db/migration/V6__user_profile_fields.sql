@@ -1,6 +1,0 @@
-ALTER TABLE
-    user_account
-ADD
-    COLUMN IF NOT EXISTS avatar_url VARCHAR(512),
-ADD
-    COLUMN IF NOT EXISTS bio VARCHAR(200);

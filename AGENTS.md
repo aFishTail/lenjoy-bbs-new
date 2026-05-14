@@ -1,42 +1,70 @@
-# Repository Guidelines
+# AGENTS.md
 
-## Project Structure & Module Organization
-This repository is a small monorepo split by runtime:
+Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
-- `apps/web`: Next.js 15 + TypeScript frontend. Main routes live in `app/`, reusable UI in `components/`, server/client helpers in `lib/`, and Playwright tests in `test/`.
-- `apps/api`: Spring Boot 3.4 backend. Java code lives in `src/main/java/com/lenjoy/bbs`, config and Flyway SQL migrations in `src/main/resources`, and JUnit tests in `src/test`.
-- `infra/docker` and `infra/nginx`: local infrastructure and gateway config.
-- `docs/` and root `*.md`: product and delivery notes.
+**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
 
-## Build, Test, and Development Commands
-- `docker compose --env-file .env -f infra/docker/docker-compose.dev.yml up -d`: start local PostgreSQL, Redis, and MinIO.
-- `cd apps/api; mvn spring-boot:run`: run the API locally on the configured port.
-- `cd apps/api; mvn test`: run backend unit and integration tests.
-- `cd apps/web; pnpm install`: install frontend dependencies. Prefer `pnpm` because the app is checked in with `pnpm-lock.yaml`.
-- `cd apps/web; pnpm dev`: start the Next.js dev server on `http://localhost:3000`.
-- `cd apps/web; pnpm build`: production build.
-- `cd apps/web; pnpm lint`: run Next.js linting.
-- `cd apps/web; pnpm test:e2e`: run Playwright end-to-end tests.
+## 1. Think Before Coding
 
-## Coding Style & Naming Conventions
-Use the existing style in each app instead of introducing a new one.
+**Don't assume. Don't hide confusion. Surface tradeoffs.**
 
-- TypeScript uses 2-space indentation, ES module imports, and PascalCase for React components, for example `PostHomeClient`.
-- Next.js route files follow framework naming such as `app/page.tsx`, `app/layout.tsx`, and server actions under `actions/`.
-- Java uses 4-space indentation, package-by-feature under `com.lenjoy.bbs`, and class names like `AuthController`, `CaptchaService`, and `RegisterRequest`.
-- Database migrations follow Flyway naming: `V13__short_description.sql`.
+Before implementing:
 
-## UI Feedback Conventions
-- Use toast notifications for user action feedback across the frontend. Prefer the existing `sonner`-based `toast` flow over `alert`, inline success/error banners, or ad hoc status text.
-- Apply toast feedback to create, update, delete, purchase, report, auth, and similar mutation flows unless a screen explicitly requires persistent inline messaging.
-- Only use another feedback pattern when the requirement is stated explicitly or the message must remain visible as page state.
+- State your assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them - don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
 
-## Testing Guidelines
-- Backend tests use JUnit 5 with Spring Boot test support and Testcontainers where needed. Mirror production packages under `apps/api/src/test/java` and name files `*Test.java`.
-- Frontend E2E tests use Playwright and live in `apps/web/test` with names like `smoke.e2e.spec.ts`.
-- Keep new tests close to the changed behavior. For web flows requiring login, populate `apps/web/test/testdata/auth-sessions.json` from the example file first.
+## 2. Simplicity First
 
-## Commit & Pull Request Guidelines
-Recent history mixes Conventional Commit prefixes and short task-based summaries. Prefer `feat:`, `fix:`, `chore:` followed by a concise description, for example `fix: handle captcha cache headers`.
+**Minimum code that solves the problem. Nothing speculative.**
 
-PRs should describe scope, list affected apps (`web`, `api`, `infra`), note any env or migration changes, and include screenshots for UI changes. Link the relevant issue or story when one exists, and state which checks you ran locally.
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
+
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+## 3. Surgical Changes
+
+**Touch only what you must. Clean up only your own mess.**
+
+When editing existing code:
+
+- Don't "improve" adjacent code, comments, or formatting.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it - don't delete it.
+
+When your changes create orphans:
+
+- Remove imports/variables/functions that YOUR changes made unused.
+- Don't remove pre-existing dead code unless asked.
+
+The test: Every changed line should trace directly to the user's request.
+
+## 4. Goal-Driven Execution
+
+**Define success criteria. Loop until verified.**
+
+Transform tasks into verifiable goals:
+
+- "Add validation" → "Write tests for invalid inputs, then make them pass"
+- "Fix the bug" → "Write a test that reproduces it, then make it pass"
+- "Refactor X" → "Ensure tests pass before and after"
+
+For multi-step tasks, state a brief plan:
+
+```
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
+```
+
+Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+---
+
+**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.

@@ -1,0 +1,1 @@
+"""Lenjoy BBS FastAPI application."""

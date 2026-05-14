@@ -2,6 +2,23 @@ import { deleteCookie, getCookie } from "cookies-next";
 
 import type { ApiResponse, AuthData } from "@/components/post/types";
 
+type ApiEnvelopeError = {
+  code: string;
+  message: string;
+};
+
+type BackendApiEnvelope<T> = {
+  data: T;
+  error: ApiEnvelopeError | null;
+  meta: Record<string, unknown>;
+};
+
+type PaginationMeta = {
+  page: number;
+  pageSize: number;
+  total: number;
+};
+
 export const AUTH_STORAGE_KEY = "lenjoy.auth";
 export const MESSAGE_EVENT = "lenjoy.messages.changed";
 
@@ -81,6 +98,25 @@ export function handleAuthStatus(status: number): void {
   }
 }
 
+export function normalizeAuthData(raw: unknown): AuthData | null {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+
+  const auth = raw as AuthData;
+
+  if (!auth.accessToken || !auth.user) {
+    return null;
+  }
+
+  return {
+    accessToken: auth.accessToken,
+    tokenType: auth.tokenType || "Bearer",
+    expiresIn: auth.expiresIn,
+    user: auth.user,
+  };
+}
+
 export function getStoredAuth(): AuthData | null {
   if (typeof window === "undefined") {
     // Return null during SSR since client-helpers can't access cookies natively reliably without req/res context passing
@@ -92,7 +128,7 @@ export function getStoredAuth(): AuthData | null {
     return null;
   }
   try {
-    return JSON.parse(raw) as AuthData;
+    return normalizeAuthData(JSON.parse(raw));
   } catch {
     return null;
   }
@@ -100,11 +136,11 @@ export function getStoredAuth(): AuthData | null {
 
 export function authHeaders(): HeadersInit {
   const auth = getStoredAuth();
-  if (!auth?.token) {
+  if (!auth?.accessToken) {
     return {};
   }
   return {
-    Authorization: `${auth.tokenType || "Bearer"} ${auth.token}`,
+    Authorization: `${auth.tokenType || "Bearer"} ${auth.accessToken}`,
   };
 }
 
@@ -115,25 +151,111 @@ export function fireMessageChanged(): void {
   window.dispatchEvent(new Event(MESSAGE_EVENT));
 }
 
+function readPaginationMeta(meta: Record<string, unknown> | undefined): PaginationMeta | null {
+  if (!meta) {
+    return null;
+  }
+
+  const page = meta.page;
+  const pageSize = meta.pageSize;
+  const total = meta.total;
+
+  if (
+    typeof page !== "number" ||
+    typeof pageSize !== "number" ||
+    typeof total !== "number"
+  ) {
+    return null;
+  }
+
+  return { page, pageSize, total };
+}
+
+function normalizeEnvelopeData<T>(
+  data: T,
+  meta: Record<string, unknown> | undefined,
+): T {
+  const pagination = readPaginationMeta(meta);
+  if (!pagination || !Array.isArray(data)) {
+    return data;
+  }
+
+  const totalPages = Math.max(1, Math.ceil(pagination.total / pagination.pageSize));
+
+  return {
+    items: data,
+    page: pagination.page,
+    pageSize: pagination.pageSize,
+    total: pagination.total,
+    totalPages,
+    hasNext: pagination.page < totalPages,
+    hasPrevious: pagination.page > 1,
+  } as T;
+}
+
+function readPayloadMessage<T>(
+  payload: ApiResponse<T> | BackendApiEnvelope<T> | null,
+): string | null {
+  if (!payload) {
+    return null;
+  }
+
+  if ("success" in payload) {
+    return payload.message || null;
+  }
+
+  return payload.error?.message || null;
+}
+
+function normalizeApiResponse<T>(
+  payload: ApiResponse<T> | BackendApiEnvelope<T> | null,
+): ApiResponse<T> | null {
+  if (!payload) {
+    return null;
+  }
+
+  if ("success" in payload) {
+    return payload;
+  }
+
+  if (payload.error) {
+    return {
+      success: false,
+      code: payload.error.code,
+      message: payload.error.message,
+      data: payload.data,
+    };
+  }
+
+  return {
+    success: true,
+    code: "",
+    message: "",
+    data: normalizeEnvelopeData(payload.data, payload.meta),
+  };
+}
+
 export async function readApi<T>(response: Response): Promise<ApiResponse<T>> {
-  let payload: ApiResponse<T> | null = null;
+  let payload: ApiResponse<T> | BackendApiEnvelope<T> | null = null;
 
   try {
-    payload = (await response.json()) as ApiResponse<T>;
+    payload = (await response.json()) as ApiResponse<T> | BackendApiEnvelope<T>;
   } catch {
     payload = null;
   }
 
+  const normalizedPayload = normalizeApiResponse(payload);
+
   if (!response.ok) {
     handleAuthStatus(response.status);
     const fallback = `请求失败（HTTP ${response.status}）`;
-    throw new Error(payload?.message || fallback);
+    throw new Error(readPayloadMessage(payload) || fallback);
   }
 
-  if (!payload || !payload.success) {
-    throw new Error(payload?.message || "请求失败");
+  if (!normalizedPayload || !normalizedPayload.success) {
+    throw new Error(readPayloadMessage(payload) || "请求失败");
   }
-  return payload;
+  return normalizedPayload;
 }
 
 export function readError(error: unknown): string {

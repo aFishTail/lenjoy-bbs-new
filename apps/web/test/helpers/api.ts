@@ -23,7 +23,7 @@ export async function apiResponse<T>(
       Accept: "application/json",
       ...(options?.auth
         ? {
-            Authorization: `${options.auth.tokenType || "Bearer"} ${options.auth.token}`,
+            Authorization: `${options.auth.tokenType || "Bearer"} ${options.auth.accessToken}`,
           }
         : {}),
       ...(options?.data ? { "Content-Type": "application/json" } : {}),

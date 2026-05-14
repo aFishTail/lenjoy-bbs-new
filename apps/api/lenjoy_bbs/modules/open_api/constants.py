@@ -1,0 +1,3 @@
+OPEN_API_CLIENT_KEY_PREFIX = "ljo_"
+OPEN_API_SYSTEM_USERNAME = "openapi"
+OPEN_API_SYSTEM_EMAIL = "openapi@example.com"

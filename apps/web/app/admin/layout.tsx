@@ -18,7 +18,7 @@ export default async function AdminLayout({
 }) {
   const authSession = await getAuthSession();
 
-  if (!authSession?.token) {
+  if (!authSession?.accessToken) {
     redirect("/auth");
   }
 

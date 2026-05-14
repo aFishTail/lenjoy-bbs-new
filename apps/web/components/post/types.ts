@@ -36,7 +36,7 @@ export type TagSummary = {
 };
 
 export type AuthData = {
-  token: string;
+  accessToken: string;
   tokenType: string;
   expiresIn: number;
   user: {

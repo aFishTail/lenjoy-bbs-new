@@ -14,7 +14,9 @@ export function Navigation() {
   const { hasAuth } = useAuth();
   const detailPostId = pathname.match(/^\/posts\/([^/]+)$/)?.[1] ?? null;
   const detailPostTypeQuery = useQuery({
-    queryKey: detailPostId ? queryKeys.postDetail(detailPostId) : ["posts", "detail-nav"],
+    queryKey: detailPostId
+      ? queryKeys.postDetail(detailPostId)
+      : ["posts", "detail-nav"],
     queryFn: () =>
       requestApiData<PostDetail>(`/api/posts/${detailPostId}`, {
         withAuth: true,
@@ -29,7 +31,8 @@ export function Navigation() {
     pathname === "/discussions" ||
     (!!detailPostId && (!detailPostType || detailPostType === "NORMAL"));
   const isResource =
-    pathname === "/resources" || (!!detailPostId && detailPostType === "RESOURCE");
+    pathname === "/resources" ||
+    (!!detailPostId && detailPostType === "RESOURCE");
   const isBounty =
     pathname === "/bounties" || (!!detailPostId && detailPostType === "BOUNTY");
 
@@ -81,7 +84,10 @@ export function Navigation() {
         <div className="nav-actions">
           <MessageNotification />
           <UserMenu />
-          <Link href={hasAuth ? "/posts/new" : "/auth"} className="btn btn-primary btn-sm">
+          <Link
+            href={hasAuth ? "/posts/new" : "/auth"}
+            className="btn btn-primary btn-sm"
+          >
             <svg
               className="icon-sm"
               viewBox="0 0 24 24"
