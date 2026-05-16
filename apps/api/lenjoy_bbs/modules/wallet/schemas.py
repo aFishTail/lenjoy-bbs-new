@@ -6,6 +6,8 @@ class WalletSummaryResponse(BaseModel):
 
     available_coins: int = Field(alias="availableCoins")
     frozen_coins: int = Field(alias="frozenCoins")
+    total_coins: int = Field(alias="totalCoins")
+    updated_at: str = Field(alias="updatedAt")
 
 
 class WalletLedgerItemResponse(BaseModel):

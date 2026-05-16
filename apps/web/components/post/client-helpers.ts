@@ -1,4 +1,4 @@
-import { deleteCookie, getCookie } from "cookies-next";
+import { deleteCookie, getCookie, setCookie } from "cookies-next";
 
 import type { ApiResponse, AuthData } from "@/components/post/types";
 
@@ -13,14 +13,9 @@ type BackendApiEnvelope<T> = {
   meta: Record<string, unknown>;
 };
 
-type PaginationMeta = {
-  page: number;
-  pageSize: number;
-  total: number;
-};
-
 export const AUTH_STORAGE_KEY = "lenjoy.auth";
 export const MESSAGE_EVENT = "lenjoy.messages.changed";
+export const VISITOR_ID_COOKIE = "lenjoy.visitor";
 
 export const queryKeys = {
   authSession: ["auth", "session"] as const,
@@ -134,6 +129,29 @@ export function getStoredAuth(): AuthData | null {
   }
 }
 
+export function getOrCreateVisitorId(): string {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  const existing = getCookie(VISITOR_ID_COOKIE);
+  if (typeof existing === "string" && existing.trim()) {
+    return existing;
+  }
+
+  const visitorId =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `visitor-${Date.now()}`;
+
+  setCookie(VISITOR_ID_COOKIE, visitorId, {
+    path: "/",
+    sameSite: "lax",
+    maxAge: 60 * 60 * 24 * 365,
+  });
+  return visitorId;
+}
+
 export function authHeaders(): HeadersInit {
   const auth = getStoredAuth();
   if (!auth?.accessToken) {
@@ -149,48 +167,6 @@ export function fireMessageChanged(): void {
     return;
   }
   window.dispatchEvent(new Event(MESSAGE_EVENT));
-}
-
-function readPaginationMeta(meta: Record<string, unknown> | undefined): PaginationMeta | null {
-  if (!meta) {
-    return null;
-  }
-
-  const page = meta.page;
-  const pageSize = meta.pageSize;
-  const total = meta.total;
-
-  if (
-    typeof page !== "number" ||
-    typeof pageSize !== "number" ||
-    typeof total !== "number"
-  ) {
-    return null;
-  }
-
-  return { page, pageSize, total };
-}
-
-function normalizeEnvelopeData<T>(
-  data: T,
-  meta: Record<string, unknown> | undefined,
-): T {
-  const pagination = readPaginationMeta(meta);
-  if (!pagination || !Array.isArray(data)) {
-    return data;
-  }
-
-  const totalPages = Math.max(1, Math.ceil(pagination.total / pagination.pageSize));
-
-  return {
-    items: data,
-    page: pagination.page,
-    pageSize: pagination.pageSize,
-    total: pagination.total,
-    totalPages,
-    hasNext: pagination.page < totalPages,
-    hasPrevious: pagination.page > 1,
-  } as T;
 }
 
 function readPayloadMessage<T>(
@@ -231,7 +207,7 @@ function normalizeApiResponse<T>(
     success: true,
     code: "",
     message: "",
-    data: normalizeEnvelopeData(payload.data, payload.meta),
+    data: payload.data,
   };
 }
 

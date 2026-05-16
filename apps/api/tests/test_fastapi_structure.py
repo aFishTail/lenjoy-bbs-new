@@ -56,8 +56,11 @@ def test_open_api_and_users_use_service_entrypoints():
     assert inspect.iscoroutinefunction(create_open_post)
     assert inspect.iscoroutinefunction(list_clients)
     assert inspect.iscoroutinefunction(update_profile)
-    assert list(create_client_sig.parameters) == ["db", "name", "remark", "status_value"]
-    assert list(create_open_post_sig.parameters) == ["db", "api_key", "payload"]
+    assert list(create_client_sig.parameters) == [
+        "db", "name", "remark", "status_value"
+    ]
+    assert list(
+        create_open_post_sig.parameters) == ["db", "api_key", "payload"]
     assert list(update_profile_sig.parameters) == ["db", "user", "payload"]
 
 
@@ -176,17 +179,23 @@ def test_core_routes_declare_response_models():
         "/api/v1/auth/register",
         "/api/v1/posts",
         "/api/v1/posts/{post_id}",
-        "/api/v1/me",
-        "/api/v1/me/wallet",
+        "/api/v1/users/me",
+        "/api/v1/users/me/wallet",
     }
     for route in app.routes:
         path = getattr(route, "path", None)
         if path in target_paths:
             routes_by_path.setdefault(path, []).append(route)
 
-    assert any(route.response_model is not None for route in routes_by_path["/api/v1/auth/login"])
-    assert any(route.response_model is not None for route in routes_by_path["/api/v1/auth/register"])
-    assert any(route.response_model is not None for route in routes_by_path["/api/v1/posts"])
-    assert any(route.response_model is not None for route in routes_by_path["/api/v1/posts/{post_id}"])
-    assert any(route.response_model is not None for route in routes_by_path["/api/v1/me"])
-    assert any(route.response_model is not None for route in routes_by_path["/api/v1/me/wallet"])
+    assert any(route.response_model is not None
+               for route in routes_by_path["/api/v1/auth/login"])
+    assert any(route.response_model is not None
+               for route in routes_by_path["/api/v1/auth/register"])
+    assert any(route.response_model is not None
+               for route in routes_by_path["/api/v1/posts"])
+    assert any(route.response_model is not None
+               for route in routes_by_path["/api/v1/posts/{post_id}"])
+    assert any(route.response_model is not None
+               for route in routes_by_path["/api/v1/users/me"])
+    assert any(route.response_model is not None
+               for route in routes_by_path["/api/v1/users/me/wallet"])

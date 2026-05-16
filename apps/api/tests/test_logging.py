@@ -8,6 +8,7 @@ from lenjoy_bbs.main import create_app
 
 
 class JsonCaptureHandler(logging.Handler):
+
     def __init__(self) -> None:
         super().__init__()
         self.messages: list[dict] = []
@@ -74,7 +75,8 @@ def test_request_id_header_is_preserved_when_provided():
 
     try:
         with TestClient(app) as client:
-            response = client.get("/api/v1/auth/captcha", headers={"X-Request-Id": "external-123"})
+            response = client.get("/api/v1/auth/captcha",
+                                  headers={"X-Request-Id": "external-123"})
     finally:
         root.removeHandler(handler)
 
@@ -165,11 +167,15 @@ def test_authenticated_request_log_contains_user_id():
     try:
         with TestClient(app) as client:
             token = register_user(client, "log-user")
-            response = client.get("/api/v1/me", headers={"Authorization": f"Bearer {token}"})
+            response = client.get("/api/v1/users/me",
+                                  headers={"Authorization": f"Bearer {token}"})
     finally:
         root.removeHandler(handler)
 
-    request_log = find_event([message for message in handler.messages if message.get("path") == "/api/v1/me"], "http.request")
+    request_log = find_event([
+        message for message in handler.messages
+        if message.get("path") == "/api/v1/users/me"
+    ], "http.request")
 
     assert response.status_code == 200
     assert request_log["user_id"] > 0

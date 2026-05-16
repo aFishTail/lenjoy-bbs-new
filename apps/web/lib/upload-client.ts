@@ -12,6 +12,10 @@ export async function uploadImage(file: File): Promise<string> {
     body: formData,
   });
 
-  const payload = await readApi<{ imageUrl: string }>(response);
-  return payload.data.imageUrl;
+  const payload = await readApi<{ url?: string; imageUrl?: string }>(response);
+  const imageUrl = payload.data.url || payload.data.imageUrl;
+  if (!imageUrl) {
+    throw new Error("上传成功，但未返回图片地址");
+  }
+  return imageUrl;
 }

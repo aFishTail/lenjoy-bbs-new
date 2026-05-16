@@ -21,11 +21,19 @@ import {
 } from "@/components/ui/table";
 
 const directionLabelMap: Record<WalletLedgerItem["direction"], string> = {
-  INCOME: "收入",
-  EXPENSE: "支出",
+  IN: "收入",
+  OUT: "支出",
   FREEZE: "冻结",
   UNFREEZE: "解冻",
+  INCOME: "收入",
+  EXPENSE: "支出",
 };
+
+function isIncomeDirection(direction: WalletLedgerItem["direction"]) {
+  return (
+    direction === "IN" || direction === "INCOME" || direction === "UNFREEZE"
+  );
+}
 
 export function MyLedgerClient() {
   const ledgerQuery = useQuery({
@@ -82,27 +90,31 @@ export function MyLedgerClient() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {items.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell>
-                        {new Date(item.createdAt).toLocaleString()}
-                      </TableCell>
-                      <TableCell>{directionLabelMap[item.direction]}</TableCell>
-                      <TableCell
-                        className={
-                          item.direction === "INCOME"
-                            ? "text-emerald-600"
-                            : "text-rose-600"
-                        }
-                      >
-                        {item.direction === "INCOME" ? "+" : "-"}
-                        {item.changeAmount}
-                      </TableCell>
-                      <TableCell>{item.bizType}</TableCell>
-                      <TableCell>{item.remark || "-"}</TableCell>
-                      <TableCell>{item.balanceAfter}</TableCell>
-                    </TableRow>
-                  ))}
+                  {items.map((item) => {
+                    const isIncome = isIncomeDirection(item.direction);
+
+                    return (
+                      <TableRow key={item.id}>
+                        <TableCell>
+                          {new Date(item.createdAt).toLocaleString()}
+                        </TableCell>
+                        <TableCell>
+                          {directionLabelMap[item.direction]}
+                        </TableCell>
+                        <TableCell
+                          className={
+                            isIncome ? "text-emerald-600" : "text-rose-600"
+                          }
+                        >
+                          {isIncome ? "+" : "-"}
+                          {item.changeAmount}
+                        </TableCell>
+                        <TableCell>{item.bizType}</TableCell>
+                        <TableCell>{item.remark || "-"}</TableCell>
+                        <TableCell>{item.balanceAfter}</TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>

@@ -20,58 +20,10 @@ type BackendApiEnvelope<T> = {
   meta: Record<string, unknown>;
 };
 
-type PaginationMeta = {
-  page: number;
-  pageSize: number;
-  total: number;
-};
-
 type FetchOptions = RequestInit & {
   // If true, will not throw but return null on 404
   allowNotFound?: boolean;
 };
-
-function readPaginationMeta(meta: Record<string, unknown> | undefined): PaginationMeta | null {
-  if (!meta) {
-    return null;
-  }
-
-  const page = meta.page;
-  const pageSize = meta.pageSize;
-  const total = meta.total;
-
-  if (
-    typeof page !== "number" ||
-    typeof pageSize !== "number" ||
-    typeof total !== "number"
-  ) {
-    return null;
-  }
-
-  return { page, pageSize, total };
-}
-
-function normalizeServerPayloadData<T>(
-  data: T,
-  meta: Record<string, unknown> | undefined,
-): T {
-  const pagination = readPaginationMeta(meta);
-  if (!pagination || !Array.isArray(data)) {
-    return data;
-  }
-
-  const totalPages = Math.max(1, Math.ceil(pagination.total / pagination.pageSize));
-
-  return {
-    items: data,
-    page: pagination.page,
-    pageSize: pagination.pageSize,
-    total: pagination.total,
-    totalPages,
-    hasNext: pagination.page < totalPages,
-    hasPrevious: pagination.page > 1,
-  } as T;
-}
 
 function readServerPayloadData<T>(payload: unknown): T {
   if (!payload || typeof payload !== "object") {
@@ -95,7 +47,7 @@ function readServerPayloadData<T>(payload: unknown): T {
     );
   }
 
-  return normalizeServerPayloadData(envelopePayload.data, envelopePayload.meta);
+  return envelopePayload.data;
 }
 
 export async function serverFetchApiData<T>(
@@ -113,7 +65,6 @@ export async function serverFetchApiData<T>(
   } catch (e) {
     // Ignore errors that occur if cookies() is called outside a valid request context
   }
-  console.log(`[Server Fetch API] Fetching ${url} with options:`, options);
   try {
     const response = await fetch(url, {
       ...options,
@@ -144,7 +95,6 @@ export async function serverFetchApiData<T>(
         `Server API Error: ${response.status} ${response.statusText}`,
       );
     }
-
     const json = await response.json();
     return readServerPayloadData<T>(json);
   } catch (error) {

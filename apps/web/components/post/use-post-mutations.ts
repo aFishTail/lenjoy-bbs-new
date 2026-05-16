@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import {
   fireMessageChanged,
+  getOrCreateVisitorId,
   queryKeys,
   requestApi,
   requestApiData,
@@ -123,13 +124,29 @@ export function usePurchaseResourceMutation(postId: string) {
 
   return useMutation({
     mutationFn: () =>
-      requestApiData<PostDetail>(`/api/posts/${postId}/purchase`, {
+      requestApiData<{
+        id: number;
+        postId: number;
+        buyerId: number;
+        sellerId: number;
+        price: number;
+      }>(`/api/posts/${postId}/purchase`, {
         method: "POST",
         withAuth: true,
       }),
-    onSuccess: (payload) => {
-      queryClient.setQueryData(queryKeys.postDetail(postId), payload);
+    onSuccess: async () => {
       fireMessageChanged();
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.postDetail(postId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.myWallet,
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.myPurchases,
+        }),
+      ]);
     },
   });
 }
@@ -268,6 +285,36 @@ export function useToggleCommentLikeMutation(postId: string) {
         (prev = []) => patchCommentLike(prev, commentId, payload),
       );
       fireMessageChanged();
+    },
+  });
+}
+
+export function useRecordPostViewMutation(postId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () =>
+      requestApiData<{ postId: number; viewCount: number }>(
+        `/api/posts/${postId}/views`,
+        {
+          method: "POST",
+          withAuth: true,
+          headers: {
+            "X-Visitor-Id": getOrCreateVisitorId(),
+          },
+        },
+      ),
+    onSuccess: (payload) => {
+      queryClient.setQueryData<PostDetail | null>(
+        queryKeys.postDetail(postId),
+        (prev) =>
+          prev
+            ? {
+                ...prev,
+                viewCount: payload.viewCount,
+              }
+            : prev,
+      );
     },
   });
 }

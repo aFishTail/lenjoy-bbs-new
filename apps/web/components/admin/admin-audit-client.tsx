@@ -67,10 +67,10 @@ export function AdminAuditClient() {
     let income = 0;
     let expense = 0;
     for (const item of walletItems) {
-      if (item.direction === "INCOME") {
+      if (item.direction === "IN" || item.direction === "INCOME") {
         income += item.changeAmount;
       }
-      if (item.direction === "EXPENSE") {
+      if (item.direction === "OUT" || item.direction === "EXPENSE") {
         expense += item.changeAmount;
       }
     }

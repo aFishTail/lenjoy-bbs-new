@@ -71,7 +71,7 @@ export type WalletSummary = {
 
 export type WalletLedgerItem = {
   id: number;
-  direction: "INCOME" | "EXPENSE" | "FREEZE" | "UNFREEZE";
+  direction: "IN" | "OUT" | "FREEZE" | "UNFREEZE" | "INCOME" | "EXPENSE";
   changeAmount: number;
   balanceAfter: number;
   frozenAfter: number;
@@ -123,6 +123,7 @@ export type PostDetail = {
   likeCount?: number;
   collectCount?: number;
   commentCount?: number;
+  answerCount?: number;
   liked?: boolean;
   collected?: boolean;
   resourceUnlocked?: boolean;
@@ -221,8 +222,10 @@ export type PostComment = {
   parentId?: number | null;
   replyToUserId?: number | null;
   replyToUsername?: string | null;
-  content: string;
-  accepted: boolean;
+  content?: string | null;
+  isAccepted: boolean;
+  canViewContent?: boolean;
+  maskedSummary?: string | null;
   deleted: boolean;
   deletedReason?: string | null;
   likeCount?: number;
