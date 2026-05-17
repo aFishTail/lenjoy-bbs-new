@@ -3,6 +3,7 @@ import {
   createPostViaApi,
   getMessages,
   getUnreadCount,
+  getWalletSummary,
   markAllMessagesRead,
   purchaseResourceViaApi,
 } from "./helpers/api";
@@ -21,6 +22,9 @@ test.describe("messages", { tag: ["@p0", "@core"] }, () => {
     const authB = getSession("user_b");
     test.skip(!authA || !authB, "missing session: user_a or user_b");
 
+    const walletBefore = await getWalletSummary(request, authB!);
+    test.skip(walletBefore.availableCoins < 3, `user_b only has ${walletBefore.availableCoins} coins, need >= 3`);
+
     // Clear existing unread messages for both users
     await markAllMessagesRead(request, authA!);
     await markAllMessagesRead(request, authB!);
@@ -36,7 +40,7 @@ test.describe("messages", { tag: ["@p0", "@core"] }, () => {
     });
 
     const purchase = await purchaseResourceViaApi(request, authB!, post.id);
-    test.skip(!purchase.ok, "purchase failed — likely insufficient balance");
+    expect(purchase.ok, `purchase failed with status ${purchase.status}`).toBeTruthy();
 
     // --- Check seller (user A) messages ---
     const sellerMessages = await getMessages(request, authA!);

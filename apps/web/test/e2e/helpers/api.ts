@@ -1,5 +1,6 @@
 import type { APIRequestContext } from "@playwright/test";
 
+import { getAccessToken } from "../../helpers/sessions";
 import type { AuthData } from "../../helpers/types";
 
 type ApiEnvelope<T> = {
@@ -11,7 +12,7 @@ type ApiEnvelope<T> = {
 
 function authHeaders(auth: AuthData): Record<string, string> {
   return {
-    Authorization: `${auth.tokenType || "Bearer"} ${auth.accessToken}`,
+    Authorization: `${auth.tokenType || "Bearer"} ${getAccessToken(auth)}`,
   };
 }
 
@@ -21,7 +22,14 @@ async function apiRequest<T>(
   path: string,
   auth?: AuthData,
   data?: unknown,
-): Promise<{ ok: boolean; status: number; data: T }> {
+): Promise<{
+  ok: boolean;
+  status: number;
+  success: boolean;
+  code: string;
+  message: string;
+  data: T;
+}> {
   const response = await request.fetch(path, {
     method,
     headers: {
@@ -32,8 +40,34 @@ async function apiRequest<T>(
     data,
   });
 
-  const payload = (await response.json()) as ApiEnvelope<T>;
-  return { ok: response.ok(), status: response.status(), data: payload.data };
+  const body = await response.text();
+  let payload: ApiEnvelope<T>;
+  try {
+    payload = JSON.parse(body) as ApiEnvelope<T>;
+  } catch {
+    throw new Error(`${method} ${path} returned non-JSON response: ${response.status()} ${body}`);
+  }
+
+  return {
+    ok: response.ok(),
+    status: response.status(),
+    success: payload.success,
+    code: payload.code,
+    message: payload.message,
+    data: payload.data,
+  };
+}
+
+function assertApiOk<T>(
+  result: Awaited<ReturnType<typeof apiRequest<T>>>,
+  operation: string,
+): T {
+  if (!result.ok || !result.success) {
+    throw new Error(
+      `${operation} failed: ${result.status} ${result.code} ${result.message}`,
+    );
+  }
+  return result.data;
 }
 
 export type WalletSummary = {
@@ -73,10 +107,7 @@ export async function createPostViaApi(
   },
 ): Promise<CreatedPost> {
   const result = await apiRequest<CreatedPost>(request, "POST", "/api/posts", auth, payload);
-  if (!result.ok) {
-    throw new Error(`createPostViaApi failed: ${result.status}`);
-  }
-  return result.data;
+  return assertApiOk(result, "createPostViaApi");
 }
 
 export async function getWalletSummary(
@@ -84,17 +115,21 @@ export async function getWalletSummary(
   auth: AuthData,
 ): Promise<WalletSummary> {
   const result = await apiRequest<WalletSummary>(request, "GET", "/api/users/me/wallet", auth);
-  if (!result.ok) {
-    throw new Error(`getWalletSummary failed: ${result.status}`);
-  }
-  return result.data;
+  return assertApiOk(result, "getWalletSummary");
 }
 
 export async function purchaseResourceViaApi(
   request: APIRequestContext,
   auth: AuthData,
   postId: number,
-): Promise<{ ok: boolean; status: number; data: unknown }> {
+): Promise<{
+  ok: boolean;
+  status: number;
+  success: boolean;
+  code: string;
+  message: string;
+  data: unknown;
+}> {
   return apiRequest(request, "POST", `/api/posts/${postId}/purchase`, auth);
 }
 
@@ -112,10 +147,7 @@ export async function submitCommentViaApi(
     auth,
     { content, parentId: parentId ?? null },
   );
-  if (!result.ok) {
-    throw new Error(`submitCommentViaApi failed: ${result.status}`);
-  }
-  return result.data;
+  return assertApiOk(result, "submitCommentViaApi");
 }
 
 export async function acceptAnswerViaApi(
@@ -130,9 +162,7 @@ export async function acceptAnswerViaApi(
     `/api/posts/${postId}/comments/${commentId}/accept`,
     auth,
   );
-  if (!result.ok) {
-    throw new Error(`acceptAnswerViaApi failed: ${result.status}`);
-  }
+  assertApiOk(result, "acceptAnswerViaApi");
 }
 
 export async function getMessages(
@@ -145,7 +175,7 @@ export async function getMessages(
     "/api/users/me/messages?limit=50",
     auth,
   );
-  return result.data ?? [];
+  return assertApiOk(result, "getMessages") ?? [];
 }
 
 export async function getUnreadCount(
@@ -158,7 +188,7 @@ export async function getUnreadCount(
     "/api/users/me/messages/unread-count",
     auth,
   );
-  return result.data ?? 0;
+  return assertApiOk(result, "getUnreadCount") ?? 0;
 }
 
 export async function markMessageRead(
@@ -166,7 +196,13 @@ export async function markMessageRead(
   auth: AuthData,
   messageId: number,
 ): Promise<void> {
-  await apiRequest(request, "PATCH", `/api/users/me/messages/${messageId}/read`, auth);
+  const result = await apiRequest(
+    request,
+    "PATCH",
+    `/api/users/me/messages/${messageId}/read`,
+    auth,
+  );
+  assertApiOk(result, "markMessageRead");
 }
 
 export async function markAllMessagesRead(
@@ -179,7 +215,7 @@ export async function markAllMessagesRead(
     "/api/users/me/messages/read-all",
     auth,
   );
-  return result.data ?? 0;
+  return assertApiOk(result, "markAllMessagesRead") ?? 0;
 }
 
 export async function getPostDetailViaApi(
@@ -205,7 +241,7 @@ export async function getPostDetailViaApi(
     `/api/posts/${postId}`,
     auth,
   );
-  return result.data;
+  return assertApiOk(result, "getPostDetailViaApi");
 }
 
 export async function getPostCommentsViaApi(
@@ -228,5 +264,5 @@ export async function getPostCommentsViaApi(
     `/api/posts/${postId}/comments`,
     auth,
   );
-  return result.data ?? [];
+  return assertApiOk(result, "getPostCommentsViaApi") ?? [];
 }

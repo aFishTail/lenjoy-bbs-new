@@ -6,7 +6,7 @@ import {
 } from "./helpers/api";
 import { expect, test } from "./fixtures/auth.fixture";
 
-test.describe("resource purchase", { tag: ["@p0", "@core"] }, () => {
+test.describe("resource purchase", { tag: ["@p0", "@core", "@wallet"] }, () => {
   test("user B purchases user A's resource post and unlocks hidden content", async ({
     baseURL,
     request,

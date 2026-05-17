@@ -6,7 +6,7 @@ import {
 } from "./helpers/api";
 import { expect, test } from "./fixtures/auth.fixture";
 
-test.describe("bounty flow", { tag: ["@p0", "@core"] }, () => {
+test.describe("bounty flow", { tag: ["@p0", "@core", "@wallet"] }, () => {
   test("user A publishes bounty, user B answers, user A accepts and wallets settle", async ({
     baseURL,
     request,

@@ -7,7 +7,7 @@ import {
 } from "./helpers/api";
 import { expect, test } from "./fixtures/auth.fixture";
 
-test.describe("resource guards", { tag: ["@p0", "@core"] }, () => {
+test.describe("resource guards", { tag: ["@p0", "@core", "@wallet"] }, () => {
   test("duplicate purchase is blocked and author cannot buy own resource", async ({
     baseURL,
     request,

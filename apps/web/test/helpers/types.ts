@@ -1,5 +1,6 @@
 export type AuthData = {
-  accessToken: string;
+  accessToken?: string;
+  token?: string;
   tokenType: string;
   expiresIn: number;
   user: {

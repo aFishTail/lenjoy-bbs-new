@@ -20,6 +20,9 @@ test.describe("admin audit", { tag: ["@p0", "@admin"] }, () => {
     const admin = getSession("admin");
     test.skip(!authA || !authB || !admin, "missing session: user_a, user_b or admin");
 
+    const walletBefore = await getWalletSummary(request, authB!);
+    test.skip(walletBefore.availableCoins < 3, `user_b only has ${walletBefore.availableCoins} coins, need >= 3`);
+
     // Seed a resource purchase
     const title = uniqueTitle(testInfo, "E2E Audit");
     const post = await createPostViaApi(request, authA!, {
@@ -31,7 +34,7 @@ test.describe("admin audit", { tag: ["@p0", "@admin"] }, () => {
     });
 
     const purchase = await purchaseResourceViaApi(request, authB!, post.id);
-    test.skip(!purchase.ok, "purchase failed — likely insufficient balance");
+    expect(purchase.ok, `purchase failed with status ${purchase.status}`).toBeTruthy();
 
     // Admin navigates to audit page
     const { page: adminPage } = await createRoleSession("admin");
