@@ -1,15 +1,53 @@
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fastapi import status
 
 from lenjoy_bbs.core.errors import ApiError
-from lenjoy_bbs.modules.posts.models import Post
+from lenjoy_bbs.modules.posts.models import Post, PostTag
 from lenjoy_bbs.modules.posts.presenters import serialize_post
+from lenjoy_bbs.modules.users.models import UserAccount
 
 
-async def list_posts(db: AsyncSession) -> list[dict]:
-    posts = (await db.scalars(select(Post).order_by(Post.created_at.desc()))).all()
+async def list_posts(
+    db: AsyncSession,
+    *,
+    status_value: str | None = None,
+    post_type: str | None = None,
+    author: str | None = None,
+    category_id: int | None = None,
+    tag_id: int | None = None,
+) -> list[dict]:
+    query = select(Post)
+    if author:
+        pattern = f"%{author.strip()}%"
+        query = query.join(UserAccount, UserAccount.id == Post.author_id).where(
+            or_(UserAccount.username.ilike(pattern), UserAccount.email.ilike(pattern))
+        )
+    if tag_id:
+        query = query.join(PostTag, PostTag.post_id == Post.id).where(PostTag.tag_id == tag_id)
+    if status_value:
+        query = query.where(Post.status == status_value)
+    if post_type:
+        query = query.where(Post.post_type == post_type)
+    if category_id:
+        query = query.where(Post.category_id == category_id)
+    posts = (await db.scalars(query.order_by(Post.created_at.desc()))).unique().all()
+    return [await serialize_post(db, post) for post in posts]
+
+
+async def list_bounties(
+    db: AsyncSession,
+    *,
+    bounty_status: str | None = None,
+    keyword: str | None = None,
+) -> list[dict]:
+    query = select(Post).where(Post.post_type == "BOUNTY")
+    if bounty_status:
+        query = query.where(Post.bounty_status == bounty_status)
+    if keyword:
+        query = query.where(Post.title.ilike(f"%{keyword.strip()}%"))
+    posts = (await db.scalars(query.order_by(Post.created_at.desc()))).all()
     return [await serialize_post(db, post) for post in posts]
 
 
@@ -32,4 +70,4 @@ async def online_post(db: AsyncSession, post_id: int) -> None:
     await db.commit()
 
 
-__all__ = ["list_posts", "offline_post", "online_post"]
+__all__ = ["list_bounties", "list_posts", "offline_post", "online_post"]

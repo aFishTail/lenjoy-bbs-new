@@ -2,6 +2,12 @@ import type { APIRequestContext } from "@playwright/test";
 
 import type { ApiEnvelope, AuthData } from "./types";
 
+type BackendEnvelope<T> = {
+  data: T;
+  error: { code: string; message: string } | null;
+  meta: Record<string, unknown>;
+};
+
 type ApiRequestOptions = {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   auth?: AuthData;
@@ -31,7 +37,16 @@ export async function apiResponse<T>(
     data: options?.data,
   });
 
-  const payload = (await response.json()) as ApiEnvelope<T>;
+  const rawPayload = (await response.json()) as ApiEnvelope<T> | BackendEnvelope<T>;
+  const payload =
+    "success" in rawPayload
+      ? rawPayload
+      : {
+          success: !rawPayload.error,
+          code: rawPayload.error?.code || "",
+          message: rawPayload.error?.message || "",
+          data: rawPayload.data,
+        };
   return {
     ok: response.ok(),
     status: response.status(),

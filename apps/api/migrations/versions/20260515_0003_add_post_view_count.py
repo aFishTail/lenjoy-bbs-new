@@ -23,7 +23,6 @@ def upgrade() -> None:
                   server_default="0"),
     )
     op.execute("UPDATE bbs_post SET view_count = 0 WHERE view_count IS NULL")
-    op.alter_column("bbs_post", "view_count", server_default=None)
 
 
 def downgrade() -> None:

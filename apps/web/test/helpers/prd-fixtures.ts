@@ -24,11 +24,14 @@ export const USER_ROUTES = [
 
 export const ADMIN_ROUTES = [
   "/admin",
-  "/admin/users",
   "/admin/posts",
+  "/admin/categories",
+  "/admin/tags",
+  "/admin/users",
   "/admin/audit",
   "/admin/coins",
   "/admin/appeals",
   "/admin/bounties",
   "/admin/reports",
+  "/admin/open-api",
 ];

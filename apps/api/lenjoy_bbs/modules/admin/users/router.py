@@ -9,8 +9,8 @@ router = APIRouter(tags=["admin"])
 
 
 @router.get("/users")
-async def users(db: DbSession, _: AdminUser):
-    return success(await list_users(db))
+async def users(db: DbSession, _: AdminUser, status: str | None = None, keyword: str | None = None):
+    return success(await list_users(db, status, keyword))
 
 
 @router.patch("/users/{user_id}/status")

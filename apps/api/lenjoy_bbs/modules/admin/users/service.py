@@ -1,6 +1,6 @@
 import logging
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fastapi import status
@@ -13,9 +13,29 @@ from lenjoy_bbs.modules.users.models import UserAccount
 logger = logging.getLogger("lenjoy_bbs.admin")
 
 
-async def list_users(db: AsyncSession) -> list[dict]:
-    rows = await db.scalars(select(UserAccount).order_by(UserAccount.created_at.desc()))
-    return [user_public(user) for user in rows.all()]
+async def list_users(db: AsyncSession, status_value: str | None = None, keyword: str | None = None) -> list[dict]:
+    query = select(UserAccount)
+    if status_value:
+        query = query.where(UserAccount.status == status_value)
+    if keyword:
+        pattern = f"%{keyword.strip()}%"
+        query = query.where(
+            or_(
+                UserAccount.username.ilike(pattern),
+                UserAccount.email.ilike(pattern),
+                UserAccount.phone.ilike(pattern),
+            )
+        )
+    rows = await db.scalars(query.order_by(UserAccount.created_at.desc()))
+    return [
+        user_public(user)
+        | {
+            "status": user.status,
+            "createdAt": user.created_at.isoformat(),
+            "updatedAt": user.updated_at.isoformat(),
+        }
+        for user in rows.all()
+    ]
 
 
 async def update_user_status(db: AsyncSession, user_id: int, status_value: str) -> None:

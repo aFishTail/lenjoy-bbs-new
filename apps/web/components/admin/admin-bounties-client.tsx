@@ -240,7 +240,7 @@ export function AdminBountiesClient() {
                       {comment.parentId ? "追问回复" : "候选答案"}
                     </TableCell>
                     <TableCell>
-                      {comment.accepted
+                      {comment.isAccepted
                         ? "已采纳"
                         : comment.deleted
                           ? "已删除"
@@ -250,7 +250,7 @@ export function AdminBountiesClient() {
                       <Button
                         type="button"
                         className="admin-btn is-danger"
-                        disabled={comment.deleted || comment.accepted}
+                        disabled={comment.deleted || comment.isAccepted}
                         onClick={() => void deleteComment(comment.id)}
                       >
                         {deletingCommentId === comment.id

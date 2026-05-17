@@ -12,4 +12,4 @@ class Base(DeclarativeBase):
     pass
 
 
-IdType = BigInteger().with_variant(Integer, "sqlite")
+IdType = Integer().with_variant(BigInteger(), "postgresql")

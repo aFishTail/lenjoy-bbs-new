@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     def sqlalchemy_url(self) -> str:
         raw = self.database_url or self.db_url
         if not raw:
-            return "sqlite://"
+            return "sqlite:///lenjoy_bbs.db"
         if raw.startswith("jdbc:postgresql://"):
             host_and_database = raw.removeprefix("jdbc:postgresql://")
             return f"postgresql+psycopg://{self.db_user}:{self.db_password}@{host_and_database}"
@@ -52,6 +52,8 @@ class Settings(BaseSettings):
     def sqlalchemy_async_url(self) -> str:
         if self.sqlalchemy_url == "sqlite://":
             return "sqlite+aiosqlite://"
+        if self.sqlalchemy_url == "sqlite:///lenjoy_bbs.db":
+            return "sqlite+aiosqlite:///lenjoy_bbs.db"
         if self.sqlalchemy_url.startswith("sqlite:///"):
             return self.sqlalchemy_url.replace("sqlite://", "sqlite+aiosqlite://", 1)
         return self.sqlalchemy_url
