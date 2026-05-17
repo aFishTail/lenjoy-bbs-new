@@ -8,6 +8,9 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   timeout: 60_000,
+  expect: {
+    timeout: 10_000,
+  },
   reporter: [
     ["line"],
     [
@@ -21,7 +24,10 @@ export default defineConfig({
   outputDir: "test/artifacts/test-results",
   use: {
     baseURL,
-    trace: "retain-on-failure",
+    actionTimeout: 10_000,
+    navigationTimeout: 15_000,
+    testIdAttribute: "data-testid",
+    trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
   },

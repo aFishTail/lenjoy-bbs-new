@@ -5,6 +5,7 @@ from fastapi import status
 
 from lenjoy_bbs.core.errors import ApiError
 from lenjoy_bbs.modules.posts.models import Post
+from lenjoy_bbs.modules.posts.lifecycle import refund_active_bounty_reserve
 from lenjoy_bbs.modules.posts.presenters import serialize_post
 
 
@@ -17,6 +18,9 @@ async def offline_post(db: AsyncSession, post_id: int, admin_id: int) -> None:
     post = await db.get(Post, post_id)
     if not post:
         raise ApiError("POST_NOT_FOUND", "Post does not exist", status.HTTP_404_NOT_FOUND)
+    await refund_active_bounty_reserve(db, post, "offline", admin_id)
+    if post.post_type == "BOUNTY" and post.bounty_status == "ACTIVE":
+        post.bounty_status = "CANCELLED"
     post.status = "OFFLINE"
     post.offlined_by = admin_id
     await db.commit()

@@ -18,10 +18,12 @@ def test_auth_use_cases_are_async_and_live_in_service_layer():
 
 
 def test_post_use_cases_are_async_and_live_in_service_layer():
-    from lenjoy_bbs.modules.posts.service import create_comment, create_post, delete_post, purchase_post, update_post
+    from lenjoy_bbs.modules.posts.engagement import create_comment
+    from lenjoy_bbs.modules.posts.lifecycle import create_post, delete_post, update_post
+    from lenjoy_bbs.modules.posts.resource_trade import purchase_resource_post
 
     assert inspect.iscoroutinefunction(create_post)
     assert inspect.iscoroutinefunction(update_post)
     assert inspect.iscoroutinefunction(delete_post)
     assert inspect.iscoroutinefunction(create_comment)
-    assert inspect.iscoroutinefunction(purchase_post)
+    assert inspect.iscoroutinefunction(purchase_resource_post)

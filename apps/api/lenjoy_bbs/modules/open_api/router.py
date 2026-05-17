@@ -4,8 +4,9 @@ from fastapi import APIRouter, Header, status
 
 from lenjoy_bbs.core.dependencies import AdminUser, DbSession
 from lenjoy_bbs.core.responses import success
+from lenjoy_bbs.modules.open_api.client_management import create_client, list_clients
+from lenjoy_bbs.modules.open_api.publication import create_open_post
 from lenjoy_bbs.modules.open_api.schemas import ClientRequest
-from lenjoy_bbs.modules.open_api.service import create_client, create_open_post, list_clients
 from lenjoy_bbs.modules.posts.schemas import PostCreateRequest
 
 admin_router = APIRouter(prefix="/admin/open-api", tags=["admin-open-api"])
@@ -18,14 +19,21 @@ async def clients(db: DbSession, _: AdminUser):
 
 
 @admin_router.post("/clients", status_code=status.HTTP_201_CREATED)
-async def create_client_route(payload: ClientRequest, db: DbSession, _: AdminUser):
+async def create_client_route(payload: ClientRequest, db: DbSession,
+                              _: AdminUser):
     client = await create_client(
         db,
         name=payload.name,
         remark=payload.remark,
         status_value=payload.status,
     )
-    return success({"id": client.id, "name": client.name, "apiKey": client.api_key, "status": client.status, "remark": client.remark})
+    return success({
+        "id": client.id,
+        "name": client.name,
+        "apiKey": client.api_key,
+        "status": client.status,
+        "remark": client.remark
+    })
 
 
 @open_router.post("/posts", status_code=status.HTTP_201_CREATED)

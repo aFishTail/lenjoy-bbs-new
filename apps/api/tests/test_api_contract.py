@@ -584,6 +584,62 @@ def test_bounty_post_detail_exposes_bounty_fields(client):
     assert detail_payload["data"]["acceptedCommentId"] is None
 
 
+def test_bounty_post_creation_freezes_wallet_balance(client):
+    author_token = register_user(client, "bounty-freeze-author",
+                                 "bounty-freeze-author@example.com")
+
+    create_response = client.post(
+        f"{API_PREFIX}/posts",
+        headers=bearer(author_token),
+        json={
+            "postType": "BOUNTY",
+            "title": "Need a frozen bounty",
+            "content": "question body",
+            "bountyAmount": 25,
+            "bountyExpireAt": "2026-06-01T12:00:00Z",
+        },
+    )
+    create_payload = unwrap(create_response)
+    wallet_payload = unwrap(
+        client.get(f"{API_PREFIX}/users/me/wallet",
+                   headers=bearer(author_token)))
+
+    assert create_response.status_code == 201
+    assert create_payload["data"]["bountyStatus"] == "ACTIVE"
+    assert wallet_payload["data"]["availableCoins"] == 75
+    assert wallet_payload["data"]["frozenCoins"] == 25
+    assert wallet_payload["data"]["totalCoins"] == 100
+
+
+def test_deleting_active_bounty_refunds_frozen_balance(client):
+    author_token = register_user(client, "bounty-delete-author",
+                                 "bounty-delete-author@example.com")
+
+    create_response = client.post(
+        f"{API_PREFIX}/posts",
+        headers=bearer(author_token),
+        json={
+            "postType": "BOUNTY",
+            "title": "Delete unused bounty",
+            "content": "question body",
+            "bountyAmount": 25,
+            "bountyExpireAt": "2026-06-01T12:00:00Z",
+        },
+    )
+    post_id = unwrap(create_response)["data"]["id"]
+
+    delete_response = client.delete(f"{API_PREFIX}/posts/{post_id}",
+                                    headers=bearer(author_token))
+    wallet_payload = unwrap(
+        client.get(f"{API_PREFIX}/users/me/wallet",
+                   headers=bearer(author_token)))
+
+    assert delete_response.status_code == 200
+    assert wallet_payload["data"]["availableCoins"] == 100
+    assert wallet_payload["data"]["frozenCoins"] == 0
+    assert wallet_payload["data"]["totalCoins"] == 100
+
+
 def test_register_login_wallet_post_comment_and_purchase_flow(client):
     alice_token = register_user(client, "alice", "alice@example.com")
     bob_token = register_user(client, "bob", "bob@example.com")
@@ -703,7 +759,10 @@ def test_bounty_author_can_accept_top_level_answer(client):
     assert detail_payload["data"]["acceptedCommentId"] == comment_id
     assert comments_payload["data"][0]["isAccepted"] is True
     assert asker_wallet["data"]["availableCoins"] == 95
+    assert asker_wallet["data"]["frozenCoins"] == 0
+    assert asker_wallet["data"]["totalCoins"] == 95
     assert answerer_wallet["data"]["availableCoins"] == 105
+    assert answerer_wallet["data"]["frozenCoins"] == 0
 
 
 def test_bounty_answers_are_masked_by_viewer_role(client):

@@ -16,6 +16,7 @@ export type AuthData = {
 export type Sessions = Partial<{
   user_a: AuthData;
   user_b: AuthData;
+  user_c: AuthData;
   admin: AuthData;
 }>;
 
