@@ -29,6 +29,11 @@ export const queryKeys = {
     page: number,
     pageSize: number,
   ) => ["posts", "feed", postType, filters, page, pageSize] as const,
+  postSearch: (
+    filters: { q: string; postType: string },
+    page: number,
+    pageSize: number,
+  ) => ["posts", "search", filters, page, pageSize] as const,
   postDetail: (postId: string) => ["posts", postId] as const,
   postComments: (postId: string) => ["posts", postId, "comments"] as const,
   myPosts: (page: number, pageSize: number) =>
