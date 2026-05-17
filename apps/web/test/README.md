@@ -2,6 +2,15 @@
 
 This directory contains TypeScript Playwright tests for `apps/web`.
 
+## Structure
+
+- `test/e2e/*.spec.ts`: the new domain-oriented Playwright specs
+- `test/e2e/fixtures/*`: shared lifecycle-aware fixtures for auth, multi-user, and setup/teardown concerns
+- `test/e2e/helpers/*`: stateless test utilities such as unique titles and response parsing
+- `test/helpers/*`: legacy helpers still reused during migration; new shared code should move into `test/e2e/*`
+
+The older top-level specs remain temporarily, but new scenarios should be added under `test/e2e`.
+
 ## Scope
 
 - anonymous browsing and access control
@@ -32,6 +41,19 @@ From `apps/web`:
 pnpm test:e2e
 ```
 
+Run the new core subset:
+
+```powershell
+pnpm test:e2e:core
+```
+
+Run auth or admin subsets:
+
+```powershell
+pnpm test:e2e:auth
+pnpm test:e2e:admin
+```
+
 Headed:
 
 ```powershell
@@ -42,3 +64,9 @@ pnpm test:e2e:headed
 
 - HTML report: `test/artifacts/playwright-report`
 - Raw test output: `test/artifacts/test-results`
+
+## Notes
+
+- Authenticated role tests currently use `auth-sessions.json` plus cookie injection, because the frontend auth contract is a `lenjoy.auth` cookie.
+- The login page itself should still be tested through the real UI flow rather than the cookie fixture.
+- If `apps/web/node_modules` is missing, Playwright commands will fail before discovery. Install frontend dependencies first.

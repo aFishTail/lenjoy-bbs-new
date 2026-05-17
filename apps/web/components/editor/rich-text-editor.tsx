@@ -46,6 +46,7 @@ export function RichTextEditor({
     editorProps: {
       attributes: {
         class: `${styles.content} ${minHeightClassName}`,
+        "aria-label": placeholder || "请输入内容...",
       },
     },
   });

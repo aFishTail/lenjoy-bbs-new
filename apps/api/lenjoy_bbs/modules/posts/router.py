@@ -1,17 +1,17 @@
 import hashlib
 
 from fastapi import APIRouter, Query, Request, status
-from sqlalchemy import func, select
 
 from lenjoy_bbs.core.api_schemas import ApiEnvelope, PageData
 from lenjoy_bbs.core.dependencies import CurrentUser, DbSession, OptionalCurrentUser
-from lenjoy_bbs.core.errors import ApiError
 from lenjoy_bbs.core.responses import success
-from lenjoy_bbs.modules.posts import repository
-from lenjoy_bbs.modules.posts.models import Post
-from lenjoy_bbs.modules.posts.presenters import load_category_names, load_post_stats, load_post_tags, load_usernames, load_viewer_post_state, serialize_comment, serialize_post, serialize_post_comments
+from lenjoy_bbs.modules.posts.bounty_settlement import accept_bounty_answer_settlement
+from lenjoy_bbs.modules.posts.engagement import create_comment, record_post_view, toggle_post_favorite, toggle_post_like
+from lenjoy_bbs.modules.posts.lifecycle import create_post, delete_post, update_post
+from lenjoy_bbs.modules.posts.presenters import serialize_comment, serialize_post
+from lenjoy_bbs.modules.posts.read_service import list_my_posts_feed, list_posts_feed, read_post_comments, read_post_detail
+from lenjoy_bbs.modules.posts.resource_trade import purchase_resource_post
 from lenjoy_bbs.modules.posts.schemas import CommentCreateRequest, CommentResponse, InteractionToggleResponse, PostCreateRequest, PostPurchaseResponse, PostResponse, PostUpdateRequest, PostViewResponse
-from lenjoy_bbs.modules.posts.service import accept_bounty_answer, create_comment, create_post, delete_post, purchase_post, record_post_view, toggle_post_favorite, toggle_post_like, update_post
 
 router = APIRouter(prefix="/posts", tags=["posts"])
 
@@ -49,43 +49,8 @@ async def list_posts(db: DbSession,
                      tagId: int | None = Query(default=None),
                      keyword: str | None = Query(default=None),
                      pageSize: int = Query(20, ge=1, le=100)):
-    offset = max(page - 1, 0) * pageSize
-    posts = await repository.list_published_posts(db, pageSize, offset,
-                                                  postType, categoryId, tagId,
-                                                  keyword)
-    usernames = await load_usernames(db, {post.author_id for post in posts})
-    post_stats = await load_post_stats(db, {post.id for post in posts})
-    category_names = await load_category_names(
-        db, {post.category_id
-             for post in posts})
-    post_tags = await load_post_tags(db, {post.id for post in posts})
-    total = await db.scalar(
-        select(func.count()).select_from(
-            repository.build_published_posts_query(postType, categoryId, tagId,
-                                                   keyword).subquery())) or 0
-    total_pages = max(1, (total + pageSize - 1) // pageSize)
-    return success({
-        "items": [
-            await serialize_post(db,
-                                 post,
-                                 usernames=usernames,
-                                 post_stats=post_stats,
-                                 category_names=category_names,
-                                 post_tags=post_tags) for post in posts
-        ],
-        "page":
-        page,
-        "pageSize":
-        pageSize,
-        "total":
-        total,
-        "totalPages":
-        total_pages,
-        "hasNext":
-        page < total_pages,
-        "hasPrevious":
-        page > 1,
-    })
+    return success(await list_posts_feed(db, page, pageSize, postType,
+                                         categoryId, tagId, keyword))
 
 
 @router.get("/mine")
@@ -94,48 +59,7 @@ async def my_posts(db: DbSession,
                    user: CurrentUser,
                    page: int = Query(1, ge=1),
                    pageSize: int = Query(20, ge=1, le=100)):
-    offset = max(page - 1, 0) * pageSize
-    query = select(Post).where(Post.author_id == user.id,
-                               Post.is_deleted.is_(False))
-    posts = (await db.scalars(
-        query.order_by(Post.created_at.desc()).limit(pageSize).offset(offset)
-    )).all()
-    usernames = await load_usernames(db, {post.author_id for post in posts})
-    post_stats = await load_post_stats(db, {post.id for post in posts})
-    category_names = await load_category_names(
-        db, {post.category_id
-             for post in posts})
-    post_tags = await load_post_tags(db, {post.id for post in posts})
-    viewer_state = await load_viewer_post_state(db,
-                                                {post.id
-                                                 for post in posts}, user.id)
-    total = await db.scalar(
-        select(func.count()).select_from(query.subquery())) or 0
-    total_pages = max(1, (total + pageSize - 1) // pageSize)
-    return success({
-        "items": [
-            await serialize_post(db,
-                                 post,
-                                 user,
-                                 usernames=usernames,
-                                 post_stats=post_stats,
-                                 category_names=category_names,
-                                 post_tags=post_tags,
-                                 viewer_state=viewer_state) for post in posts
-        ],
-        "page":
-        page,
-        "pageSize":
-        pageSize,
-        "total":
-        total,
-        "totalPages":
-        total_pages,
-        "hasNext":
-        page < total_pages,
-        "hasPrevious":
-        page > 1,
-    })
+    return success(await list_my_posts_feed(db, user, page, pageSize))
 
 
 @router.post("",
@@ -148,11 +72,7 @@ async def create(payload: PostCreateRequest, db: DbSession, user: CurrentUser):
 
 @router.get("/{post_id}", response_model=ApiEnvelope[PostResponse])
 async def detail(post_id: int, db: DbSession, user: OptionalCurrentUser):
-    post = await repository.find_published_post(db, post_id)
-    if post is None:
-        raise ApiError("POST_NOT_FOUND", "Post does not exist",
-                       status.HTTP_404_NOT_FOUND)
-    return success(await serialize_post(db, post, user))
+    return success(await read_post_detail(db, post_id, user))
 
 
 @router.post("/{post_id}/views", response_model=ApiEnvelope[PostViewResponse])
@@ -195,23 +115,7 @@ async def delete(post_id: int, db: DbSession, user: CurrentUser):
 @router.get("/{post_id}/comments",
             response_model=ApiEnvelope[list[CommentResponse]])
 async def comments(post_id: int, db: DbSession, user: OptionalCurrentUser):
-    post = await repository.find_published_post(db, post_id)
-    if not post:
-        raise ApiError("POST_NOT_FOUND", "Post does not exist",
-                       status.HTTP_404_NOT_FOUND)
-    items = await repository.list_comments(db, post_id)
-    usernames = await load_usernames(
-        db,
-        {comment.author_id
-         for comment in items}
-        | {comment.reply_to_user_id
-           for comment in items},
-    )
-    return success(await serialize_post_comments(db,
-                                                 post,
-                                                 items,
-                                                 user,
-                                                 usernames=usernames))
+    return success(await read_post_comments(db, post_id, user))
 
 
 @router.post("/{post_id}/comments",
@@ -232,14 +136,15 @@ async def add_comment(
 async def accept_comment(post_id: int, comment_id: int, db: DbSession,
                          user: CurrentUser):
     return success(await serialize_comment(
-        db, await accept_bounty_answer(db, post_id, comment_id, user)))
+        db, await accept_bounty_answer_settlement(db, post_id, comment_id,
+                                                  user)))
 
 
 @router.post("/{post_id}/purchase",
              status_code=status.HTTP_201_CREATED,
              response_model=ApiEnvelope[PostPurchaseResponse])
 async def purchase(post_id: int, db: DbSession, user: CurrentUser):
-    item = await purchase_post(db, post_id, user)
+    item = await purchase_resource_post(db, post_id, user)
     return success({
         "id": item.id,
         "postId": item.post_id,
