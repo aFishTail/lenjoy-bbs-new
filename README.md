@@ -201,8 +201,8 @@ Run:
 
 ```bash
 cd apps/web
-npm install
-npm run dev
+pnpm install
+pnpm run dev
 ```
 
 ## Next Implementation Steps

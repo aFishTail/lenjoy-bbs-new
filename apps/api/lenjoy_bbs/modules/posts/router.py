@@ -4,6 +4,7 @@ from fastapi import APIRouter, Query, Request, status
 
 from lenjoy_bbs.core.api_schemas import ApiEnvelope, PageData
 from lenjoy_bbs.core.dependencies import CurrentUser, DbSession, OptionalCurrentUser
+from lenjoy_bbs.core.errors import ApiError
 from lenjoy_bbs.core.responses import success
 from lenjoy_bbs.modules.posts.bounty_settlement import accept_bounty_answer_settlement
 from lenjoy_bbs.modules.posts.engagement import create_comment, record_post_view, toggle_post_favorite, toggle_post_like
@@ -54,43 +55,8 @@ async def list_posts(db: DbSession,
         raise ApiError("INVALID_KEYWORD", "Keyword is too long",
                        status.HTTP_422_UNPROCESSABLE_CONTENT)
     keyword_filter = normalized_keyword or None
-    offset = max(page - 1, 0) * pageSize
-    posts = await repository.list_published_posts(db, pageSize, offset,
-                                                  postType, categoryId, tagId,
-                                                  keyword_filter)
-    usernames = await load_usernames(db, {post.author_id for post in posts})
-    post_stats = await load_post_stats(db, {post.id for post in posts})
-    category_names = await load_category_names(
-        db, {post.category_id
-             for post in posts})
-    post_tags = await load_post_tags(db, {post.id for post in posts})
-    total = await db.scalar(
-        select(func.count()).select_from(
-            repository.build_published_posts_query(
-                postType, categoryId, tagId, keyword_filter).subquery())) or 0
-    total_pages = max(1, (total + pageSize - 1) // pageSize)
-    return success({
-        "items": [
-            await serialize_post(db,
-                                 post,
-                                 usernames=usernames,
-                                 post_stats=post_stats,
-                                 category_names=category_names,
-                                 post_tags=post_tags) for post in posts
-        ],
-        "page":
-        page,
-        "pageSize":
-        pageSize,
-        "total":
-        total,
-        "totalPages":
-        total_pages,
-        "hasNext":
-        page < total_pages,
-        "hasPrevious":
-        page > 1,
-    })
+    return success(await list_posts_feed(db, page, pageSize, postType,
+                                         categoryId, tagId, keyword_filter))
 
 
 @router.get("/mine")
