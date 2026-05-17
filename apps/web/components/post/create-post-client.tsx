@@ -1,17 +1,31 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { SendIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { RichTextEditor } from "@/components/editor/rich-text-editor";
 import { readError } from "@/components/post/client-helpers";
 import { TagPicker } from "@/components/post/tag-picker";
-import { useCreatePostMutation } from "@/components/post/use-post-mutations";
 import type { CreatePostInput } from "@/components/post/use-post-mutations";
-import { useCategoriesQuery, useTagsQuery } from "@/components/post/use-taxonomy-queries";
+import { useCreatePostMutation } from "@/components/post/use-post-mutations";
+import {
+  useCategoriesQuery,
+  useTagsQuery,
+} from "@/components/post/use-taxonomy-queries";
 import { useAuth } from "@/components/providers/auth-provider";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const postTypeOptions = [
   { value: "NORMAL", label: "普通帖", desc: "讨论、分享、提问" },
@@ -139,7 +153,7 @@ export function CreatePostClient() {
   if (!auth && (!authReady || hasAuth)) {
     return (
       <main className="page">
-        <div className="text-center py-12 text-[var(--text-sub)]">
+        <div className="py-12 text-center text-[var(--text-sub)]">
           正在检查登录状态...
         </div>
       </main>
@@ -149,7 +163,7 @@ export function CreatePostClient() {
   if (!auth) {
     return (
       <main className="page">
-        <div className="text-center py-12 text-[var(--text-sub)]">
+        <div className="py-12 text-center text-[var(--text-sub)]">
           正在跳转到登录页...
         </div>
       </main>
@@ -158,173 +172,180 @@ export function CreatePostClient() {
 
   return (
     <main className="page min-h-[calc(100vh-80px)] py-8">
-      <div className="max-w-3xl mx-auto px-4">
+      <div className="mx-auto max-w-3xl px-4">
         <div className="mb-8 text-center">
           <h1
-            className="text-3xl font-bold text-[var(--text-main)] mb-2"
+            className="mb-2 text-3xl font-bold text-[var(--text-main)]"
             style={{ fontFamily: "'Newsreader', serif" }}
           >
             发布新帖子
           </h1>
-          <p className="text-[var(--text-muted)]">分类负责归档，标签负责话题表达</p>
+          <p className="text-[var(--text-muted)]">
+            分类负责归档，标签负责话题表达
+          </p>
         </div>
 
-        <form onSubmit={(event) => void onSubmit(event)} className="space-y-6">
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-[var(--border-light)] shadow-[var(--shadow-md)]">
-            <label className="block text-sm font-medium text-[var(--text-sub)] mb-4">
-              帖子类型
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {postTypeOptions.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => setPostType(option.value)}
-                  className={`relative p-4 rounded-xl border-2 transition-all duration-200 text-left ${
-                    postType === option.value
-                      ? "border-[var(--color-primary)] bg-[var(--color-primary)]/5"
-                      : "border-[var(--border-light)] hover:border-[var(--color-primary-light)]"
-                  }`}
-                >
-                  <div className="font-medium text-[var(--text-main)]">
-                    {option.label}
-                  </div>
-                  <div className="text-xs text-[var(--text-muted)] mt-1">
-                    {option.desc}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
+        <form onSubmit={(event) => void onSubmit(event)}>
+          <FieldGroup className="gap-6">
+            <Card className="bg-white/80 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <Field>
+                  <FieldLabel>帖子类型</FieldLabel>
+                  <ToggleGroup
+                    type="single"
+                    value={postType}
+                    onValueChange={(value) => {
+                      if (value) {
+                        setPostType(
+                          value as "NORMAL" | "RESOURCE" | "BOUNTY",
+                        );
+                      }
+                    }}
+                    className="grid grid-cols-1 gap-3 sm:grid-cols-3"
+                  >
+                    {postTypeOptions.map((option) => (
+                      <ToggleGroupItem
+                        key={option.value}
+                        value={option.value}
+                        className="h-auto flex-col items-start rounded-xl p-4 text-left"
+                      >
+                        <span className="font-medium">{option.label}</span>
+                        <span className="mt-1 text-xs text-slate-500">
+                          {option.desc}
+                        </span>
+                      </ToggleGroupItem>
+                    ))}
+                  </ToggleGroup>
+                </Field>
+              </CardContent>
+            </Card>
 
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-[var(--border-light)] shadow-[var(--shadow-md)] space-y-4">
-            <div>
-              <label
-                className="block text-sm font-medium text-[var(--text-sub)] mb-3"
-                htmlFor="title"
-              >
-                标题
-              </label>
-              <input
-                id="title"
-                className="w-full px-4 py-3 rounded-xl border border-[var(--border-medium)] bg-white/50 text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent transition-all"
-                required
-                placeholder="请输入标题"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-              />
-            </div>
+            <Card className="bg-white/80 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <FieldGroup>
+                  <Field>
+                    <FieldLabel htmlFor="title">标题</FieldLabel>
+                    <Input
+                      id="title"
+                      required
+                      placeholder="请输入标题"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                    />
+                  </Field>
 
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-sub)] mb-3">
-                分类
-              </label>
-              <Select
-                value={categoryId}
-                onChange={(event) => setCategoryId(event.target.value)}
-              >
-                {categories.map((category) => (
-                  <option key={category.id} value={String(category.id)}>
-                    {category.name}
-                  </option>
-                ))}
-              </Select>
-            </div>
+                  <Field>
+                    <FieldLabel htmlFor="categoryId">分类</FieldLabel>
+                    <Select
+                      id="categoryId"
+                      value={categoryId}
+                      onChange={(event) => setCategoryId(event.target.value)}
+                    >
+                      {categories.map((category) => (
+                        <option key={category.id} value={String(category.id)}>
+                          {category.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
 
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-sub)] mb-3">
-                标签
-              </label>
-              <TagPicker
-                tags={tags}
-                selectedTagIds={selectedTagIds}
-                onChange={setSelectedTagIds}
-              />
-              {selectedTags.length > 0 ? (
-                <div className="mt-3 text-xs text-[var(--text-muted)]">
-                  已选：{selectedTags.map((tag) => tag.name).join(" / ")}
-                </div>
-              ) : null}
-            </div>
-          </div>
+                  <Field>
+                    <FieldLabel>标签</FieldLabel>
+                    <TagPicker
+                      tags={tags}
+                      selectedTagIds={selectedTagIds}
+                      onChange={setSelectedTagIds}
+                    />
+                    {selectedTags.length > 0 ? (
+                      <FieldDescription>
+                        已选：{selectedTags.map((tag) => tag.name).join(" / ")}
+                      </FieldDescription>
+                    ) : null}
+                  </Field>
+                </FieldGroup>
+              </CardContent>
+            </Card>
 
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-[var(--border-light)] shadow-[var(--shadow-md)]">
-            <label className="block text-sm font-medium text-[var(--text-sub)] mb-3">
-              正文
-            </label>
-            <RichTextEditor
-              value={content}
-              onChange={setContent}
-              placeholder="详细描述帖子内容..."
-            />
-          </div>
+            <Card className="bg-white/80 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <Field>
+                  <FieldLabel>正文</FieldLabel>
+                  <RichTextEditor
+                    value={content}
+                    onChange={setContent}
+                    placeholder="详细描述帖子内容..."
+                  />
+                </Field>
+              </CardContent>
+            </Card>
 
-          {postType === "RESOURCE" && (
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-[var(--border-light)] shadow-[var(--shadow-md)] space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-[var(--text-sub)] mb-2">
-                  隐藏内容
-                </label>
-                <RichTextEditor
-                  value={hiddenContent}
-                  onChange={setHiddenContent}
-                  placeholder="下载链接、提取码、使用说明等"
-                  minHeightClassName="min-h-[160px]"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-[var(--text-sub)] mb-2">
-                  售价
-                </label>
-                <input
-                  className="w-full px-4 py-3 rounded-xl border border-[var(--border-medium)] bg-white/50 text-[var(--text-main)]"
-                  type="number"
-                  step="1"
-                  min="1"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                />
-              </div>
-            </div>
-          )}
+            {postType === "RESOURCE" && (
+              <Card className="bg-white/80 backdrop-blur-sm">
+                <CardContent className="p-6">
+                  <FieldGroup>
+                    <Field>
+                      <FieldLabel>隐藏内容</FieldLabel>
+                      <RichTextEditor
+                        value={hiddenContent}
+                        onChange={setHiddenContent}
+                        placeholder="下载链接、提取码、使用说明等"
+                        minHeightClassName="min-h-[160px]"
+                      />
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="price">售价</FieldLabel>
+                      <Input
+                        id="price"
+                        type="number"
+                        step="1"
+                        min="1"
+                        value={price}
+                        onChange={(e) => setPrice(e.target.value)}
+                      />
+                    </Field>
+                  </FieldGroup>
+                </CardContent>
+              </Card>
+            )}
 
-          {postType === "BOUNTY" && (
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-[var(--border-light)] shadow-[var(--shadow-md)] space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-[var(--text-sub)] mb-2">
-                  悬赏金额
-                </label>
-                <input
-                  className="w-full px-4 py-3 rounded-xl border border-[var(--border-medium)] bg-white/50 text-[var(--text-main)]"
-                  type="number"
-                  step="1"
-                  min="1"
-                  value={bountyAmount}
-                  onChange={(e) => setBountyAmount(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-[var(--text-sub)] mb-2">
-                  截止时间
-                </label>
-                <input
-                  className="w-full px-4 py-3 rounded-xl border border-[var(--border-medium)] bg-white/50 text-[var(--text-main)]"
-                  type="datetime-local"
-                  value={bountyExpireAt}
-                  onChange={(e) => setBountyExpireAt(e.target.value)}
-                />
-              </div>
-            </div>
-          )}
+            {postType === "BOUNTY" && (
+              <Card className="bg-white/80 backdrop-blur-sm">
+                <CardContent className="p-6">
+                  <FieldGroup>
+                    <Field>
+                      <FieldLabel htmlFor="bountyAmount">
+                        悬赏金额
+                      </FieldLabel>
+                      <Input
+                        id="bountyAmount"
+                        type="number"
+                        step="1"
+                        min="1"
+                        value={bountyAmount}
+                        onChange={(e) => setBountyAmount(e.target.value)}
+                      />
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="bountyExpireAt">
+                        截止时间
+                      </FieldLabel>
+                      <Input
+                        id="bountyExpireAt"
+                        type="datetime-local"
+                        value={bountyExpireAt}
+                        onChange={(e) => setBountyExpireAt(e.target.value)}
+                      />
+                    </Field>
+                  </FieldGroup>
+                </CardContent>
+              </Card>
+            )}
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full py-4 px-6 rounded-xl font-medium text-white bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-primary-hover)] hover:shadow-[var(--shadow-primary)] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {submitting ? "发布中..." : "发布帖子"}
-          </button>
-
+            <Button type="submit" disabled={submitting} className="w-full">
+              <SendIcon data-icon="inline-start" />
+              {submitting ? "发布中..." : "发布帖子"}
+            </Button>
+          </FieldGroup>
         </form>
       </div>
     </main>
