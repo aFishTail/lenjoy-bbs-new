@@ -32,4 +32,19 @@ test.describe("PRD smoke", () => {
     await expect(page.getByLabel("搜索帖子")).toHaveValue("redis");
     await expect(page.locator("main")).toBeVisible();
   });
+
+  test("home hero search is visible and routes to search", async ({
+    page,
+    baseURL,
+  }) => {
+    test.skip(!baseURL, "baseURL is required");
+
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await expect(page.getByLabel("首页搜索帖子")).toBeVisible();
+    await page.getByLabel("首页搜索帖子").fill("python");
+    await page.getByRole("button", { name: "搜索首页帖子" }).click();
+
+    await page.waitForURL(/\/search\?q=python/);
+    await expect(page.locator("main")).toBeVisible();
+  });
 });

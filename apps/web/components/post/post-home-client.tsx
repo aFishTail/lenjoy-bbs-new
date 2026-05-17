@@ -4,7 +4,8 @@ import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { readError } from "@/components/post/client-helpers";
 import { PaginationControls } from "@/components/post/pagination-controls";
@@ -24,8 +25,10 @@ type PostHomeClientProps = {
 
 export function PostHomeClient({ initialPosts }: PostHomeClientProps = {}) {
   const rootRef = useRef<HTMLElement>(null);
+  const router = useRouter();
   const [errorText, setErrorText] = useState("");
   const [page, setPage] = useState(1);
+  const [heroKeyword, setHeroKeyword] = useState("");
   const { authData: auth, hasAuth } = useAuth();
   const isAdmin = auth?.user.roles?.some(
     (role) => role === "ADMIN" || role === "ROLE_ADMIN",
@@ -134,6 +137,16 @@ export function PostHomeClient({ initialPosts }: PostHomeClientProps = {}) {
     }
   };
 
+  function handleHeroSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const keyword = heroKeyword.trim();
+    if (!keyword) {
+      return;
+    }
+    const params = new URLSearchParams({ q: keyword });
+    router.push(`/search?${params.toString()}`);
+  }
+
   return (
     <main ref={rootRef} className={styles.page}>
       <section className={styles.hero}>
@@ -146,6 +159,18 @@ export function PostHomeClient({ initialPosts }: PostHomeClientProps = {}) {
           <p className={styles.heroSubtitle}>
             Lenjoy 是面向创造者与学习者的社区论坛。讨论想法、交换资源、发布悬赏，把碎片信息沉淀成可检索的知识。
           </p>
+          <form className={styles.heroSearch} onSubmit={handleHeroSearch}>
+            <input
+              value={heroKeyword}
+              onChange={(event) => setHeroKeyword(event.target.value)}
+              placeholder="搜索帖子标题或正文"
+              aria-label="首页搜索帖子"
+              maxLength={100}
+            />
+            <button type="submit" aria-label="搜索首页帖子">
+              搜索
+            </button>
+          </form>
           <div className={styles.heroActions}>
             <Link
               href={hasAuth ? "/posts/new" : "/auth"}
