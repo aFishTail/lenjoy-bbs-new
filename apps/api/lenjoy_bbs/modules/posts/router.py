@@ -47,12 +47,17 @@ async def list_posts(db: DbSession,
                      postType: str | None = Query(default=None),
                      categoryId: int | None = Query(default=None),
                      tagId: int | None = Query(default=None),
-                     keyword: str | None = Query(default=None, max_length=100),
+                     keyword: str | None = Query(default=None),
                      pageSize: int = Query(20, ge=1, le=100)):
+    normalized_keyword = (keyword or "").strip()
+    if len(normalized_keyword) > 100:
+        raise ApiError("INVALID_KEYWORD", "Keyword is too long",
+                       status.HTTP_422_UNPROCESSABLE_CONTENT)
+    keyword_filter = normalized_keyword or None
     offset = max(page - 1, 0) * pageSize
     posts = await repository.list_published_posts(db, pageSize, offset,
                                                   postType, categoryId, tagId,
-                                                  keyword)
+                                                  keyword_filter)
     usernames = await load_usernames(db, {post.author_id for post in posts})
     post_stats = await load_post_stats(db, {post.id for post in posts})
     category_names = await load_category_names(
@@ -62,7 +67,8 @@ async def list_posts(db: DbSession,
     total = await db.scalar(
         select(func.count()).select_from(
             repository.build_published_posts_query(postType, categoryId, tagId,
-                                                   keyword).subquery())) or 0
+                                                   keyword_filter).subquery()
+        )) or 0
     total_pages = max(1, (total + pageSize - 1) // pageSize)
     return success({
         "items": [

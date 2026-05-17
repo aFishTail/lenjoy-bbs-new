@@ -26,7 +26,7 @@ test.describe("PRD smoke", () => {
 
     await page.goto("/", { waitUntil: "domcontentloaded" });
     await page.getByLabel("搜索帖子").fill("redis");
-    await page.getByLabel("搜索").click();
+    await page.getByRole("button", { name: "搜索" }).click();
 
     await page.waitForURL(/\/search\?q=redis/);
     await expect(page.getByLabel("搜索帖子")).toHaveValue("redis");

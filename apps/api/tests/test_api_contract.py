@@ -385,6 +385,14 @@ def test_posts_keyword_whitespace_behaves_like_no_keyword(client):
 
     assert post_id in {item["id"] for item in payload["data"]["items"]}
 
+    overlong_blank_payload = unwrap(
+        client.get(f"{API_PREFIX}/posts?page=1&pageSize=20",
+                   params={"keyword": " " * 101}))
+    assert post_id in {
+        item["id"]
+        for item in overlong_blank_payload["data"]["items"]
+    }
+
 
 def test_posts_keyword_rejects_overlong_value(client):
     keyword = "x" * 101
