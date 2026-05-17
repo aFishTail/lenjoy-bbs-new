@@ -199,10 +199,7 @@ export function AuthPageClient() {
       <div style={{ maxWidth: "500px", margin: "0 auto" }}>
         {/* Header */}
         <div className="text-center mb-6">
-          <div
-            className="avatar avatar-lg mx-auto mb-4"
-            style={{ margin: "0 auto" }}
-          >
+          <div className="mx-auto mb-4 flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-[var(--gradient-primary)] text-lg font-semibold text-white">
             <svg
               width="24"
               height="24"
@@ -316,7 +313,10 @@ export function AuthPageClient() {
 
         {/* Back Link */}
         <div className="text-center mt-6">
-          <Link href="/" className="nav-link">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 rounded-[10px] px-4 py-2 font-medium text-[var(--text-sub)] no-underline hover:bg-[rgba(47,111,237,0.08)] hover:text-[var(--color-primary)]"
+          >
             <svg
               className="icon-sm"
               viewBox="0 0 24 24"

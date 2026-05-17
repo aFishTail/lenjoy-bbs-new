@@ -3,6 +3,7 @@
 import { useEffect, useId } from "react";
 
 import { Button } from "@/components/ui/button";
+import styles from "./confirm-dialog.module.css";
 
 type Props = {
   open: boolean;
@@ -59,7 +60,7 @@ export function ConfirmDialog({
 
   return (
     <div
-      className="confirm-dialog-backdrop"
+      className={styles.backdrop}
       onClick={() => {
         if (!confirmBusy) {
           onOpenChange(false);
@@ -67,27 +68,27 @@ export function ConfirmDialog({
       }}
     >
       <div
-        className="confirm-dialog-panel"
+        className={styles.panel}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="confirm-dialog-header">
-          <h3 id={titleId} className="confirm-dialog-title">
+        <div className={styles.header}>
+          <h3 id={titleId} className={styles.title}>
             {title}
           </h3>
           {description ? (
-            <p id={descriptionId} className="confirm-dialog-description">
+            <p id={descriptionId} className={styles.description}>
               {description}
             </p>
           ) : null}
         </div>
 
-        {children ? <div className="confirm-dialog-body">{children}</div> : null}
+        {children ? <div className={styles.body}>{children}</div> : null}
 
-        <div className="confirm-dialog-actions">
+        <div className={styles.actions}>
           <Button
             type="button"
             variant="outline"

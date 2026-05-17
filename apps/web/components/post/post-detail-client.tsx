@@ -105,7 +105,10 @@ export function PostDetailClient({
     <main className="page">
       {/* Back Link */}
       <div className="mb-4">
-        <Link href="/" className="nav-link">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 rounded-[10px] px-4 py-2 font-medium text-[var(--text-sub)] no-underline hover:bg-[rgba(47,111,237,0.08)] hover:text-[var(--color-primary)]"
+        >
           <svg
             className="icon-sm"
             viewBox="0 0 24 24"

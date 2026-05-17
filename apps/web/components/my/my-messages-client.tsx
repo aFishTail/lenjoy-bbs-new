@@ -12,6 +12,7 @@ import {
 } from "@/components/my/use-my-queries";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import pageStyles from "./my-pages.module.css";
 
 function formatTime(value: string) {
   return new Date(value).toLocaleString();
@@ -68,40 +69,36 @@ export function MyMessagesClient() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6">
-      <section className="rounded-3xl border border-cyan-200 bg-linear-to-br from-cyan-50 via-white to-emerald-50 p-6 shadow-sm">
-        <p className="text-xs uppercase tracking-[0.24em] text-cyan-700">
-          Message Center
-        </p>
-        <h1 className="mt-2 text-3xl font-semibold text-slate-900">消息中心</h1>
-        <p className="mt-2 max-w-2xl text-sm text-slate-600">
-          这里会收拢资源购买、申诉提交和退款处理等关键通知，避免交易状态只停留在
-          toast。
-        </p>
+    <main className={`${pageStyles.shell} ${pageStyles.stack}`}>
+      <section className={pageStyles.intro}>
+        <div>
+          <h1>消息中心</h1>
+          <p>集中查看购买、申诉、退款等关键通知。</p>
+        </div>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-3">
-        <Card className="border-cyan-200 bg-white/95">
+      <section className={pageStyles.grid3}>
+        <Card className={pageStyles.statCard}>
           <CardHeader>
             <CardTitle className="text-base">消息总数</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-semibold text-slate-900">
+            <div className={pageStyles.number}>
               {loading ? "--" : items.length}
             </div>
           </CardContent>
         </Card>
-        <Card className="border-amber-200 bg-white/95">
+        <Card className={pageStyles.statCard}>
           <CardHeader>
             <CardTitle className="text-base">未读消息</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-semibold text-slate-900">
+            <div className={pageStyles.number}>
               {loading ? "--" : unreadCount}
             </div>
           </CardContent>
         </Card>
-        <Card className="self-start border-emerald-200 bg-white/95">
+        <Card className={`${pageStyles.statCard} self-start`}>
           <CardHeader>
             <CardTitle className="text-base">快捷操作</CardTitle>
           </CardHeader>
@@ -118,7 +115,7 @@ export function MyMessagesClient() {
         </Card>
       </section>
 
-      <Card>
+      <Card className={pageStyles.contentCard}>
         <CardHeader>
           <CardTitle>最近消息</CardTitle>
         </CardHeader>
@@ -144,7 +141,7 @@ export function MyMessagesClient() {
                     className={`rounded-2xl border px-4 py-4 transition ${
                       item.read
                         ? "border-slate-200 bg-slate-50/70"
-                        : "border-cyan-200 bg-cyan-50/60"
+                        : "border-blue-200 bg-blue-50/60"
                     }`}
                   >
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -157,7 +154,7 @@ export function MyMessagesClient() {
                             className={`rounded-full px-2 py-0.5 text-xs ${
                               item.read
                                 ? "bg-slate-200 text-slate-600"
-                                : "bg-cyan-100 text-cyan-700"
+                                : "bg-blue-100 text-blue-700"
                             }`}
                           >
                             {item.read ? "已读" : "未读"}

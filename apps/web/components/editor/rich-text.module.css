@@ -1,0 +1,103 @@
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px;
+  border-bottom: 1px solid var(--border-light);
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.toolbar button,
+.uploadButton {
+  border: 1px solid var(--border-medium);
+  border-radius: 8px;
+  background: white;
+  color: var(--text-sub);
+  font-size: 0.85rem;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease,
+    background 0.15s ease;
+}
+
+.toolbar button:hover,
+.uploadButton:hover {
+  border-color: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.toolbar button.isActive {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: rgba(47, 111, 237, 0.08);
+}
+
+.uploadButton {
+  display: inline-flex;
+  align-items: center;
+}
+
+.uploadButton input {
+  display: none;
+}
+
+.content {
+  padding: 14px;
+  outline: none;
+  color: var(--text-main);
+  background: transparent;
+}
+
+.content p:global(.is-editor-empty):first-child::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.render p,
+.content p {
+  margin: 0 0 0.9rem;
+}
+
+.render ul,
+.render ol,
+.content ul,
+.content ol {
+  margin: 0 0 0.9rem;
+  padding-left: 1.4rem;
+}
+
+.render blockquote,
+.content blockquote {
+  border-left: 3px solid var(--color-primary-light);
+  margin: 0 0 0.9rem;
+  padding-left: 0.9rem;
+  color: var(--text-sub);
+}
+
+.render pre,
+.content pre {
+  margin: 0 0 0.9rem;
+  padding: 0.75rem;
+  border-radius: 8px;
+  background: #111827;
+  color: #f3f4f6;
+  overflow-x: auto;
+}
+
+.render a,
+.content a {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+.render img,
+.content img {
+  max-width: 100%;
+  border-radius: 10px;
+  margin: 0.5rem 0;
+}

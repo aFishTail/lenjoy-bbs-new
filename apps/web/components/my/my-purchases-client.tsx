@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import pageStyles from "./my-pages.module.css";
 
 export function MyPurchasesClient() {
   const [reasonById, setReasonById] = useState<Record<number, string>>({});
@@ -106,38 +107,35 @@ export function MyPurchasesClient() {
   );
 
   return (
-    <main className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6">
-      <section className="rounded-3xl border border-amber-200 bg-linear-to-br from-amber-50 via-white to-orange-50 p-6 shadow-sm">
-        <p className="text-xs uppercase tracking-[0.24em] text-amber-700">
-          Purchased Resources
-        </p>
-        <h1 className="mt-2 text-3xl font-semibold text-slate-900">已购资源</h1>
-        <p className="mt-2 text-sm text-slate-600">
-          查看你已经解锁的资源，必要时可提交资源失效或内容不符申诉。
-        </p>
+    <main className={`${pageStyles.wideShell} ${pageStyles.stack}`}>
+      <section className={pageStyles.intro}>
+        <div>
+          <h1>已购资源</h1>
+          <p>查看已解锁资源；遇到失效或内容不符时可提交申诉。</p>
+        </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <Card>
+      <section className={pageStyles.grid3}>
+        <Card className={pageStyles.statCard}>
           <CardContent className="p-5">
             <p className="text-xs text-slate-500">购买笔数</p>
-            <p className="mt-1 text-3xl font-semibold text-slate-900">
+            <p className={`mt-1 ${pageStyles.number}`}>
               {items.length}
             </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className={pageStyles.statCard}>
           <CardContent className="p-5">
             <p className="text-xs text-slate-500">累计支付</p>
-            <p className="mt-1 text-3xl font-semibold text-slate-900">
+            <p className={`mt-1 ${pageStyles.number}`}>
               {items.reduce((sum, item) => sum + item.price, 0)}
             </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className={pageStyles.statCard}>
           <CardContent className="p-5">
             <p className="text-xs text-slate-500">当前净支出</p>
-            <p className="mt-1 text-3xl font-semibold text-slate-900">
+            <p className={`mt-1 ${pageStyles.number}`}>
               {settledTotal}
             </p>
           </CardContent>
@@ -145,13 +143,13 @@ export function MyPurchasesClient() {
       </section>
 
       {loading ? (
-        <Card>
+        <Card className={pageStyles.contentCard}>
           <CardContent className="p-8 text-sm text-slate-500">
             加载购买记录中...
           </CardContent>
         </Card>
       ) : items.length === 0 ? (
-        <Card>
+        <Card className={pageStyles.contentCard}>
           <CardContent className="p-8 text-sm text-slate-500">
             你还没有购买任何资源。
           </CardContent>
@@ -161,7 +159,7 @@ export function MyPurchasesClient() {
           {items.map((item) => {
             const canAppeal = !item.appealStatus && item.status !== "REFUNDED";
             return (
-              <Card key={item.purchaseId}>
+              <Card key={item.purchaseId} className={pageStyles.contentCard}>
                 <CardHeader>
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
@@ -173,7 +171,7 @@ export function MyPurchasesClient() {
                         {new Date(item.purchasedAt).toLocaleString()}
                       </p>
                     </div>
-                    <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                    <div className={pageStyles.statusPill}>
                       {item.status}
                     </div>
                   </div>
@@ -218,7 +216,7 @@ export function MyPurchasesClient() {
                         </Label>
                         <textarea
                           id={`appeal-detail-${item.purchaseId}`}
-                          className="min-h-24 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition-all focus-visible:border-emerald-700 focus-visible:ring-2 focus-visible:ring-emerald-700/20"
+                          className="min-h-24 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition-all focus-visible:border-blue-600 focus-visible:ring-2 focus-visible:ring-blue-600/20"
                           value={detailById[item.purchaseId] || ""}
                           onChange={(event) =>
                             setDetailById((prev) => ({

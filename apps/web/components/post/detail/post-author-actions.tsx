@@ -18,6 +18,7 @@ import {
 } from "@/components/post/use-taxonomy-queries";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Select } from "@/components/ui/select";
+import styles from "./post-author-actions.module.css";
 
 type Props = {
   postId: string;
@@ -123,16 +124,16 @@ export function PostAuthorActions({ postId }: Props) {
 
   return (
     <>
-      <section className="card author-actions-card">
-        <div className="author-actions-header">
+      <section className={`card ${styles.card}`}>
+        <div className={styles.header}>
           <div>
-            <p className="author-actions-eyebrow">AUTHOR TOOLS</p>
+            <p className={styles.eyebrow}>AUTHOR TOOLS</p>
             <h2 className="section-title">作者操作</h2>
           </div>
-          <div className="author-actions-toolbar">
+          <div className={styles.toolbar}>
             <button
               type="button"
-              className={`btn btn-ghost ${isEditing ? "author-tool-active" : ""}`}
+              className={`btn btn-ghost ${isEditing ? styles.toolActive : ""}`}
               onClick={() => setIsEditing((value) => !value)}
             >
               {isEditing ? "收起编辑" : "编辑帖子"}
@@ -148,11 +149,11 @@ export function PostAuthorActions({ postId }: Props) {
         </div>
 
         {isEditing ? (
-          <form onSubmit={submitUpdate} className="author-actions-editor">
-            <div className="author-actions-editor-head">
+          <form onSubmit={submitUpdate} className={styles.editor}>
+            <div className={styles.editorHead}>
               <div>
-                <h3 className="author-actions-editor-title">编辑内容</h3>
-                <p className="author-actions-editor-copy">
+                <h3 className={styles.editorTitle}>编辑内容</h3>
+                <p className={styles.editorCopy}>
                   在同一块区域完成内容维护，保存后直接回到作者操作概览。
                 </p>
               </div>
@@ -246,7 +247,7 @@ export function PostAuthorActions({ postId }: Props) {
                 </>
               ) : null}
 
-              <div className="author-actions-submit-row">
+              <div className={styles.submitRow}>
                 <button className="btn btn-primary" type="submit">
                   保存修改
                 </button>
@@ -261,17 +262,17 @@ export function PostAuthorActions({ postId }: Props) {
             </div>
           </form>
         ) : (
-          <div className="author-actions-summary">
-            <div className="author-actions-summary-item">
-              <span className="author-actions-summary-label">当前状态</span>
+          <div className={styles.summary}>
+            <div className={styles.summaryItem}>
+              <span className={styles.summaryLabel}>当前状态</span>
               <strong>{getPostStatusLabel(post.status)}</strong>
             </div>
-            <div className="author-actions-summary-item">
-              <span className="author-actions-summary-label">内容类型</span>
+            <div className={styles.summaryItem}>
+              <span className={styles.summaryLabel}>内容类型</span>
               <strong>{getPostTypeLabel(post.postType)}</strong>
             </div>
-            <div className="author-actions-summary-item">
-              <span className="author-actions-summary-label">最近更新</span>
+            <div className={styles.summaryItem}>
+              <span className={styles.summaryLabel}>最近更新</span>
               <strong>{new Date(post.updatedAt).toLocaleString("zh-CN")}</strong>
             </div>
           </div>

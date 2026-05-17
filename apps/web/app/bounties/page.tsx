@@ -50,7 +50,6 @@ export default async function BountiesPage({ searchParams }: Props) {
     <PostTypeFeedClient
       postType="BOUNTY"
       title="悬赏"
-      subtitle="按任务分类浏览悬赏内容，用标签归纳题材。"
       initialPosts={initialPosts}
       initialCategories={initialCategories}
       initialHotTags={initialHotTags}

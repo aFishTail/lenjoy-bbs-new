@@ -19,6 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import pageStyles from "./my-pages.module.css";
 
 const directionLabelMap: Record<WalletLedgerItem["direction"], string> = {
   IN: "收入",
@@ -55,19 +56,15 @@ export function MyLedgerClient() {
   const loading = ledgerQuery.isLoading;
 
   return (
-    <main className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6">
-      <section className="rounded-3xl border border-cyan-200 bg-linear-to-br from-cyan-50 via-white to-sky-50 p-6 shadow-sm">
-        <p className="text-xs uppercase tracking-[0.24em] text-cyan-700">
-          Ledger Feed
-        </p>
-        <h1 className="mt-2 text-3xl font-semibold text-slate-900">金币流水</h1>
-        <p className="mt-2 text-sm text-slate-600">
-          最近 50
-          条资产变动记录会展示在这里，便于追踪注册赠送、后台调整和后续交易结算。
-        </p>
+    <main className={`${pageStyles.wideShell} ${pageStyles.stack}`}>
+      <section className={pageStyles.intro}>
+        <div>
+          <h1>金币流水</h1>
+          <p>查看最近 50 条资产变动，追踪赠送、调整和交易结算。</p>
+        </div>
       </section>
 
-      <Card>
+      <Card className={pageStyles.contentCard}>
         <CardHeader>
           <CardTitle>资产记录</CardTitle>
         </CardHeader>
@@ -103,7 +100,7 @@ export function MyLedgerClient() {
                         </TableCell>
                         <TableCell
                           className={
-                            isIncome ? "text-emerald-600" : "text-rose-600"
+                            isIncome ? "text-blue-600" : "text-rose-600"
                           }
                         >
                           {isIncome ? "+" : "-"}

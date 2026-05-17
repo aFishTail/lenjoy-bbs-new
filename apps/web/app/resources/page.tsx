@@ -50,7 +50,6 @@ export default async function ResourcesPage({ searchParams }: Props) {
     <PostTypeFeedClient
       postType="RESOURCE"
       title="资源"
-      subtitle="按分类归档资源，用标签描述话题和特征。"
       initialPosts={initialPosts}
       initialCategories={initialCategories}
       initialHotTags={initialHotTags}
