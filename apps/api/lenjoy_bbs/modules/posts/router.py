@@ -47,7 +47,7 @@ async def list_posts(db: DbSession,
                      postType: str | None = Query(default=None),
                      categoryId: int | None = Query(default=None),
                      tagId: int | None = Query(default=None),
-                     keyword: str | None = Query(default=None),
+                     keyword: str | None = Query(default=None, max_length=100),
                      pageSize: int = Query(20, ge=1, le=100)):
     offset = max(page - 1, 0) * pageSize
     posts = await repository.list_published_posts(db, pageSize, offset,
