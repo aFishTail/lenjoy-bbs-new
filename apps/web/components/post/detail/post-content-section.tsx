@@ -17,6 +17,7 @@ import { usePostDetailQuery } from "@/components/post/use-post-queries";
 import { useAuth } from "@/components/providers/auth-provider";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
+import styles from "./post-content-section.module.css";
 
 type Props = {
   postId: string;
@@ -187,7 +188,7 @@ export function PostContentSection({ postId }: Props) {
         </h1>
 
         <div className="mb-4 flex items-center gap-3 text-sm text-muted">
-          <div className="avatar avatar-sm">
+          <div className={styles.authorAvatar}>
             {post.authorUsername?.charAt(0).toUpperCase() || "U"}
           </div>
           <span>{post.authorUsername || post.authorId}</span>
@@ -209,7 +210,7 @@ export function PostContentSection({ postId }: Props) {
           </div>
         ) : null}
 
-        <div className="post-content">
+        <div className={styles.content}>
           {post.content ? (
             <div className="mb-4">
               <RichTextContent html={post.content} className="leading-7" />
@@ -259,10 +260,12 @@ export function PostContentSection({ postId }: Props) {
           ) : null}
         </div>
 
-        <div className="post-action-bar">
+        <div className={styles.actionBar}>
           <button
             type="button"
-            className={`post-action-btn${post.liked ? " is-active is-like" : ""}`}
+            className={`${styles.actionButton} ${
+              post.liked ? `${styles.active} ${styles.like}` : ""
+            }`}
             onClick={() => void togglePostLike()}
             disabled={isLiking}
             aria-pressed={post.liked}
@@ -272,11 +275,15 @@ export function PostContentSection({ postId }: Props) {
               <path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.96 2.39l-1.22 6A2 2 0 0 1 18.61 20H7a2 2 0 0 1-2-2v-8.31a2 2 0 0 1 .59-1.41l5.66-5.66A1 1 0 0 1 13 3.33V5a2 2 0 0 0 2 2Z" />
             </svg>
             <span>{post.likeCount || 0} 点赞</span>
-            {post.liked ? <span className="post-action-state">已赞</span> : null}
+            {post.liked ? (
+              <span className={styles.actionState}>已赞</span>
+            ) : null}
           </button>
           <button
             type="button"
-            className={`post-action-btn${post.collected ? " is-active is-favorite" : ""}`}
+            className={`${styles.actionButton} ${
+              post.collected ? `${styles.active} ${styles.favorite}` : ""
+            }`}
             onClick={() => void togglePostFavorite()}
             disabled={isFavoriting}
             aria-pressed={post.collected}
@@ -285,11 +292,13 @@ export function PostContentSection({ postId }: Props) {
               <path d="m12 17.27-5.18 3.05 1.4-5.84L3.5 10.24l6.01-.49L12 4.25l2.49 5.5 6.01.49-4.72 4.24 1.4 5.84z" />
             </svg>
             <span>{post.collectCount || 0} 收藏</span>
-            {post.collected ? <span className="post-action-state">已收藏</span> : null}
+            {post.collected ? (
+              <span className={styles.actionState}>已收藏</span>
+            ) : null}
           </button>
           <button
             type="button"
-            className="post-action-btn"
+            className={styles.actionButton}
             onClick={openReportDialog}
             disabled={isReporting}
           >

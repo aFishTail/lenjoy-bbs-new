@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { PropsWithChildren } from "react";
+import styles from "./admin-shell.module.css";
 
 const menus = [
   { href: "/admin", label: "总览" },
@@ -22,7 +23,7 @@ export function AdminShell({ children }: PropsWithChildren) {
   const pathname = usePathname();
 
   return (
-    <div className="admin-shell">
+    <div className={styles.shell}>
       <aside className="admin-sidebar">
         <div className="admin-brand">
           <span className="admin-brand-mark">LX</span>

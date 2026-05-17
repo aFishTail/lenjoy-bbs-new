@@ -8,6 +8,7 @@ import { UserMenu } from "@/components/layout/user-menu";
 import { queryKeys, requestApiData } from "@/components/post/client-helpers";
 import type { PostDetail } from "@/components/post/types";
 import { useAuth } from "@/components/providers/auth-provider";
+import styles from "./navigation.module.css";
 
 export function Navigation() {
   const pathname = usePathname();
@@ -41,10 +42,10 @@ export function Navigation() {
   }
 
   return (
-    <nav className="nav">
-      <div className="nav-container">
-        <Link href="/" className="nav-logo">
-          <span className="nav-logo-icon">
+    <nav className={styles.nav}>
+      <div className={styles.container}>
+        <Link href="/" className={styles.logo}>
+          <span className={styles.logoIcon}>
             <svg
               width="20"
               height="20"
@@ -58,35 +59,38 @@ export function Navigation() {
           </span>
           Lenjoy
         </Link>
-        <div className="nav-links">
-          <Link href="/" className={`nav-link ${isHome ? "active" : ""}`}>
+        <div className={styles.links}>
+          <Link
+            href="/"
+            className={`${styles.link} ${isHome ? styles.active : ""}`}
+          >
             首页
           </Link>
           <Link
             href="/discussions"
-            className={`nav-link ${isDiscussion ? "active" : ""}`}
+            className={`${styles.link} ${isDiscussion ? styles.active : ""}`}
           >
             讨论
           </Link>
           <Link
             href="/resources"
-            className={`nav-link ${isResource ? "active" : ""}`}
+            className={`${styles.link} ${isResource ? styles.active : ""}`}
           >
             资源
           </Link>
           <Link
             href="/bounties"
-            className={`nav-link ${isBounty ? "active" : ""}`}
+            className={`${styles.link} ${isBounty ? styles.active : ""}`}
           >
             悬赏
           </Link>
         </div>
-        <div className="nav-actions">
+        <div className={styles.actions}>
           <MessageNotification />
           <UserMenu />
           <Link
             href={hasAuth ? "/posts/new" : "/auth"}
-            className="btn btn-primary btn-sm"
+            className={styles.newPost}
           >
             <svg
               className="icon-sm"

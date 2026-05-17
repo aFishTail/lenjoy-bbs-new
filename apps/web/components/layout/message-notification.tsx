@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useUnreadCount } from "@/components/layout/use-auth-unread";
 import { useAuth } from "@/components/providers/auth-provider";
+import styles from "./navigation.module.css";
 
 export function MessageNotification() {
   const { hasAuth } = useAuth();
@@ -15,7 +16,7 @@ export function MessageNotification() {
   return (
     <Link
       href="/my/messages"
-      className="nav-message-btn"
+      className={styles.messageButton}
       aria-label="消息通知"
       title="消息通知"
     >
@@ -30,7 +31,7 @@ export function MessageNotification() {
         <path d="M9 17a3 3 0 0 0 6 0" />
       </svg>
       {unreadCount > 0 ? (
-        <span className="nav-message-badge">
+        <span className={styles.messageBadge}>
           {unreadCount > 99 ? "99+" : unreadCount}
         </span>
       ) : null}

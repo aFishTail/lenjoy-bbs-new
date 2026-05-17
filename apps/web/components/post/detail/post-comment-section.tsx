@@ -232,7 +232,7 @@ export function PostCommentSection({ postId }: Props) {
   return (
     <>
       <section className="card mb-4">
-        <div className="flex-between mb-4">
+        <div className="mb-4 flex items-center justify-between">
           <h2 className="section-title">
             {post.postType === "BOUNTY" ? "候选答案" : "评论区"}
           </h2>

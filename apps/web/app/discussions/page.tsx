@@ -50,7 +50,6 @@ export default async function DiscussionsPage({ searchParams }: Props) {
     <PostTypeFeedClient
       postType="NORMAL"
       title="讨论"
-      subtitle="按版块组织讨论内容，用标签表达话题。"
       initialPosts={initialPosts}
       initialCategories={initialCategories}
       initialHotTags={initialHotTags}

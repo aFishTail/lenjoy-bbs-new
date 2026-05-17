@@ -1,6 +1,10 @@
 import { FormEvent } from "react";
+import { Loader2Icon, UserPlusIcon } from "lucide-react";
 
 import { CaptchaField } from "@/components/auth/captcha-field";
+import { Button } from "@/components/ui/button";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 
 type RegisterFormValue = {
   username: string;
@@ -35,14 +39,11 @@ export function RegisterForm({
 }: RegisterFormProps) {
   return (
     <form onSubmit={(event) => void onSubmit(event)}>
-      <div className="grid gap-4">
-        <div className="form-group">
-          <label className="form-label" htmlFor="username">
-            用户名
-          </label>
-          <input
+      <FieldGroup>
+        <Field>
+          <FieldLabel htmlFor="username">用户名</FieldLabel>
+          <Input
             id="username"
-            className="form-input"
             required
             minLength={3}
             maxLength={64}
@@ -52,15 +53,12 @@ export function RegisterForm({
             value={value.username}
             onChange={(e) => onChange({ ...value, username: e.target.value })}
           />
-        </div>
+        </Field>
 
-        <div className="form-group">
-          <label className="form-label" htmlFor="registerPassword">
-            密码
-          </label>
-          <input
+        <Field>
+          <FieldLabel htmlFor="registerPassword">密码</FieldLabel>
+          <Input
             id="registerPassword"
-            className="form-input"
             required
             type="password"
             minLength={8}
@@ -69,35 +67,29 @@ export function RegisterForm({
             value={value.password}
             onChange={(e) => onChange({ ...value, password: e.target.value })}
           />
-        </div>
+        </Field>
 
-        <div className="form-group">
-          <label className="form-label" htmlFor="email">
-            邮箱
-          </label>
-          <input
+        <Field>
+          <FieldLabel htmlFor="email">邮箱</FieldLabel>
+          <Input
             id="email"
-            className="form-input"
             type="email"
             placeholder="可选，邮箱或手机号至少填一项"
             value={value.email}
             onChange={(e) => onChange({ ...value, email: e.target.value })}
           />
-        </div>
+        </Field>
 
-        <div className="form-group">
-          <label className="form-label" htmlFor="phone">
-            手机号
-          </label>
-          <input
+        <Field>
+          <FieldLabel htmlFor="phone">手机号</FieldLabel>
+          <Input
             id="phone"
-            className="form-input"
             maxLength={32}
             placeholder="可选，邮箱或手机号至少填一项"
             value={value.phone}
             onChange={(e) => onChange({ ...value, phone: e.target.value })}
           />
-        </div>
+        </Field>
 
         <CaptchaField
           captchaId={captchaId}
@@ -111,38 +103,24 @@ export function RegisterForm({
           onRefresh={onRefreshCaptcha}
         />
 
-        <button
-          className="btn btn-primary"
+        <Button
+          className="w-full"
           disabled={submitting || refreshingCaptcha}
           type="submit"
         >
           {submitting ? (
             <>
-              <div
-                className="spinner"
-                style={{ width: "16px", height: "16px" }}
-              ></div>
+              <Loader2Icon data-icon="inline-start" className="animate-spin" />
               注册中...
             </>
           ) : (
             <>
-              <svg
-                className="icon-sm"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-              >
-                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                <circle cx="8.5" cy="7" r="4" />
-                <line x1="20" y1="8" x2="20" y2="14" />
-                <line x1="23" y1="11" x2="17" y2="11" />
-              </svg>
+              <UserPlusIcon data-icon="inline-start" />
               注册
             </>
           )}
-        </button>
-      </div>
+        </Button>
+      </FieldGroup>
     </form>
   );
 }

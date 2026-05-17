@@ -17,14 +17,15 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import pageStyles from "./my-pages.module.css";
 
 
 function StatCard({ label, value }: { label: string; value: number }) {
   return (
-    <Card className="border-slate-200 bg-white/95">
+    <Card className={pageStyles.statCard}>
       <CardContent className="p-4">
         <p className="text-xs text-slate-500">{label}</p>
-        <p className="mt-1 text-2xl font-semibold text-slate-900">{value}</p>
+        <p className={`mt-1 ${pageStyles.number}`}>{value}</p>
       </CardContent>
     </Card>
   );
@@ -124,8 +125,8 @@ export function MyProfileClient() {
 
   if (loading) {
     return (
-      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-        <Card>
+      <main className={pageStyles.shell}>
+        <Card className={pageStyles.contentCard}>
           <CardContent className="p-8 text-sm text-slate-500">
             加载个人资料中...
           </CardContent>
@@ -135,32 +136,29 @@ export function MyProfileClient() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6">
-      <section className="rounded-2xl border border-slate-200 bg-linear-to-r from-emerald-50 via-white to-cyan-50 p-6">
-        <p className="text-xs uppercase tracking-[0.2em] text-emerald-700">
-          Personal Center
-        </p>
-        <h1 className="mt-2 text-3xl font-semibold text-slate-900">个人中心</h1>
-        <p className="mt-2 text-sm text-slate-600">
-          查看并编辑你的头像、昵称与简介。
-        </p>
+    <main className={`${pageStyles.shell} ${pageStyles.stack}`}>
+      <section className={pageStyles.intro}>
+        <div>
+          <h1>个人中心</h1>
+          <p>查看并编辑头像、昵称、简介和账户概览。</p>
+        </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <section className={pageStyles.grid3}>
         <StatCard label="发帖数" value={profile?.postCount ?? 0} />
         <StatCard label="关注数" value={profile?.followingCount ?? 0} />
         <StatCard label="粉丝数" value={profile?.followerCount ?? 0} />
       </section>
 
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_0.9fr]">
-        <Card className="border-amber-200 bg-white/95">
+        <Card className={pageStyles.contentCard}>
           <CardHeader>
             <CardTitle>金币资产</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-3 gap-3 text-center">
-              <div className="rounded-xl bg-amber-50 px-3 py-4">
-                <p className="text-xs text-amber-700">可用</p>
+              <div className="rounded-xl bg-slate-50 px-3 py-4">
+                <p className="text-xs text-slate-500">可用</p>
                 <p className="mt-1 text-2xl font-semibold text-slate-900">
                   {wallet?.availableCoins ?? 0}
                 </p>
@@ -171,8 +169,8 @@ export function MyProfileClient() {
                   {wallet?.frozenCoins ?? 0}
                 </p>
               </div>
-              <div className="rounded-xl bg-emerald-50 px-3 py-4">
-                <p className="text-xs text-emerald-700">总计</p>
+              <div className="rounded-xl bg-blue-50 px-3 py-4">
+                <p className="text-xs text-blue-700">总计</p>
                 <p className="mt-1 text-2xl font-semibold text-slate-900">
                   {wallet?.totalCoins ?? 0}
                 </p>
@@ -195,44 +193,44 @@ export function MyProfileClient() {
           </CardContent>
         </Card>
 
-        <Card className="border-cyan-200 bg-white/95">
+        <Card className={pageStyles.contentCard}>
           <CardHeader>
             <CardTitle>快捷入口</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3 text-sm text-slate-600">
             <Link
               href="/my/posts"
-              className="rounded-xl border border-slate-200 px-4 py-3 transition hover:border-emerald-300 hover:bg-emerald-50"
+              className={pageStyles.quickLink}
             >
               管理我的帖子
             </Link>
             <Link
               href="/my/wallet"
-              className="rounded-xl border border-slate-200 px-4 py-3 transition hover:border-amber-300 hover:bg-amber-50"
+              className={pageStyles.quickLink}
             >
               查看钱包概览
             </Link>
             <Link
               href="/my/ledger"
-              className="rounded-xl border border-slate-200 px-4 py-3 transition hover:border-cyan-300 hover:bg-cyan-50"
+              className={pageStyles.quickLink}
             >
               查看金币流水
             </Link>
             <Link
               href="/my/purchases"
-              className="rounded-xl border border-slate-200 px-4 py-3 transition hover:border-amber-300 hover:bg-amber-50"
+              className={pageStyles.quickLink}
             >
               查看已购资源
             </Link>
             <Link
               href="/my/sales"
-              className="rounded-xl border border-slate-200 px-4 py-3 transition hover:border-emerald-300 hover:bg-emerald-50"
+              className={pageStyles.quickLink}
             >
               查看销售记录
             </Link>
             <Link
               href="/my/messages"
-              className="rounded-xl border border-slate-200 px-4 py-3 transition hover:border-cyan-300 hover:bg-cyan-50"
+              className={pageStyles.quickLink}
             >
               进入消息中心
             </Link>
@@ -240,7 +238,7 @@ export function MyProfileClient() {
         </Card>
       </section>
 
-      <Card>
+      <Card className={pageStyles.contentCard}>
         <CardHeader>
           <CardTitle>编辑资料</CardTitle>
         </CardHeader>
@@ -270,7 +268,7 @@ export function MyProfileClient() {
                 placeholder="https://example.com/avatar.png"
               />
               <div className="flex items-center gap-3 text-xs text-slate-500">
-                <label className="cursor-pointer text-emerald-700 hover:text-emerald-800">
+                <label className={`cursor-pointer ${pageStyles.blueText}`}>
                   {uploading ? "上传中..." : "上传本地头像"}
                   <input
                     type="file"
@@ -308,7 +306,7 @@ export function MyProfileClient() {
             <Label htmlFor="bio">简介</Label>
             <textarea
               id="bio"
-              className="min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition-all placeholder:text-slate-400 focus-visible:border-emerald-700 focus-visible:ring-2 focus-visible:ring-emerald-700/20"
+              className="min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition-all placeholder:text-slate-400 focus-visible:border-blue-600 focus-visible:ring-2 focus-visible:ring-blue-600/20"
               value={bio}
               onChange={(e) => setBio(e.target.value)}
               maxLength={200}
