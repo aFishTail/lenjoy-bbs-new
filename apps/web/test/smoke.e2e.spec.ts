@@ -17,4 +17,19 @@ test.describe("PRD smoke", () => {
     await page.goto("/my", { waitUntil: "domcontentloaded" });
     await page.waitForURL(/\/auth/);
   });
+
+  test("global search routes to search results with keyword state", async ({
+    page,
+    baseURL,
+  }) => {
+    test.skip(!baseURL, "baseURL is required");
+
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await page.getByLabel("搜索帖子").fill("redis");
+    await page.getByLabel("搜索").click();
+
+    await page.waitForURL(/\/search\?q=redis/);
+    await expect(page.getByLabel("搜索帖子")).toHaveValue("redis");
+    await expect(page.locator("main")).toBeVisible();
+  });
 });
