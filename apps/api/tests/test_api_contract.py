@@ -175,6 +175,226 @@ def test_posts_list_filters_by_post_type(client):
             for item in bounty_payload["data"]["items"]} == {"BOUNTY"}
 
 
+def test_posts_keyword_search_matches_title_and_public_content(client):
+    token = register_user(client, "search-author",
+                          "search-author@example.com")
+
+    title_response = client.post(
+        f"{API_PREFIX}/posts",
+        headers=bearer(token),
+        json={
+            "postType": "NORMAL",
+            "title": "Need help with Redis streams",
+            "content": "general body",
+        },
+    )
+    content_response = client.post(
+        f"{API_PREFIX}/posts",
+        headers=bearer(token),
+        json={
+            "postType": "RESOURCE",
+            "title": "Backend note",
+            "content": "This public body mentions searchable-marker.",
+            "hiddenContent": "private download",
+            "price": 3,
+        },
+    )
+    other_response = client.post(
+        f"{API_PREFIX}/posts",
+        headers=bearer(token),
+        json={
+            "postType": "BOUNTY",
+            "title": "Unrelated question",
+            "content": "different body",
+            "bountyAmount": 5,
+            "bountyExpireAt": "2026-06-01T12:00:00Z",
+        },
+    )
+    assert title_response.status_code == 201
+    assert content_response.status_code == 201
+    assert other_response.status_code == 201
+
+    title_id = unwrap(title_response)["data"]["id"]
+    content_id = unwrap(content_response)["data"]["id"]
+    other_id = unwrap(other_response)["data"]["id"]
+
+    title_payload = unwrap(
+        client.get(f"{API_PREFIX}/posts?page=1&pageSize=20&keyword=redis"))
+    title_ids = {item["id"] for item in title_payload["data"]["items"]}
+    assert title_id in title_ids
+    assert content_id not in title_ids
+    assert other_id not in title_ids
+
+    content_payload = unwrap(
+        client.get(
+            f"{API_PREFIX}/posts?page=1&pageSize=20&keyword=searchable-marker"
+        ))
+    content_ids = {item["id"] for item in content_payload["data"]["items"]}
+    assert content_id in content_ids
+    assert title_id not in content_ids
+    assert other_id not in content_ids
+
+
+def test_posts_keyword_search_excludes_hidden_content(client):
+    token = register_user(client, "hidden-search-author",
+                          "hidden-search-author@example.com")
+
+    create_response = client.post(
+        f"{API_PREFIX}/posts",
+        headers=bearer(token),
+        json={
+            "postType": "RESOURCE",
+            "title": "Public title",
+            "content": "public body",
+            "hiddenContent": "hidden-only-needle",
+            "price": 7,
+        },
+    )
+    assert create_response.status_code == 201
+    post_id = unwrap(create_response)["data"]["id"]
+
+    payload = unwrap(
+        client.get(
+            f"{API_PREFIX}/posts?page=1&pageSize=20&keyword=hidden-only-needle"
+        ))
+
+    assert post_id not in {item["id"] for item in payload["data"]["items"]}
+
+
+def test_posts_keyword_search_combines_with_post_type(client):
+    token = register_user(client, "typed-search-author",
+                          "typed-search-author@example.com")
+
+    normal_response = client.post(
+        f"{API_PREFIX}/posts",
+        headers=bearer(token),
+        json={
+            "postType": "NORMAL",
+            "title": "Shared keyword",
+            "content": "body",
+        },
+    )
+    resource_response = client.post(
+        f"{API_PREFIX}/posts",
+        headers=bearer(token),
+        json={
+            "postType": "RESOURCE",
+            "title": "Shared keyword",
+            "content": "body",
+            "hiddenContent": "download",
+            "price": 4,
+        },
+    )
+    assert normal_response.status_code == 201
+    assert resource_response.status_code == 201
+
+    normal_id = unwrap(normal_response)["data"]["id"]
+    resource_id = unwrap(resource_response)["data"]["id"]
+
+    payload = unwrap(
+        client.get(
+            f"{API_PREFIX}/posts?page=1&pageSize=20&keyword=shared&postType=RESOURCE"
+        ))
+    ids = {item["id"] for item in payload["data"]["items"]}
+
+    assert resource_id in ids
+    assert normal_id not in ids
+    assert {item["postType"] for item in payload["data"]["items"]} == {
+        "RESOURCE"
+    }
+
+
+def test_posts_keyword_search_excludes_deleted_and_offline_posts(client):
+    token = register_user(client, "visibility-search-author",
+                          "visibility-search-author@example.com")
+
+    published_response = client.post(
+        f"{API_PREFIX}/posts",
+        headers=bearer(token),
+        json={
+            "postType": "NORMAL",
+            "title": "visible-search-keyword",
+            "content": "body",
+        },
+    )
+    offline_response = client.post(
+        f"{API_PREFIX}/posts",
+        headers=bearer(token),
+        json={
+            "postType": "NORMAL",
+            "title": "offline-search-keyword",
+            "content": "body",
+        },
+    )
+    deleted_response = client.post(
+        f"{API_PREFIX}/posts",
+        headers=bearer(token),
+        json={
+            "postType": "NORMAL",
+            "title": "deleted-search-keyword",
+            "content": "body",
+        },
+    )
+    assert published_response.status_code == 201
+    assert offline_response.status_code == 201
+    assert deleted_response.status_code == 201
+
+    published_id = unwrap(published_response)["data"]["id"]
+    offline_id = unwrap(offline_response)["data"]["id"]
+    deleted_id = unwrap(deleted_response)["data"]["id"]
+
+    async def hide_posts() -> None:
+        async with SessionLocal() as db:
+            from lenjoy_bbs.modules.posts.models import Post
+
+            offline_post = await db.get(Post, offline_id)
+            deleted_post = await db.get(Post, deleted_id)
+            offline_post.status = "OFFLINE"
+            deleted_post.is_deleted = True
+            await db.commit()
+
+    asyncio.run(hide_posts())
+
+    payload = unwrap(
+        client.get(f"{API_PREFIX}/posts?page=1&pageSize=20&keyword=search-keyword"))
+    ids = {item["id"] for item in payload["data"]["items"]}
+
+    assert published_id in ids
+    assert offline_id not in ids
+    assert deleted_id not in ids
+
+
+def test_posts_keyword_whitespace_behaves_like_no_keyword(client):
+    token = register_user(client, "blank-search-author",
+                          "blank-search-author@example.com")
+
+    create_response = client.post(
+        f"{API_PREFIX}/posts",
+        headers=bearer(token),
+        json={
+            "postType": "NORMAL",
+            "title": "Blank keyword visible",
+            "content": "body",
+        },
+    )
+    assert create_response.status_code == 201
+    post_id = unwrap(create_response)["data"]["id"]
+
+    payload = unwrap(
+        client.get(f"{API_PREFIX}/posts?page=1&pageSize=20&keyword=%20%20%20"))
+
+    assert post_id in {item["id"] for item in payload["data"]["items"]}
+
+
+def test_posts_keyword_rejects_overlong_value(client):
+    keyword = "x" * 101
+
+    response = client.get(
+        f"{API_PREFIX}/posts?page=1&pageSize=20&keyword={keyword}")
+
+    assert response.status_code == 422
+
+
 def test_posts_list_exposes_interaction_counts_for_all_post_types(client):
     author_token = register_user(client, "stats-author",
                                  "stats-author@example.com")
