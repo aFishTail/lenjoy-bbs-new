@@ -29,7 +29,7 @@ export default async function SearchPage({ searchParams }: Props) {
   const keyword = (readQueryValue(resolved.q) || "").trim();
   const postType = readPostType(readQueryValue(resolved.type));
   const rawPage = Number(readQueryValue(resolved.page) || 1);
-  const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
+  const page = Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1;
 
   let initialPosts: PaginatedResponse<PostSummary> | null = null;
 

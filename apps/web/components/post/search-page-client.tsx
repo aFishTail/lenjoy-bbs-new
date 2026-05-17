@@ -72,7 +72,7 @@ export function SearchPageClient({
       ? typeParam
       : "";
   const pageParam = Number(searchParams.get("page") || initialPage || 1);
-  const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1;
+  const page = Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1;
 
   const postsQuery = useSearchPostsQuery(
     page,
@@ -87,14 +87,20 @@ export function SearchPageClient({
   );
 
   useEffect(() => {
+    setErrorText("");
+  }, [keyword, postType, page]);
+
+  useEffect(() => {
     if (postsQuery.error) {
       setErrorText(readError(postsQuery.error));
+    } else if (postsQuery.isSuccess) {
+      setErrorText("");
     }
-  }, [postsQuery.error]);
+  }, [postsQuery.error, postsQuery.isSuccess]);
 
   const postsPage = postsQuery.data;
   const posts = postsPage?.items ?? [];
-  const loading = postsQuery.isLoading || postsQuery.isFetching;
+  const loading = postsQuery.isLoading;
 
   const resultText = useMemo(() => {
     if (!keyword) {
@@ -145,6 +151,7 @@ export function SearchPageClient({
               key={tab.value || "all"}
               type="button"
               className={`tab ${postType === tab.value ? "active" : ""}`}
+              aria-pressed={postType === tab.value}
               onClick={() => replaceSearch({ postType: tab.value, page: 1 })}
               disabled={!keyword}
             >
@@ -166,7 +173,7 @@ export function SearchPageClient({
           <p className="text-muted">搜索范围包括帖子标题和公开正文。</p>
         </div>
       ) : loading ? (
-        <div className="loading">
+        <div className="loading" role="status">
           <div className="spinner"></div>
           <span className="ml-3">加载中...</span>
         </div>
