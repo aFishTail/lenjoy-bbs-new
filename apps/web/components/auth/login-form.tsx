@@ -1,6 +1,10 @@
 import { FormEvent } from "react";
+import { Loader2Icon, LogInIcon } from "lucide-react";
 
 import { CaptchaField } from "@/components/auth/captcha-field";
+import { Button } from "@/components/ui/button";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 
 type LoginFormValue = {
   account: string;
@@ -33,28 +37,24 @@ export function LoginForm({
 }: LoginFormProps) {
   return (
     <form onSubmit={(event) => void onSubmit(event)}>
-      <div className="grid gap-4">
-        <div className="form-group">
-          <label className="form-label" htmlFor="account">
-            账号（邮箱/手机号/用户名）
-          </label>
-          <input
+      <FieldGroup>
+        <Field>
+          <FieldLabel htmlFor="account">
+            账号（邮箱 / 手机号 / 用户名）
+          </FieldLabel>
+          <Input
             id="account"
-            className="form-input"
             required
             placeholder="name@example.com 或 13800138000"
             value={value.account}
             onChange={(e) => onChange({ ...value, account: e.target.value })}
           />
-        </div>
+        </Field>
 
-        <div className="form-group">
-          <label className="form-label" htmlFor="password">
-            密码
-          </label>
-          <input
+        <Field>
+          <FieldLabel htmlFor="password">密码</FieldLabel>
+          <Input
             id="password"
-            className="form-input"
             required
             type="password"
             minLength={6}
@@ -62,7 +62,7 @@ export function LoginForm({
             value={value.password}
             onChange={(e) => onChange({ ...value, password: e.target.value })}
           />
-        </div>
+        </Field>
 
         <CaptchaField
           captchaId={captchaId}
@@ -76,26 +76,24 @@ export function LoginForm({
           onRefresh={onRefreshCaptcha}
         />
 
-        <button
-          className="btn btn-primary"
+        <Button
+          className="w-full"
           disabled={submitting || refreshingCaptcha}
           type="submit"
         >
           {submitting ? (
             <>
-              <div className="spinner" style={{ width: "16px", height: "16px" }}></div>
+              <Loader2Icon data-icon="inline-start" className="animate-spin" />
               登录中...
             </>
           ) : (
             <>
-              <svg className="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3" />
-              </svg>
+              <LogInIcon data-icon="inline-start" />
               登录
             </>
           )}
-        </button>
-      </div>
+        </Button>
+      </FieldGroup>
     </form>
   );
 }

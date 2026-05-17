@@ -1,3 +1,14 @@
+import { RotateCwIcon } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+
 type CaptchaFieldProps = {
   captchaId: string;
   captchaImageSrc: string;
@@ -18,51 +29,44 @@ export function CaptchaField({
   onRefresh,
 }: CaptchaFieldProps) {
   return (
-    <div className="form-group">
-      <label className="form-label" htmlFor="captchaCode">
-        图形验证码
-      </label>
-      <input
+    <Field>
+      <FieldLabel htmlFor="captchaCode">图形验证码</FieldLabel>
+      <Input
         id="captchaCode"
-        className="form-input"
         required
         placeholder="请输入图中字符"
         value={captchaCode}
         onChange={(e) => onCaptchaCodeChange(e.target.value)}
       />
 
-      <div className="grid gap-3" style={{ gridTemplateColumns: "180px 1fr" }}>
-        <div
-          className="captcha-image-wrap"
-          style={{ minHeight: "68px" }}
-        >
+      <div className="grid gap-3 sm:grid-cols-[180px_1fr]">
+        <div className="flex min-h-[68px] items-center justify-center rounded-md border border-slate-200 bg-slate-50">
           {captchaImageSrc ? (
             <img
               src={captchaImageSrc}
               alt="图形验证码"
-              className="captcha-image"
+              className="h-[68px] w-full rounded-md object-contain"
             />
           ) : (
-            <span className="text-muted text-sm">验证码加载中</span>
+            <span className="text-sm text-slate-500">验证码加载中</span>
           )}
         </div>
-        <div className="captcha-actions">
-          <button
+        <FieldGroup className="gap-2">
+          <Button
             type="button"
-            className="btn btn-ghost btn-sm"
+            variant="ghost"
+            size="sm"
             onClick={() => void onRefresh()}
             disabled={refreshingCaptcha}
+            className="w-fit"
           >
+            <RotateCwIcon data-icon="inline-start" />
             {refreshingCaptcha ? "刷新中..." : "刷新验证码"}
-          </button>
-          <small className="text-muted">
-            ID: {captchaId || "-"}
-          </small>
-          <small className="text-muted">
-            过期: {captchaExpireText}
-          </small>
-        </div>
+          </Button>
+          <FieldDescription>ID: {captchaId || "-"}</FieldDescription>
+          <FieldDescription>过期: {captchaExpireText}</FieldDescription>
+        </FieldGroup>
       </div>
-    </div>
+    </Field>
   );
 }
