@@ -2,7 +2,8 @@
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { FormEvent, useEffect, useState } from "react";
 import { MessageNotification } from "@/components/layout/message-notification";
 import { UserMenu } from "@/components/layout/user-menu";
 import { queryKeys, requestApiData } from "@/components/post/client-helpers";
@@ -12,6 +13,9 @@ import styles from "./navigation.module.css";
 
 export function Navigation() {
   const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [searchKeyword, setSearchKeyword] = useState("");
   const { hasAuth } = useAuth();
   const detailPostId = pathname.match(/^\/posts\/([^/]+)$/)?.[1] ?? null;
   const detailPostTypeQuery = useQuery({
@@ -36,6 +40,22 @@ export function Navigation() {
     (!!detailPostId && detailPostType === "RESOURCE");
   const isBounty =
     pathname === "/bounties" || (!!detailPostId && detailPostType === "BOUNTY");
+
+  useEffect(() => {
+    if (pathname === "/search") {
+      setSearchKeyword(searchParams.get("q") || "");
+    }
+  }, [pathname, searchParams]);
+
+  function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const keyword = searchKeyword.trim();
+    if (!keyword) {
+      return;
+    }
+    const params = new URLSearchParams({ q: keyword });
+    router.push(`/search?${params.toString()}`);
+  }
 
   if (pathname === "/admin" || pathname.startsWith("/admin/")) {
     return null;
@@ -85,6 +105,28 @@ export function Navigation() {
             悬赏
           </Link>
         </div>
+        <form className={styles.search} onSubmit={handleSearchSubmit}>
+          <input
+            className={styles.searchInput}
+            value={searchKeyword}
+            onChange={(event) => setSearchKeyword(event.target.value)}
+            placeholder="搜索帖子"
+            aria-label="搜索帖子"
+            maxLength={100}
+          />
+          <button className={styles.searchButton} type="submit" aria-label="搜索">
+            <svg
+              className="icon-sm"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+            >
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.5-3.5" />
+            </svg>
+          </button>
+        </form>
         <div className={styles.actions}>
           <MessageNotification />
           <UserMenu />
