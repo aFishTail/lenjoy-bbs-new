@@ -18,7 +18,7 @@ from lenjoy_bbs.modules.posts.repository import find_post, find_published_post
 from lenjoy_bbs.modules.posts.schemas import CommentCreateRequest, PostCreateRequest, PostUpdateRequest
 from lenjoy_bbs.modules.taxonomy.models import Tag
 from lenjoy_bbs.modules.users.models import UserAccount
-from lenjoy_bbs.modules.wallet.service import adjust_available, lock_wallet
+from lenjoy_bbs.modules.wallet.service import adjust_available, freeze_available, lock_wallet, spend_frozen
 
 logger = logging.getLogger("lenjoy_bbs.posts")
 POST_VIEW_KEY_PREFIX = "post:view:"
@@ -137,6 +137,16 @@ async def create_post_for_author_id(
     )
     db.add(post)
     await db.flush()
+    if payload.post_type == "BOUNTY":
+        bounty_amount = payload.bounty_amount or 0
+        if bounty_amount <= 0:
+            raise ApiError("INVALID_BOUNTY_AMOUNT",
+                           "Bounty amount must be greater than zero",
+                           status.HTTP_400_BAD_REQUEST)
+        await freeze_available(
+            db, author_id, bounty_amount, "BOUNTY_FREEZE",
+            f"bounty:freeze:{post.id}",
+            "Bounty post created")
     await _replace_post_tags(db, post.id, payload.tag_ids)
     if commit:
         await db.commit()
@@ -495,11 +505,6 @@ async def accept_bounty_answer(db: AsyncSession, post_id: int, comment_id: int,
                        "Author cannot accept their own answer")
 
     bounty_amount = post.bounty_amount or 0
-    author_wallet = await lock_wallet(db, actor.id)
-    if author_wallet.available_coins < bounty_amount:
-        raise ApiError("INSUFFICIENT_COINS",
-                       "Insufficient coins to settle the bounty")
-
     try:
         post.accepted_comment_id = comment.id
         post.bounty_status = "RESOLVED"
@@ -507,9 +512,9 @@ async def accept_bounty_answer(db: AsyncSession, post_id: int, comment_id: int,
         comment.is_accepted = True
 
         if bounty_amount > 0:
-            await adjust_available(
-                db, actor.id, -bounty_amount, "BOUNTY_ACCEPTED",
-                f"bounty:accept:debit:{post.id}:{comment.id}",
+            await spend_frozen(
+                db, actor.id, bounty_amount, "BOUNTY_ACCEPTED",
+                f"bounty:accept:spend:{post.id}:{comment.id}",
                 "Bounty accepted payout")
             await adjust_available(
                 db, comment.author_id, bounty_amount, "BOUNTY_REWARD",

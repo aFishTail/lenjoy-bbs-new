@@ -2,6 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lenjoy_bbs.core.config import get_settings
+from lenjoy_bbs.core.errors import ApiError
 from lenjoy_bbs.db.base import now_utc
 from lenjoy_bbs.modules.wallet.models import Wallet, WalletLedger
 
@@ -78,4 +79,63 @@ async def adjust_available(
     wallet.updated_at = now_utc()
     direction = "IN" if delta >= 0 else "OUT"
     await add_ledger(db, wallet, user_id, direction, abs(delta), biz_type, biz_key, remark, operated_by)
+    return wallet
+
+
+async def freeze_available(
+    db: AsyncSession,
+    user_id: int,
+    amount: int,
+    biz_type: str,
+    biz_key: str,
+    remark: str,
+    operated_by: int | None = None,
+) -> Wallet:
+    wallet = await lock_wallet(db, user_id)
+    if wallet.available_coins < amount:
+        raise ApiError("INSUFFICIENT_COINS", "Insufficient coins")
+    wallet.available_coins -= amount
+    wallet.frozen_coins += amount
+    wallet.updated_at = now_utc()
+    await add_ledger(db, wallet, user_id, "FREEZE", amount, biz_type, biz_key,
+                     remark, operated_by)
+    return wallet
+
+
+async def spend_frozen(
+    db: AsyncSession,
+    user_id: int,
+    amount: int,
+    biz_type: str,
+    biz_key: str,
+    remark: str,
+    operated_by: int | None = None,
+) -> Wallet:
+    wallet = await lock_wallet(db, user_id)
+    if wallet.frozen_coins < amount:
+        raise ApiError("INSUFFICIENT_FROZEN_COINS", "Insufficient frozen coins")
+    wallet.frozen_coins -= amount
+    wallet.updated_at = now_utc()
+    await add_ledger(db, wallet, user_id, "OUT", amount, biz_type, biz_key,
+                     remark, operated_by)
+    return wallet
+
+
+async def unfreeze_to_available(
+    db: AsyncSession,
+    user_id: int,
+    amount: int,
+    biz_type: str,
+    biz_key: str,
+    remark: str,
+    operated_by: int | None = None,
+) -> Wallet:
+    wallet = await lock_wallet(db, user_id)
+    if wallet.frozen_coins < amount:
+        raise ApiError("INSUFFICIENT_FROZEN_COINS", "Insufficient frozen coins")
+    wallet.frozen_coins -= amount
+    wallet.available_coins += amount
+    wallet.updated_at = now_utc()
+    await add_ledger(db, wallet, user_id, "UNFREEZE", amount, biz_type,
+                     biz_key, remark, operated_by)
     return wallet
