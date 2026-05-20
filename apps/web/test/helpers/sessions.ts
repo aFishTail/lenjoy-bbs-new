@@ -19,6 +19,14 @@ export function loadSessions(): Sessions {
   return JSON.parse(fs.readFileSync(filePath, "utf8")) as Sessions;
 }
 
+export function getAccessToken(auth: AuthData): string {
+  const token = auth.accessToken || auth.token;
+  if (!token) {
+    throw new Error("auth session is missing accessToken or token");
+  }
+  return token;
+}
+
 export type JwtClaims = {
   sub?: string;
   username?: string;
@@ -28,7 +36,7 @@ export type JwtClaims = {
 };
 
 export function readJwtClaims(auth: AuthData): JwtClaims | null {
-  const parts = auth.accessToken.split(".");
+  const parts = getAccessToken(auth).split(".");
   if (parts.length < 2) {
     return null;
   }
@@ -50,10 +58,15 @@ export async function applySession(
   auth: AuthData,
 ): Promise<void> {
   const url = new URL(baseURL);
+  const normalizedAuth = {
+    ...auth,
+    accessToken: getAccessToken(auth),
+  };
+
   await context.addCookies([
     {
       name: AUTH_COOKIE_NAME,
-      value: JSON.stringify(auth),
+      value: JSON.stringify(normalizedAuth),
       domain: url.hostname,
       path: "/",
       httpOnly: false,

@@ -14,17 +14,37 @@ def test_shared_dependency_aliases_are_available():
     assert AdminUser is not None
 
 
+def test_wallet_asset_rules_have_service_entrypoints():
+    import inspect
+
+    from lenjoy_bbs.modules.wallet.asset_ledger import apply_admin_adjustment, grant_registration_gift, reserve_bounty_funds, settle_bounty_reward, settle_resource_purchase
+
+    assert inspect.iscoroutinefunction(grant_registration_gift)
+    assert inspect.iscoroutinefunction(apply_admin_adjustment)
+    assert inspect.iscoroutinefunction(reserve_bounty_funds)
+    assert inspect.iscoroutinefunction(settle_bounty_reward)
+    assert inspect.iscoroutinefunction(settle_resource_purchase)
+
+
 def test_post_presenters_are_split_from_application_writes():
+    from lenjoy_bbs.modules.posts.bounty_settlement import accept_bounty_answer_settlement
+    from lenjoy_bbs.modules.posts.engagement import create_comment, record_post_view
+    from lenjoy_bbs.modules.posts.lifecycle import create_post, create_post_for_author_id, delete_post, update_post
+    from lenjoy_bbs.modules.posts.lifecycle import create_post_for_author_id
     from lenjoy_bbs.modules.posts.presenters import serialize_comment, serialize_post
-    from lenjoy_bbs.modules.posts.service import create_comment, create_post, delete_post, purchase_post, update_post
+    from lenjoy_bbs.modules.posts.resource_trade import purchase_resource_post
 
     assert serialize_post is not None
     assert serialize_comment is not None
+    assert accept_bounty_answer_settlement is not None
+    assert record_post_view is not None
+    assert create_post_for_author_id is not None
+    assert purchase_resource_post is not None
     assert create_post is not None
     assert update_post is not None
     assert delete_post is not None
     assert create_comment is not None
-    assert purchase_post is not None
+    assert purchase_resource_post is not None
 
 
 def test_security_helpers_are_split_into_specialized_modules():
@@ -45,7 +65,10 @@ def test_security_helpers_are_split_into_specialized_modules():
 def test_open_api_and_users_use_service_entrypoints():
     import inspect
 
-    from lenjoy_bbs.modules.open_api.service import create_client, create_open_post, list_clients
+    from lenjoy_bbs.modules.open_api.client_auth import require_active_client
+    from lenjoy_bbs.modules.open_api.client_management import create_client, list_clients
+    from lenjoy_bbs.modules.open_api.publisher_identity import get_or_create_open_api_user
+    from lenjoy_bbs.modules.open_api.publication import create_open_post
     from lenjoy_bbs.modules.users.service import update_profile
 
     create_client_sig = inspect.signature(create_client)
@@ -55,6 +78,8 @@ def test_open_api_and_users_use_service_entrypoints():
     assert inspect.iscoroutinefunction(create_client)
     assert inspect.iscoroutinefunction(create_open_post)
     assert inspect.iscoroutinefunction(list_clients)
+    assert inspect.iscoroutinefunction(require_active_client)
+    assert inspect.iscoroutinefunction(get_or_create_open_api_user)
     assert inspect.iscoroutinefunction(update_profile)
     assert list(create_client_sig.parameters) == [
         "db", "name", "remark", "status_value"

@@ -11,7 +11,6 @@ import {
   useState,
 } from "react";
 
-import { AuthSessionCard } from "@/components/auth/auth-session-card";
 import { LoginForm } from "@/components/auth/login-form";
 import { RegisterForm } from "@/components/auth/register-form";
 import {
@@ -32,7 +31,7 @@ export function AuthPageClient() {
   const [captchaStamp, setCaptchaStamp] = useState<number>(Date.now());
   const [errorText, setErrorText] = useState("");
   const [successText, setSuccessText] = useState("");
-  const { authData: auth, setAuth: saveAuth, clearAuth: handleClearAuth } = useAuth();
+  const { setAuth: saveAuth } = useAuth();
 
   const [loginForm, setLoginForm] = useState({
     account: "",
@@ -126,14 +125,6 @@ export function AuthPageClient() {
     } catch (error) {
       setErrorText(readError(error));
     }
-  }
-
-  // saveAuth is provided by useAuth
-
-  function logout() {
-    handleClearAuth();
-    setSuccessText("已退出登录");
-    setErrorText("");
   }
 
   async function onSubmitLogin(event: FormEvent<HTMLFormElement>) {
@@ -307,8 +298,6 @@ export function AuthPageClient() {
               {successText}
             </div>
           )}
-
-          {auth && <AuthSessionCard auth={auth} onLogout={logout} />}
         </div>
 
         {/* Back Link */}

@@ -16,6 +16,11 @@ export type PostFeedFilters = {
   keyword?: string;
 };
 
+export type PostSearchFilters = {
+  q: string;
+  postType?: "" | "NORMAL" | "RESOURCE" | "BOUNTY";
+};
+
 function buildFeedQuery(
   postType: "NORMAL" | "RESOURCE" | "BOUNTY",
   page: number,
@@ -35,6 +40,22 @@ function buildFeedQuery(
   }
   if (filters?.keyword) {
     params.set("keyword", filters.keyword);
+  }
+  return `/api/posts?${params.toString()}`;
+}
+
+function buildSearchQuery(
+  page: number,
+  pageSize: number,
+  filters: PostSearchFilters,
+) {
+  const params = new URLSearchParams({
+    page: String(page),
+    pageSize: String(pageSize),
+    keyword: filters.q,
+  });
+  if (filters.postType) {
+    params.set("postType", filters.postType);
   }
   return `/api/posts?${params.toString()}`;
 }
@@ -78,6 +99,36 @@ export function usePostFeedQuery(
         buildFeedQuery(postType, page, pageSize, filters),
         { cache: "no-store" },
       ),
+    initialData: initialData || undefined,
+  });
+}
+
+export function useSearchPostsQuery(
+  page: number,
+  pageSize: number,
+  filters: PostSearchFilters,
+  initialData?: PaginatedResponse<PostSummary> | null,
+) {
+  const normalizedKeyword = filters.q.trim();
+
+  return useQuery({
+    queryKey: queryKeys.postSearch(
+      {
+        q: normalizedKeyword,
+        postType: filters.postType || "",
+      },
+      page,
+      pageSize,
+    ),
+    queryFn: () =>
+      requestApiData<PaginatedResponse<PostSummary>>(
+        buildSearchQuery(page, pageSize, {
+          ...filters,
+          q: normalizedKeyword,
+        }),
+        { cache: "no-store" },
+      ),
+    enabled: normalizedKeyword.length > 0,
     initialData: initialData || undefined,
   });
 }

@@ -9,5 +9,6 @@ from lenjoy_bbs.modules.users.models import UserAccount
 
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 CurrentUser = Annotated[UserAccount, Depends(current_user)]
-OptionalCurrentUser = Annotated[UserAccount | None, Depends(optional_current_user)]
+OptionalCurrentUser = Annotated[UserAccount | None,
+                                Depends(optional_current_user)]
 AdminUser = Annotated[UserAccount, Depends(require_admin)]

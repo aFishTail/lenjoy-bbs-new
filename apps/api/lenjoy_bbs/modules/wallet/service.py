@@ -78,7 +78,67 @@ async def adjust_available(
     wallet.available_coins += delta
     wallet.updated_at = now_utc()
     direction = "IN" if delta >= 0 else "OUT"
-    await add_ledger(db, wallet, user_id, direction, abs(delta), biz_type, biz_key, remark, operated_by)
+    await add_ledger(db, wallet, user_id, direction, abs(delta), biz_type,
+                     biz_key, remark, operated_by)
+    return wallet
+
+
+async def freeze_available(
+    db: AsyncSession,
+    user_id: int,
+    amount: int,
+    biz_type: str,
+    biz_key: str,
+    remark: str,
+    operated_by: int | None = None,
+) -> Wallet:
+    wallet = await lock_wallet(db, user_id)
+    if wallet.available_coins < amount:
+        raise ApiError("INSUFFICIENT_COINS", "Insufficient coins")
+    wallet.available_coins -= amount
+    wallet.frozen_coins += amount
+    wallet.updated_at = now_utc()
+    await add_ledger(db, wallet, user_id, "FREEZE", amount, biz_type, biz_key,
+                     remark, operated_by)
+    return wallet
+
+
+async def spend_frozen(
+    db: AsyncSession,
+    user_id: int,
+    amount: int,
+    biz_type: str,
+    biz_key: str,
+    remark: str,
+    operated_by: int | None = None,
+) -> Wallet:
+    wallet = await lock_wallet(db, user_id)
+    if wallet.frozen_coins < amount:
+        raise ApiError("INSUFFICIENT_COINS", "Insufficient frozen coins")
+    wallet.frozen_coins -= amount
+    wallet.updated_at = now_utc()
+    await add_ledger(db, wallet, user_id, "OUT", amount, biz_type, biz_key,
+                     remark, operated_by)
+    return wallet
+
+
+async def unfreeze_available(
+    db: AsyncSession,
+    user_id: int,
+    amount: int,
+    biz_type: str,
+    biz_key: str,
+    remark: str,
+    operated_by: int | None = None,
+) -> Wallet:
+    wallet = await lock_wallet(db, user_id)
+    if wallet.frozen_coins < amount:
+        raise ApiError("INSUFFICIENT_COINS", "Insufficient frozen coins")
+    wallet.frozen_coins -= amount
+    wallet.available_coins += amount
+    wallet.updated_at = now_utc()
+    await add_ledger(db, wallet, user_id, "UNFREEZE", amount, biz_type,
+                     biz_key, remark, operated_by)
     return wallet
 
 

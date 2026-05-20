@@ -1,5 +1,6 @@
 export type AuthData = {
-  accessToken: string;
+  accessToken?: string;
+  token?: string;
   tokenType: string;
   expiresIn: number;
   user: {
@@ -16,6 +17,7 @@ export type AuthData = {
 export type Sessions = Partial<{
   user_a: AuthData;
   user_b: AuthData;
+  user_c: AuthData;
   admin: AuthData;
 }>;
 

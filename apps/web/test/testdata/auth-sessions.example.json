@@ -1,0 +1,44 @@
+{
+  "user_a": {
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwidXNlcm5hbWUiOiJ0ZXN0MSIsInJvbGVzIjpbIlVTRVIiXSwiaWF0IjoxNzc5MDAzNzA4LCJleHAiOjE3NzkwNzU3MDh9.VLfi1VY7SOjRjiVwF5czygNb2oGak2ugOZq8y3qIwfs",
+    "tokenType": "Bearer",
+    "expiresIn": 72000,
+    "user": {
+      "id": 1,
+      "username": "test1",
+      "email": "test1@lenjoy.com",
+      "phone": "13151562286",
+      "avatarUrl": null,
+      "bio": null,
+      "roles": ["USER"]
+    }
+  },
+  "user_b": {
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyIiwidXNlcm5hbWUiOiJ0ZXN0MiIsInJvbGVzIjpbIlVTRVIiXSwiaWF0IjoxNzc5MDAzNzc0LCJleHAiOjE3NzkwNzU3NzR9.V65rRRIgM54X2BD1WEbk_d8Cu7TQZPPyFtDMk7U5GHM",
+    "tokenType": "Bearer",
+    "expiresIn": 72000,
+    "user": {
+      "id": 2,
+      "username": "test2",
+      "email": "test2@lenjoy.com",
+      "phone": "13151562287",
+      "avatarUrl": null,
+      "bio": null,
+      "roles": ["USER"]
+    }
+  },
+  "admin": {
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyMiIsInVzZXJuYW1lIjoiYWRtaW4iLCJyb2xlcyI6WyJBRE1JTiJdLCJpYXQiOjE3NzkwMDM4MDIsImV4cCI6MTc3OTA3NTgwMn0.tUr3fWoXBF6v04mPl5ZhZcxroZhaltkkoMeVY0qdi5g",
+    "tokenType": "Bearer",
+    "expiresIn": 72000,
+    "user": {
+      "id": 22,
+      "username": "admin",
+      "email": "admin@lenjoy.com",
+      "phone": "13151562210",
+      "avatarUrl": null,
+      "bio": null,
+      "roles": ["ADMIN"]
+    }
+  }
+}

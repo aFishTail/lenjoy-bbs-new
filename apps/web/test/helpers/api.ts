@@ -1,5 +1,6 @@
 import type { APIRequestContext } from "@playwright/test";
 
+import { getAccessToken } from "./sessions";
 import type { ApiEnvelope, AuthData } from "./types";
 
 type BackendEnvelope<T> = {
@@ -29,7 +30,7 @@ export async function apiResponse<T>(
       Accept: "application/json",
       ...(options?.auth
         ? {
-            Authorization: `${options.auth.tokenType || "Bearer"} ${options.auth.accessToken}`,
+            Authorization: `${options.auth.tokenType || "Bearer"} ${getAccessToken(options.auth)}`,
           }
         : {}),
       ...(options?.data ? { "Content-Type": "application/json" } : {}),

@@ -1,6 +1,7 @@
 import asyncio
 import importlib
 import os
+from datetime import datetime, UTC
 from io import BytesIO
 
 import jwt
@@ -20,16 +21,18 @@ from lenjoy_bbs.core.security import create_access_token
 from lenjoy_bbs.db.session import SessionLocal
 from lenjoy_bbs.infrastructure.storage.image_storage import MinioImageStorage, validate_image_upload
 from lenjoy_bbs.main import app, create_app
-from lenjoy_bbs.modules.open_api import service as open_api_service
-from lenjoy_bbs.modules.open_api.service import create_client, create_open_post
+from lenjoy_bbs.modules.open_api import client_management as open_api_client_management
+from lenjoy_bbs.modules.open_api.client_management import create_client
+from lenjoy_bbs.modules.open_api.publication import create_open_post
 from lenjoy_bbs.modules.open_api.constants import OPEN_API_SYSTEM_EMAIL, OPEN_API_SYSTEM_USERNAME
 from lenjoy_bbs.modules.open_api.models import OpenApiClient
 from lenjoy_bbs.modules.files.router import get_storage_service, upload_image as upload_image_endpoint
-from lenjoy_bbs.modules.posts.models import Post, PostTag
+from lenjoy_bbs.modules.posts.models import Post, PostComment, PostTag
+from lenjoy_bbs.modules.posts.bounty_settlement import accept_bounty_answer_settlement
 from lenjoy_bbs.modules.posts.schemas import PostCreateRequest
 from lenjoy_bbs.modules.taxonomy.models import Tag
 from lenjoy_bbs.modules.users.models import Role, UserAccount, UserRole
-from lenjoy_bbs.modules.wallet.models import WalletLedger
+from lenjoy_bbs.modules.wallet.models import Wallet, WalletLedger
 
 API_PREFIX = "/api/v1"
 
@@ -174,7 +177,7 @@ def test_invalid_jwt_subjects_return_unauthorized(monkeypatch):
 
     with TestClient(app, raise_server_exceptions=False) as test_client:
         for token in [missing_subject, bad_subject]:
-            response = test_client.get(f"{API_PREFIX}/me",
+            response = test_client.get(f"{API_PREFIX}/users/me",
                                        headers=bearer(token))
             payload = unwrap(response)
             assert response.status_code == 401
@@ -266,8 +269,8 @@ async def test_open_api_create_client_rolls_back_failed_insert_and_session_recov
         monkeypatch):
     async with SessionLocal() as db:
         values = iter(["dup-key", "dup-key", "fresh-key"])
-        monkeypatch.setattr(open_api_service.secrets, "token_urlsafe",
-                            lambda length: next(values))
+        monkeypatch.setattr(open_api_client_management.secrets,
+                            "token_urlsafe", lambda length: next(values))
 
         first = await create_client(db,
                                     name="client-one",
@@ -736,3 +739,102 @@ def test_offline_post_is_hidden_from_public_detail_comment_and_purchase(
     assert unwrap(comments_response)["error"]["code"] == "POST_NOT_FOUND"
     assert purchase_response.status_code == 404
     assert unwrap(purchase_response)["error"]["code"] == "POST_NOT_FOUND"
+
+
+def test_admin_offline_active_bounty_refunds_frozen_balance(client):
+    author_token = register_user(client, "offline-bounty-author",
+                                 "offline-bounty-author@example.com")
+    register_user(client, "offline-bounty-admin",
+                  "offline-bounty-admin@example.com")
+
+    post_response = client.post(
+        f"{API_PREFIX}/posts",
+        headers=bearer(author_token),
+        json={
+            "postType": "BOUNTY",
+            "title": "Offline bounty",
+            "content": "question",
+            "bountyAmount": 25,
+            "bountyExpireAt": "2026-06-01T12:00:00Z",
+        },
+    )
+    post_id = unwrap(post_response)["data"]["id"]
+
+    async def promote_admin() -> str:
+        async with SessionLocal() as db:
+            user = await db.scalar(
+                select(UserAccount).where(
+                    UserAccount.username == "offline-bounty-admin"))
+            role = await db.scalar(
+                select(Role).where(Role.role_code == "ADMIN"))
+            assert user is not None
+            assert role is not None
+            db.add(UserRole(user_id=user.id, role_id=role.id))
+            await db.commit()
+            return create_access_token(user, ["ADMIN"])
+
+    admin_token = asyncio.run(promote_admin())
+
+    offline_response = client.patch(
+        f"{API_PREFIX}/admin/posts/{post_id}/offline",
+        headers=bearer(admin_token))
+    wallet_payload = unwrap(
+        client.get(f"{API_PREFIX}/users/me/wallet",
+                   headers=bearer(author_token)))
+
+    assert offline_response.status_code == 200
+    assert wallet_payload["data"]["availableCoins"] == 100
+    assert wallet_payload["data"]["frozenCoins"] == 0
+
+
+@pytest.mark.asyncio
+async def test_accepting_expired_bounty_refunds_frozen_balance():
+    async with SessionLocal() as db:
+        author = UserAccount(username="expired-bounty-author",
+                             email="expired-bounty-author@example.com",
+                             password_hash="hashed")
+        answerer = UserAccount(username="expired-bounty-answerer",
+                               email="expired-bounty-answerer@example.com",
+                               password_hash="hashed")
+        db.add_all([author, answerer])
+        await db.flush()
+        db.add(Wallet(user_id=author.id, available_coins=75, frozen_coins=25))
+
+        post = Post(
+            author_id=author.id,
+            post_type="BOUNTY",
+            title="Expired bounty",
+            content="question",
+            bounty_amount=25,
+            bounty_status="ACTIVE",
+            bounty_expire_at=datetime(2020, 1, 1, tzinfo=UTC),
+        )
+        db.add(post)
+        await db.flush()
+        comment = PostComment(post_id=post.id,
+                              author_id=answerer.id,
+                              content="answer")
+        db.add(comment)
+        await db.commit()
+        post_id = post.id
+        comment_id = comment.id
+
+    async with SessionLocal() as db:
+        author = await db.scalar(
+            select(UserAccount).where(
+                UserAccount.username == "expired-bounty-author"))
+        assert author is not None
+        with pytest.raises(ApiError, match="Bounty has expired"):
+            await accept_bounty_answer_settlement(db, post_id, comment_id,
+                                                  author)
+
+    async with SessionLocal() as db:
+        post = await db.get(Post, post_id)
+        wallet = await db.scalar(
+            select(Wallet).where(Wallet.user_id == author.id))
+
+    assert post is not None
+    assert post.bounty_status == "EXPIRED"
+    assert wallet is not None
+    assert wallet.available_coins == 100
+    assert wallet.frozen_coins == 0
