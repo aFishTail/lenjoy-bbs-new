@@ -218,26 +218,25 @@ export function AdminOpenApiClientsClient() {
         onOpenChange={(v) => !v && resetClientDialog()}
       >
         <div style={{ display: "grid", gap: 10 }}>
-          <Input
-            className="admin-input"
-            placeholder="客户端名称"
-            value={form.name}
-            onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-          />
-          <Input
-            className="admin-input"
-            placeholder="备注（可选）"
-            value={form.remark}
-            onChange={(e) => setForm((p) => ({ ...p, remark: e.target.value }))}
-          />
-          <Select
-            className="admin-input"
-            value={form.status}
-            onChange={(e) => setForm((p) => ({ ...p, status: e.target.value as "ACTIVE" | "INACTIVE" }))}
-          >
+          <div className="coin-modal-field">
+            <label className="coin-modal-label">客户端名称</label>
+            <Input className="admin-input" placeholder="输入客户端名称" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
+          </div>
+          <div className="coin-modal-field">
+            <label className="coin-modal-label">备注</label>
+            <Input className="admin-input" placeholder="输入备注（可选）" value={form.remark} onChange={(e) => setForm((p) => ({ ...p, remark: e.target.value }))} />
+          </div>
+          <div className="coin-modal-field">
+            <label className="coin-modal-label">状态</label>
+            <Select
+              className="admin-input"
+              value={form.status}
+              onChange={(e) => setForm((p) => ({ ...p, status: e.target.value as "ACTIVE" | "INACTIVE" }))}
+            >
             <option value="ACTIVE">启用</option>
             <option value="INACTIVE">停用</option>
           </Select>
+          </div>
         </div>
       </ConfirmDialog>
 

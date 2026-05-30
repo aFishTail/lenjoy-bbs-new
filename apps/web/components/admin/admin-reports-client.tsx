@@ -211,12 +211,15 @@ export function AdminReportsClient() {
               <strong>{reviewDialog.item.targetType} #{reviewDialog.item.targetId}</strong>
               <span>{reviewDialog.item.reason}</span>
             </div>
-            <Input
-              className="admin-input"
-              placeholder="处理说明（可选）"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-            />
+            <div className="coin-modal-field">
+              <label className="coin-modal-label">处理说明</label>
+              <Input
+                className="admin-input"
+                placeholder="请输入处理说明（可选）"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+              />
+            </div>
           </div>
         )}
       </ConfirmDialog>

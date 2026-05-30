@@ -209,7 +209,17 @@ export function AdminTagsClient() {
         onConfirm={() => void (dialog?.type === "edit" ? submitEdit() : submitCreate())}
         onOpenChange={(v) => !v && closeDialog()}
       >
-        <Input className="admin-input" placeholder="标签名称" value={name} onChange={(e) => setName(e.target.value)} />
+        <div style={{ display: "grid", gap: 10 }}>
+          <div className="coin-modal-field">
+            <label className="coin-modal-label">标签名称</label>
+            <Input
+              className="admin-input"
+              placeholder="输入标签名称"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+        </div>
       </ConfirmDialog>
 
       {/* 合并 */}

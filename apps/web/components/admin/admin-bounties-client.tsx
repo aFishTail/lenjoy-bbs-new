@@ -66,7 +66,7 @@ export function AdminBountiesClient() {
   const commentLoading = commentsQuery.isLoading || commentsQuery.isFetching;
 
   function openDeleteDialog(comment: PostComment) {
-    setDeleteDialog({ commentId: comment.id, content: comment.content });
+    setDeleteDialog({ commentId: comment.id, content: comment.content ?? "" });
     setDeleteReason("");
     setDeleting(false);
   }
@@ -263,12 +263,15 @@ export function AdminBountiesClient() {
               <strong>{deleteDialog.content.length > 60 ? deleteDialog.content.slice(0, 60) + "…" : deleteDialog.content}</strong>
               <span>评论 ID {deleteDialog.commentId}</span>
             </div>
-            <Input
-              className="admin-input"
-              placeholder="删除原因（必填）"
-              value={deleteReason}
-              onChange={(e) => setDeleteReason(e.target.value)}
-            />
+            <div className="coin-modal-field">
+              <label className="coin-modal-label">删除原因</label>
+              <Input
+                className="admin-input"
+                placeholder="请输入删除原因（必填）"
+                value={deleteReason}
+                onChange={(e) => setDeleteReason(e.target.value)}
+              />
+            </div>
           </div>
         )}
       </ConfirmDialog>

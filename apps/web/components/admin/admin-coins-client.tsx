@@ -206,19 +206,25 @@ export function AdminCoinsClient() {
               <strong>{modal.user.username}</strong>
               <span>可用 {modal.user.availableCoins} / 冻结 {modal.user.frozenCoins}</span>
             </div>
-            <Input
-              className="admin-input"
-              inputMode="numeric"
-              placeholder="金币数量（正整数）"
-              value={modal.amount}
-              onChange={(e) => setModal((p) => p && { ...p, amount: e.target.value })}
-            />
-            <Input
-              className="admin-input"
-              placeholder="操作原因（必填）"
-              value={modal.reason}
-              onChange={(e) => setModal((p) => p && { ...p, reason: e.target.value })}
-            />
+            <div className="coin-modal-field">
+              <label className="coin-modal-label">金币数量</label>
+              <Input
+                className="admin-input"
+                inputMode="numeric"
+                placeholder="输入金币数量（正整数）"
+                value={modal.amount}
+                onChange={(e) => setModal((p) => p && { ...p, amount: e.target.value })}
+              />
+            </div>
+            <div className="coin-modal-field">
+              <label className="coin-modal-label">操作原因</label>
+              <Input
+                className="admin-input"
+                placeholder="请输入操作原因（必填）"
+                value={modal.reason}
+                onChange={(e) => setModal((p) => p && { ...p, reason: e.target.value })}
+              />
+            </div>
           </div>
         )}
       </ConfirmDialog>

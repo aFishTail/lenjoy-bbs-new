@@ -218,20 +218,26 @@ export function AdminResourceAppealsClient() {
               <span>买家 {appealDialog.item.buyerUsername || appealDialog.item.buyerId}</span>
             </div>
             {appealDialog.action === "APPROVE" && (
-              <Input
-                className="admin-input"
-                inputMode="numeric"
-                placeholder="退款金币数量"
-                value={refundAmount}
+              <div className="coin-modal-field">
+                <label className="coin-modal-label">退款金币数量</label>
+                <Input
+                  className="admin-input"
+                  inputMode="numeric"
+                  placeholder="输入退款金币数量"
+                  value={refundAmount}
                 onChange={(e) => setRefundAmount(e.target.value)}
               />
+              </div>
             )}
-            <Input
-              className="admin-input"
-              placeholder="处理说明（可选）"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-            />
+            <div className="coin-modal-field">
+              <label className="coin-modal-label">处理说明</label>
+              <Input
+                className="admin-input"
+                placeholder="请输入处理说明（可选）"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+              />
+            </div>
           </div>
         )}
       </ConfirmDialog>

@@ -279,12 +279,15 @@ export function AdminPostsClient() {
               <strong>{actionDialog.title}</strong>
               <span>帖子 ID {actionDialog.postId}</span>
             </div>
-            <Input
-              className="admin-input"
-              placeholder="操作原因（必填）"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-            />
+            <div className="coin-modal-field">
+              <label className="coin-modal-label">操作原因</label>
+              <Input
+                className="admin-input"
+                placeholder="请输入操作原因（必填）"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+              />
+            </div>
           </div>
         )}
       </ConfirmDialog>

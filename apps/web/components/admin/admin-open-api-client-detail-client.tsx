@@ -252,38 +252,36 @@ export function AdminOpenApiClientDetailClient({ clientId }: { clientId: string 
         onOpenChange={(v) => !v && resetBindingDialog()}
       >
         <div style={{ display: "grid", gap: 10 }}>
-          <Input
-            className="admin-input"
-            placeholder="绑定码"
-            value={form.bindingCode}
-            onChange={(e) => setForm((p) => ({ ...p, bindingCode: e.target.value }))}
-          />
-          <Select
-            className="admin-input"
-            value={form.userId}
-            onChange={(e) => setForm((p) => ({ ...p, userId: e.target.value }))}
-          >
-            <option value="">选择用户</option>
-            {usersQuery.data?.map((user) => (
-              <option key={user.id} value={String(user.id)}>
-                {user.username} / {user.id}{user.email ? ` / ${user.email}` : user.phone ? ` / ${user.phone}` : ""}
-              </option>
-            ))}
-          </Select>
-          <Input
-            className="admin-input"
-            placeholder="备注（可选）"
-            value={form.remark}
-            onChange={(e) => setForm((p) => ({ ...p, remark: e.target.value }))}
-          />
-          <Select
-            className="admin-input"
-            value={form.status}
-            onChange={(e) => setForm((p) => ({ ...p, status: e.target.value as "ACTIVE" | "INACTIVE" }))}
-          >
-            <option value="ACTIVE">启用</option>
-            <option value="INACTIVE">停用</option>
-          </Select>
+          <div className="coin-modal-field">
+            <label className="coin-modal-label">绑定码</label>
+            <Input className="admin-input" placeholder="输入绑定码" value={form.bindingCode} onChange={(e) => setForm((p) => ({ ...p, bindingCode: e.target.value }))} />
+          </div>
+          <div className="coin-modal-field">
+            <label className="coin-modal-label">关联用户</label>
+            <Select
+              className="admin-input"
+              value={form.userId}
+              onChange={(e) => setForm((p) => ({ ...p, userId: e.target.value }))}
+            >
+              <option value="">选择用户</option>
+              {usersQuery.data?.map((user) => (
+                <option key={user.id} value={String(user.id)}>
+                  {user.username} / {user.id}{user.email ? ` / ${user.email}` : user.phone ? ` / ${user.phone}` : ""}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className="coin-modal-field">
+            <label className="coin-modal-label">备注</label>
+            <Input className="admin-input" placeholder="输入备注（可选）" value={form.remark} onChange={(e) => setForm((p) => ({ ...p, remark: e.target.value }))} />
+          </div>
+          <div className="coin-modal-field">
+            <label className="coin-modal-label">状态</label>
+            <Select className="admin-input" value={form.status} onChange={(e) => setForm((p) => ({ ...p, status: e.target.value as "ACTIVE" | "INACTIVE" }))}>
+              <option value="ACTIVE">启用</option>
+              <option value="INACTIVE">停用</option>
+            </Select>
+          </div>
         </div>
       </ConfirmDialog>
 

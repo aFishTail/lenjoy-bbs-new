@@ -1,7 +1,7 @@
 "use client";
 
-import { LayoutGrid, Plus, Pencil, Power, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { LayoutGrid, Plus } from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -39,7 +39,6 @@ const DEFAULT_FORM: CategoryFormState = {
 };
 
 const CONTENT_TYPE_OPTIONS = [
-  { label: "全部类型", value: "" },
   { label: "RESOURCE", value: "RESOURCE" },
   { label: "NORMAL", value: "NORMAL" },
   { label: "BOUNTY", value: "BOUNTY" },
@@ -58,14 +57,10 @@ export function AdminCategoriesClient() {
   const deleteCategoryMutation = useDeleteAdminCategoryMutation(contentType);
 
   useEffect(() => {
-    if (categoriesQuery.error) {
-      toast.error(readError(categoriesQuery.error));
-    }
+    if (categoriesQuery.error) toast.error(readError(categoriesQuery.error));
   }, [categoriesQuery.error]);
 
   const dialogBusy = createCategoryMutation.isPending || updateCategoryMutation.isPending;
-  const dialogTitle = editingCategory ? "编辑分类" : "新建分类";
-  const dialogConfirmLabel = editingCategory ? "保存修改" : "创建分类";
   const categories = categoriesQuery.data ?? [];
   const loading = categoriesQuery.isLoading || categoriesQuery.isFetching;
 
@@ -97,6 +92,7 @@ export function AdminCategoriesClient() {
   }
 
   async function submitCategory() {
+    if (!form.name.trim()) return;
     const payload = {
       name: form.name,
       contentType: form.contentType,
@@ -104,13 +100,9 @@ export function AdminCategoriesClient() {
       sort: Number(form.sort || 0),
       leaf: true,
     };
-
     try {
       if (editingCategory) {
-        await updateCategoryMutation.mutateAsync({
-          categoryId: editingCategory.id,
-          payload,
-        });
+        await updateCategoryMutation.mutateAsync({ categoryId: editingCategory.id, payload });
         toast.success("分类已更新");
       } else {
         await createCategoryMutation.mutateAsync(payload);
@@ -119,63 +111,45 @@ export function AdminCategoriesClient() {
       setContentType(form.contentType);
       setDialogOpen(false);
       resetDialogState(form.contentType);
-    } catch (error) {
-      toast.error(readError(error));
-    }
+    } catch (e) { toast.error(readError(e)); }
   }
 
   async function toggleStatus(categoryId: number, nextStatus: string) {
     try {
       await updateStatusMutation.mutateAsync({ categoryId, status: nextStatus });
       toast.success("分类状态已更新");
-    } catch (error) {
-      toast.error(readError(error));
-    }
+    } catch (e) { toast.error(readError(e)); }
   }
 
   async function deleteCategory(categoryId: number, categoryName: string) {
     if (typeof window === "undefined") return;
-    const confirmed = window.confirm(`确认删除分类 "${categoryName}" 吗？`);
-    if (!confirmed) return;
-
+    if (!window.confirm(`确认删除分类 "${categoryName}" 吗？`)) return;
     try {
       await deleteCategoryMutation.mutateAsync(categoryId);
       toast.success("分类已删除");
-    } catch (error) {
-      toast.error(readError(error));
-    }
+    } catch (e) { toast.error(readError(e)); }
   }
 
   return (
     <main className="admin-main">
-      {/* ===== Toolbar ===== */}
       <section className="admin-toolbar">
         <div className="admin-filter-grid">
           <Select
             className="admin-input"
             value={contentType}
-            onChange={(e) =>
-              setContentType(e.target.value as "RESOURCE" | "NORMAL" | "BOUNTY")
-            }
+            onChange={(e) => setContentType(e.target.value as "RESOURCE" | "NORMAL" | "BOUNTY")}
           >
-            {CONTENT_TYPE_OPTIONS.slice(1).map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
+            {CONTENT_TYPE_OPTIONS.map((item) => (
+              <option key={item.value} value={item.value}>{item.label}</option>
             ))}
           </Select>
-          <Button
-            type="button"
-            className="admin-btn"
-            onClick={openCreateDialog}
-          >
+          <Button type="button" className="admin-btn" onClick={openCreateDialog}>
             <Plus size={15} strokeWidth={2.5} />
             新建分类
           </Button>
         </div>
       </section>
 
-      {/* ===== Table card ===== */}
       <section className="admin-table-card">
         <div className="admin-table-head">
           <h2>
@@ -206,72 +180,29 @@ export function AdminCategoriesClient() {
                 {categories.map((category) => (
                   <TableRow key={category.id}>
                     <TableCell>{category.id}</TableCell>
+                    <TableCell><strong className="cat-name">{category.name}</strong></TableCell>
                     <TableCell>
-                      <strong className="cat-name">{category.name}</strong>
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={`admin-badge ${
-                          category.contentType === "RESOURCE"
-                            ? "is-resource"
-                            : category.contentType === "BOUNTY"
-                              ? "is-bounty"
-                              : "is-active"
-                        }`}
-                      >
+                      <span className={`admin-badge ${category.contentType === "RESOURCE" ? "is-resource" : category.contentType === "BOUNTY" ? "is-bounty" : "is-active"}`}>
                         {category.contentType}
                       </span>
                     </TableCell>
                     <TableCell>{category.sort}</TableCell>
                     <TableCell>
-                      <span
-                        className={`admin-badge ${
-                          category.status === "ACTIVE"
-                            ? "is-active"
-                            : category.status === "INACTIVE"
-                              ? "is-muted"
-                              : "is-banned"
-                        }`}
-                      >
+                      <span className={`admin-badge ${category.status === "ACTIVE" ? "is-active" : category.status === "INACTIVE" ? "is-muted" : "is-banned"}`}>
                         {category.status === "ACTIVE" ? "启用" : "停用"}
                       </span>
                     </TableCell>
                     <TableCell>
                       <div className="cat-actions">
+                        <button type="button" className="cat-btn" onClick={() => openEditDialog(category)}>编辑</button>
                         <button
                           type="button"
-                          className="cat-btn"
-                          onClick={() => openEditDialog(category)}
-                        >
-                          编辑
-                        </button>
-                        <button
-                          type="button"
-                          className={`cat-btn ${
-                            category.status === "ACTIVE"
-                              ? "cat-btn-disable"
-                              : "cat-btn-enable"
-                          }`}
-                          onClick={() =>
-                            toggleStatus(
-                              category.id,
-                              category.status === "ACTIVE"
-                                ? "INACTIVE"
-                                : "ACTIVE",
-                            )
-                          }
+                          className={`cat-btn ${category.status === "ACTIVE" ? "cat-btn-disable" : "cat-btn-enable"}`}
+                          onClick={() => toggleStatus(category.id, category.status === "ACTIVE" ? "INACTIVE" : "ACTIVE")}
                         >
                           {category.status === "ACTIVE" ? "停用" : "启用"}
                         </button>
-                        <button
-                          type="button"
-                          className="cat-btn cat-btn-delete"
-                          onClick={() =>
-                            deleteCategory(category.id, category.name)
-                          }
-                        >
-                          删除
-                        </button>
+                        <button type="button" className="cat-btn cat-btn-delete" onClick={() => deleteCategory(category.id, category.name)}>删除</button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -282,52 +213,49 @@ export function AdminCategoriesClient() {
         )}
       </section>
 
-      {/* ===== Dialog ===== */}
+      {/* 创建 / 编辑 */}
       <ConfirmDialog
         open={dialogOpen}
-        title={dialogTitle}
-        description="填写分类信息后提交，创建与编辑共用同一弹框。"
-        confirmLabel={dialogConfirmLabel}
+        title={editingCategory ? "编辑分类" : "新建分类"}
+        description="填写分类信息后提交。"
+        confirmLabel={editingCategory ? "保存修改" : "创建分类"}
         confirmBusy={dialogBusy}
         confirmDisabled={!form.name.trim()}
         onConfirm={() => void submitCategory()}
         onOpenChange={closeDialog}
       >
-        <div className="cat-dialog-form">
-          <Input
-            className="admin-input"
-            placeholder="分类名称"
-            value={form.name}
-            onChange={(e) =>
-              setForm((prev) => ({ ...prev, name: e.target.value }))
-            }
-          />
-          <Select
-            className="admin-input"
-            value={form.contentType}
-            onChange={(e) =>
-              setForm((prev) => ({
-                ...prev,
-                contentType: e.target.value as "RESOURCE" | "NORMAL" | "BOUNTY",
-              }))
-            }
-          >
-            {CONTENT_TYPE_OPTIONS.slice(1).map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </Select>
-          <Input
-            className="admin-input"
-            placeholder="排序值"
-            type="number"
-            inputMode="numeric"
-            value={form.sort}
-            onChange={(e) =>
-              setForm((prev) => ({ ...prev, sort: e.target.value }))
-            }
-          />
+        <div style={{ display: "grid", gap: 10 }}>
+          <div className="coin-modal-field">
+            <label className="coin-modal-label">分类名称</label>
+            <Input
+              className="admin-input"
+              placeholder="输入分类名称"
+              value={form.name}
+              onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+            />
+          </div>
+          <div className="coin-modal-field">
+            <label className="coin-modal-label">帖子类型</label>
+            <Select
+              className="admin-input"
+              value={form.contentType}
+              onChange={(e) => setForm((p) => ({ ...p, contentType: e.target.value as "RESOURCE" | "NORMAL" | "BOUNTY" }))}
+            >
+              {CONTENT_TYPE_OPTIONS.map((item) => (
+                <option key={item.value} value={item.value}>{item.label}</option>
+              ))}
+            </Select>
+          </div>
+          <div className="coin-modal-field">
+            <label className="coin-modal-label">排序值</label>
+            <Input
+              className="admin-input"
+              inputMode="numeric"
+              placeholder="数值越小排越前"
+              value={form.sort}
+              onChange={(e) => setForm((p) => ({ ...p, sort: e.target.value }))}
+            />
+          </div>
         </div>
       </ConfirmDialog>
     </main>
