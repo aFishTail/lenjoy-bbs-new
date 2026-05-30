@@ -9,12 +9,13 @@ from sqlalchemy import delete, func, select
 os.environ["DATABASE_URL"] = "sqlite://"
 
 from lenjoy_bbs.main import app
+from lenjoy_bbs.core.tokens import create_access_token
 from lenjoy_bbs.db.session import SessionLocal
 from lenjoy_bbs.modules.messages.models import SiteMessage
 from lenjoy_bbs.modules.posts.models import Post, PostComment, PostFavorite, PostLike, PostTag
 from lenjoy_bbs.modules.reports.models import BountyDeleteRequest, PostReport, ResourceAppeal
 from lenjoy_bbs.modules.taxonomy.models import Category, Tag
-from lenjoy_bbs.modules.users.models import UserAccount
+from lenjoy_bbs.modules.users.models import Role, UserAccount, UserRole
 from lenjoy_bbs.modules.wallet.models import Wallet
 
 API_PREFIX = "/api/v1"
@@ -60,6 +61,23 @@ def register_user(client: TestClient, username: str, email: str) -> str:
     assert payload["data"]["user"]["username"] == username
     assert payload["data"]["user"]["nickname"] == username
     return payload["data"]["accessToken"]
+
+
+def register_admin_user(client: TestClient, username: str, email: str) -> str:
+    register_user(client, username, email)
+
+    async def _promote() -> str:
+        async with SessionLocal() as db:
+            user = await db.scalar(
+                select(UserAccount).where(UserAccount.username == username))
+            role = await db.scalar(select(Role).where(Role.role_code == "ADMIN"))
+            assert user is not None
+            assert role is not None
+            db.add(UserRole(user_id=user.id, role_id=role.id))
+            await db.commit()
+            return create_access_token(user, ["ADMIN"])
+
+    return asyncio.run(_promote())
 
 
 def remove_wallet(username: str) -> None:
@@ -1097,6 +1115,198 @@ def test_bounty_delete_request_duplicate_pending_rejected(client):
 
     assert response.status_code == 400
     assert payload["error"]["code"] == "BOUNTY_DELETE_REQUEST_PENDING"
+
+
+def test_admin_approves_bounty_delete_request_soft_deletes_post_and_notifies_author(
+        client):
+    author_token = register_user(client, "bounty-admin-approve-author",
+                                 "bounty-admin-approve-author@example.com")
+    answerer_token = register_user(client, "bounty-admin-approve-answerer",
+                                   "bounty-admin-approve-answerer@example.com")
+    admin_token = register_admin_user(client, "bounty-admin-approve-admin",
+                                      "bounty-admin-approve-admin@example.com")
+    post_id = create_bounty_post_with_external_answer(
+        client, author_token, answerer_token, "Approve delete request bounty")
+    request_response = client.post(
+        f"{API_PREFIX}/posts/{post_id}/bounty-delete-requests",
+        headers=bearer(author_token),
+        json={"reason": "question duplicated"},
+    )
+    request_id = unwrap(request_response)["data"]["id"]
+
+    review_response = client.patch(
+        f"{API_PREFIX}/admin/bounty-delete-requests/{request_id}",
+        headers=bearer(admin_token),
+        json={
+            "action": "APPROVE",
+            "resolutionNote": "approved",
+        },
+    )
+
+    assert review_response.status_code == 200
+    payload = unwrap(review_response)
+    assert payload["data"]["status"] == "APPROVED"
+    assert client.get(f"{API_PREFIX}/posts/{post_id}").status_code == 404
+    messages = unwrap(
+        client.get(f"{API_PREFIX}/users/me/messages",
+                   headers=bearer(author_token)))["data"]
+    assert any(item["messageType"] == "BOUNTY_DELETE_REQUEST_APPROVED"
+               for item in messages)
+
+    second_review_response = client.patch(
+        f"{API_PREFIX}/admin/bounty-delete-requests/{request_id}",
+        headers=bearer(admin_token),
+        json={"action": "REJECT"},
+    )
+    second_review_payload = unwrap(second_review_response)
+    assert second_review_response.status_code == 400
+    assert second_review_payload["error"][
+        "code"] == "BOUNTY_DELETE_REQUEST_ALREADY_HANDLED"
+
+
+def test_admin_rejects_bounty_delete_request_keeps_post_visible(client):
+    author_token = register_user(client, "bounty-admin-reject-author",
+                                 "bounty-admin-reject-author@example.com")
+    answerer_token = register_user(client, "bounty-admin-reject-answerer",
+                                   "bounty-admin-reject-answerer@example.com")
+    admin_token = register_admin_user(client, "bounty-admin-reject-admin",
+                                      "bounty-admin-reject-admin@example.com")
+    post_id = create_bounty_post_with_external_answer(
+        client, author_token, answerer_token, "Reject delete request bounty")
+    request_response = client.post(
+        f"{API_PREFIX}/posts/{post_id}/bounty-delete-requests",
+        headers=bearer(author_token),
+        json={"reason": "still useful"},
+    )
+    request_id = unwrap(request_response)["data"]["id"]
+
+    review_response = client.patch(
+        f"{API_PREFIX}/admin/bounty-delete-requests/{request_id}",
+        headers=bearer(admin_token),
+        json={
+            "action": "REJECT",
+            "resolutionNote": "keep visible",
+        },
+    )
+
+    assert review_response.status_code == 200
+    payload = unwrap(review_response)
+    assert payload["data"]["status"] == "REJECTED"
+    assert client.get(f"{API_PREFIX}/posts/{post_id}").status_code == 200
+    messages = unwrap(
+        client.get(f"{API_PREFIX}/users/me/messages",
+                   headers=bearer(author_token)))["data"]
+    assert any(item["messageType"] == "BOUNTY_DELETE_REQUEST_REJECTED"
+               for item in messages)
+
+
+def test_admin_rejects_approval_when_bounty_delete_request_is_resolved(
+        client):
+    author_token = register_user(client, "bounty-admin-resolved-author",
+                                 "bounty-admin-resolved-author@example.com")
+    answerer_token = register_user(client, "bounty-admin-resolved-answerer",
+                                   "bounty-admin-resolved-answerer@example.com")
+    admin_token = register_admin_user(client, "bounty-admin-resolved-admin",
+                                      "bounty-admin-resolved-admin@example.com")
+    create_response = client.post(
+        f"{API_PREFIX}/posts",
+        headers=bearer(author_token),
+        json={
+            "postType": "BOUNTY",
+            "title": "Resolved delete request bounty",
+            "content": "question body",
+            "bountyAmount": 25,
+            "bountyExpireAt": future_utc_timestamp(),
+        },
+    )
+    post_id = unwrap(create_response)["data"]["id"]
+    answer_response = client.post(
+        f"{API_PREFIX}/posts/{post_id}/comments",
+        headers=bearer(answerer_token),
+        json={"content": "candidate answer"},
+    )
+    comment_id = unwrap(answer_response)["data"]["id"]
+    request_response = client.post(
+        f"{API_PREFIX}/posts/{post_id}/bounty-delete-requests",
+        headers=bearer(author_token),
+        json={"reason": "please remove after review"},
+    )
+    request_id = unwrap(request_response)["data"]["id"]
+    accept_response = client.post(
+        f"{API_PREFIX}/posts/{post_id}/comments/{comment_id}/accept",
+        headers=bearer(author_token),
+    )
+    assert accept_response.status_code == 200
+
+    review_response = client.patch(
+        f"{API_PREFIX}/admin/bounty-delete-requests/{request_id}",
+        headers=bearer(admin_token),
+        json={"action": "APPROVE"},
+    )
+    review_payload = unwrap(review_response)
+    detail_payload = unwrap(
+        client.get(f"{API_PREFIX}/posts/{post_id}",
+                   headers=bearer(author_token)))
+
+    async def request_status() -> str | None:
+        async with SessionLocal() as db:
+            return await db.scalar(
+                select(BountyDeleteRequest.status).where(
+                    BountyDeleteRequest.id == request_id))
+
+    assert review_response.status_code == 400
+    assert review_payload["error"][
+        "code"] == "BOUNTY_DELETE_REQUEST_NOT_APPROVABLE"
+    assert detail_payload["data"]["bountyStatus"] == "RESOLVED"
+    assert detail_payload["data"]["acceptedCommentId"] == comment_id
+    assert asyncio.run(request_status()) == "PENDING"
+
+
+def test_admin_lists_bounty_delete_requests_with_filters(client):
+    author_token = register_user(client, "bounty-admin-list-author",
+                                 "bounty-admin-list-author@example.com")
+    answerer_token = register_user(client, "bounty-admin-list-answerer",
+                                   "bounty-admin-list-answerer@example.com")
+    admin_token = register_admin_user(client, "bounty-admin-list-admin",
+                                      "bounty-admin-list-admin@example.com")
+    post_id = create_bounty_post_with_external_answer(
+        client, author_token, answerer_token, "Filterable delete bounty")
+    request_response = client.post(
+        f"{API_PREFIX}/posts/{post_id}/bounty-delete-requests",
+        headers=bearer(author_token),
+        json={"reason": "filterable reason"},
+    )
+    request_id = unwrap(request_response)["data"]["id"]
+
+    list_response = client.get(
+        f"{API_PREFIX}/admin/bounty-delete-requests",
+        headers=bearer(admin_token),
+        params={
+            "status": "PENDING",
+            "keyword": "Filterable",
+        },
+    )
+    miss_response = client.get(
+        f"{API_PREFIX}/admin/bounty-delete-requests",
+        headers=bearer(admin_token),
+        params={
+            "status": "APPROVED",
+            "keyword": "Filterable",
+        },
+    )
+    payload = unwrap(list_response)
+    miss_payload = unwrap(miss_response)
+
+    assert list_response.status_code == 200
+    assert miss_response.status_code == 200
+    assert miss_payload["data"] == []
+    assert len(payload["data"]) == 1
+    item = payload["data"][0]
+    assert item["id"] == request_id
+    assert item["status"] == "PENDING"
+    assert item["postId"] == post_id
+    assert item["reason"] == "filterable reason"
+    assert item["answerCount"] == 1
 
 
 def test_bounty_author_can_submit_delete_request_report(client):
