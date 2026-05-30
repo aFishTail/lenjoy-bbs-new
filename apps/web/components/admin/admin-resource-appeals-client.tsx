@@ -21,7 +21,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-const statusOptions = ["", "PENDING", "APPROVED", "REJECTED"] as const;
+const statusOptions: { label: string; value: string }[] = [
+  { label: "全部状态", value: "" },
+  { label: "待处理", value: "PENDING" },
+  { label: "已退款", value: "APPROVED" },
+  { label: "已驳回", value: "REJECTED" },
+];
 
 type AppealDialog =
   | { item: ResourceAppeal; action: "APPROVE" }
@@ -110,7 +115,7 @@ export function AdminResourceAppealsClient() {
             onChange={(event) => setStatus(event.target.value)}
           >
             {statusOptions.map((option) => (
-              <option key={option || "ALL"} value={option}>{option || "全部状态"}</option>
+              <option key={option.value || "ALL"} value={option.value}>{option.label}</option>
             ))}
           </Select>
           <Input

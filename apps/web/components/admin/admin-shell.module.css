@@ -314,6 +314,23 @@
   background: #dbeafe;
 }
 
+.shell :global(.admin-tag) {
+  display: inline-block;
+  border-radius: 5px;
+  padding: 2px 7px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #475569;
+  background: #f1f5f9;
+  margin: 1px 2px 1px 0;
+  line-height: 1.5;
+}
+
+.shell :global(.admin-tag.is-category) {
+  color: #6d28d9;
+  background: #ede9fe;
+}
+
 .shell :global(.admin-loading),
 .shell :global(.admin-empty) {
   padding: 24px;

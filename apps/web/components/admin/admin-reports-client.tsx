@@ -21,8 +21,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-const statusOptions = ["", "PENDING", "VALID", "INVALID", "PUNISHED"] as const;
-const targetOptions = ["", "POST", "COMMENT"] as const;
+const statusOptions: { label: string; value: string }[] = [
+  { label: "全部状态", value: "" },
+  { label: "待处理", value: "PENDING" },
+  { label: "有效", value: "VALID" },
+  { label: "无效", value: "INVALID" },
+  { label: "已处罚", value: "PUNISHED" },
+];
+const targetOptions: { label: string; value: string }[] = [
+  { label: "全部目标", value: "" },
+  { label: "帖子", value: "POST" },
+  { label: "评论", value: "COMMENT" },
+];
 
 type ReviewDialog = {
   item: ReportItem;
@@ -105,12 +115,12 @@ export function AdminReportsClient() {
         <div className="admin-filter-grid">
           <Select className="admin-input" value={status} onChange={(e) => setStatus(e.target.value)}>
             {statusOptions.map((option) => (
-              <option key={option || "ALL"} value={option}>{option || "全部状态"}</option>
+              <option key={option.value || "ALL"} value={option.value}>{option.label}</option>
             ))}
           </Select>
           <Select className="admin-input" value={targetType} onChange={(e) => setTargetType(e.target.value)}>
             {targetOptions.map((option) => (
-              <option key={option || "ALL"} value={option}>{option || "全部目标"}</option>
+              <option key={option.value || "ALL"} value={option.value}>{option.label}</option>
             ))}
           </Select>
           <Input

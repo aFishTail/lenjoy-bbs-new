@@ -25,7 +25,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-const bountyStatuses = ["", "ACTIVE", "RESOLVED", "EXPIRED"] as const;
+const bountyStatuses: { label: string; value: string }[] = [
+  { label: "全部状态", value: "" },
+  { label: "进行中", value: "ACTIVE" },
+  { label: "已结算", value: "RESOLVED" },
+  { label: "已过期", value: "EXPIRED" },
+];
 
 function flattenComments(items: PostComment[]) {
   return items.flatMap((item) => [item, ...(item.replies || [])]);
@@ -98,7 +103,7 @@ export function AdminBountiesClient() {
             onChange={(event) => setStatus(event.target.value)}
           >
             {bountyStatuses.map((option) => (
-              <option key={option || "ALL"} value={option}>{option || "全部悬赏状态"}</option>
+              <option key={option.value || "ALL"} value={option.value}>{option.label}</option>
             ))}
           </Select>
           <Input

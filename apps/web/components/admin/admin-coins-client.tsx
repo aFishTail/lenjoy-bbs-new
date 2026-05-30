@@ -21,7 +21,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-const statusOptions = ["", "ACTIVE", "MUTED", "BANNED"] as const;
+const statusOptions: { label: string; value: string }[] = [
+  { label: "全部状态", value: "" },
+  { label: "正常", value: "ACTIVE" },
+  { label: "禁言", value: "MUTED" },
+  { label: "封禁", value: "BANNED" },
+];
 
 type CoinModalState = {
   user: AdminCoinUserSummary;
@@ -104,7 +109,7 @@ export function AdminCoinsClient() {
             onChange={(e) => setStatus(e.target.value)}
           >
             {statusOptions.map((option) => (
-              <option key={option || "ALL"} value={option}>{option || "全部状态"}</option>
+              <option key={option.value || "ALL"} value={option.value}>{option.label}</option>
             ))}
           </Select>
           <Input
