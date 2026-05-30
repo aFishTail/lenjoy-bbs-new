@@ -8,12 +8,15 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { uploadImage } from "@/lib/upload-client";
+import { cn } from "@/lib/utils";
+import styles from "./rich-text.module.css";
 
 type Props = {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   minHeightClassName?: string;
+  invalid?: boolean;
 };
 
 export function RichTextEditor({
@@ -21,6 +24,7 @@ export function RichTextEditor({
   onChange,
   placeholder,
   minHeightClassName = "min-h-[220px]",
+  invalid = false,
 }: Props) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploadError, setUploadError] = useState("");
@@ -44,7 +48,8 @@ export function RichTextEditor({
     },
     editorProps: {
       attributes: {
-        class: `rich-editor-content ${minHeightClassName}`,
+        class: `${styles.content} ${minHeightClassName}`,
+        "aria-label": placeholder || "请输入内容...",
       },
     },
   });
@@ -107,19 +112,25 @@ export function RichTextEditor({
   }
 
   return (
-    <div className="rounded-xl border border-(--border-medium) bg-white/50 overflow-hidden">
-      <div className="rich-editor-toolbar">
+    <div
+      aria-invalid={invalid}
+      className={cn(
+        "overflow-hidden rounded-xl border border-(--border-medium) bg-white/50 transition-colors",
+        "field-error-control",
+      )}
+    >
+      <div className={styles.toolbar}>
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleBold().run()}
-          className={editor.isActive("bold") ? "is-active" : ""}
+          className={editor.isActive("bold") ? styles.isActive : ""}
         >
           粗体
         </button>
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleItalic().run()}
-          className={editor.isActive("italic") ? "is-active" : ""}
+          className={editor.isActive("italic") ? styles.isActive : ""}
         >
           斜体
         </button>
@@ -129,7 +140,7 @@ export function RichTextEditor({
             editor.chain().focus().toggleHeading({ level: 2 }).run()
           }
           className={
-            editor.isActive("heading", { level: 2 }) ? "is-active" : ""
+            editor.isActive("heading", { level: 2 }) ? styles.isActive : ""
           }
         >
           H2
@@ -137,32 +148,32 @@ export function RichTextEditor({
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleBulletList().run()}
-          className={editor.isActive("bulletList") ? "is-active" : ""}
+          className={editor.isActive("bulletList") ? styles.isActive : ""}
         >
           列表
         </button>
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleBlockquote().run()}
-          className={editor.isActive("blockquote") ? "is-active" : ""}
+          className={editor.isActive("blockquote") ? styles.isActive : ""}
         >
           引用
         </button>
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-          className={editor.isActive("codeBlock") ? "is-active" : ""}
+          className={editor.isActive("codeBlock") ? styles.isActive : ""}
         >
           代码块
         </button>
         <button
           type="button"
           onClick={setLink}
-          className={editor.isActive("link") ? "is-active" : ""}
+          className={editor.isActive("link") ? styles.isActive : ""}
         >
           链接
         </button>
-        <label className="rich-editor-upload-btn">
+        <label className={styles.uploadButton}>
           图片
           <input
             ref={fileInputRef}

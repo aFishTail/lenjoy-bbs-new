@@ -7,6 +7,8 @@ import { readError } from "@/components/post/client-helpers";
 import { PostCardStats } from "@/components/post/post-card-stats";
 import { PaginationControls } from "@/components/post/pagination-controls";
 import { useMyPostsQuery } from "@/components/post/use-post-queries";
+import pageStyles from "@/components/my/my-pages.module.css";
+import styles from "./post-list.module.css";
 
 const PAGE_SIZE = 20;
 
@@ -43,22 +45,25 @@ export function MyPostsClient() {
       case "BOUNTY":
         return "悬赏";
       default:
-        return "普通";
+        return "讨论";
     }
   };
 
   return (
-    <main className="page">
+    <main className={`${pageStyles.wideShell} ${pageStyles.stack}`}>
       <div className="mb-4">
-        <Link href="/" className="nav-link">
+        <Link
+          href="/"
+          className={pageStyles.plainLink}
+        >
           返回首页
         </Link>
       </div>
 
-      <section className="card-hero mb-6">
-        <div className="hero-content">
-          <h1 className="hero-title">我的帖子</h1>
-          <p className="hero-subtitle">查看和管理你发布的所有内容</p>
+      <section className={pageStyles.intro}>
+        <div>
+          <h1>我的帖子</h1>
+          <p>查看你发布过的讨论、资源与悬赏。</p>
         </div>
       </section>
 
@@ -85,15 +90,14 @@ export function MyPostsClient() {
               <Link
                 key={post.id}
                 href={`/posts/${post.id}`}
-                className="post-item"
+                className={styles.item}
               >
-                <div className="post-item-header">
+                <div className={styles.header}>
                   <span className={getBadgeClass(post.postType)}>
                     {getTypeText(post.postType)}
                   </span>
-                  <span className="badge badge-info">{post.status}</span>
                 </div>
-                <h3 className="post-item-title">{post.title}</h3>
+                <h3 className={styles.title}>{post.title}</h3>
                 <PostCardStats
                   viewCount={post.viewCount}
                   commentCount={post.commentCount}

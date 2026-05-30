@@ -36,12 +36,13 @@ export type TagSummary = {
 };
 
 export type AuthData = {
-  token: string;
+  accessToken: string;
   tokenType: string;
   expiresIn: number;
   user: {
     id: number;
     username: string;
+    nickname?: string | null;
     email?: string;
     phone?: string;
     avatarUrl?: string | null;
@@ -53,6 +54,7 @@ export type AuthData = {
 export type MyProfile = {
   id: number;
   username: string;
+  nickname: string;
   email?: string | null;
   phone?: string | null;
   avatarUrl?: string | null;
@@ -60,6 +62,19 @@ export type MyProfile = {
   postCount: number;
   followingCount: number;
   followerCount: number;
+};
+
+export type PublicUserProfile = {
+  id: number;
+  username: string;
+  nickname: string;
+  avatarUrl?: string | null;
+  bio?: string | null;
+  postCount: number;
+  followingCount: number;
+  followerCount: number;
+  followedByMe: boolean;
+  isSelf: boolean;
 };
 
 export type WalletSummary = {
@@ -71,7 +86,7 @@ export type WalletSummary = {
 
 export type WalletLedgerItem = {
   id: number;
-  direction: "INCOME" | "EXPENSE" | "FREEZE" | "UNFREEZE";
+  direction: "IN" | "OUT" | "FREEZE" | "UNFREEZE" | "INCOME" | "EXPENSE";
   changeAmount: number;
   balanceAfter: number;
   frozenAfter: number;
@@ -123,6 +138,7 @@ export type PostDetail = {
   likeCount?: number;
   collectCount?: number;
   commentCount?: number;
+  answerCount?: number;
   liked?: boolean;
   collected?: boolean;
   resourceUnlocked?: boolean;
@@ -173,6 +189,22 @@ export type ResourceAppeal = {
   updatedAt: string;
 };
 
+export type BountyDeleteRequestItem = {
+  id: number;
+  postId: number;
+  postTitle?: string | null;
+  authorId: number;
+  authorUsername?: string | null;
+  reason: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  resolutionNote?: string | null;
+  handledBy?: number | null;
+  createdAt: string;
+  handledAt?: string | null;
+  bountyAmount?: number | null;
+  answerCount?: number;
+};
+
 export type SiteMessage = {
   id: number;
   messageType: string;
@@ -192,6 +224,7 @@ export type SiteMessage = {
 export type AdminUserSummary = {
   id: number;
   username: string;
+  nickname: string;
   email?: string;
   phone?: string;
   status: "ACTIVE" | "MUTED" | "BANNED";
@@ -203,6 +236,7 @@ export type AdminUserSummary = {
 export type AdminCoinUserSummary = {
   id: number;
   username: string;
+  nickname?: string | null;
   email?: string;
   phone?: string;
   status: "ACTIVE" | "MUTED" | "BANNED";
@@ -221,8 +255,10 @@ export type PostComment = {
   parentId?: number | null;
   replyToUserId?: number | null;
   replyToUsername?: string | null;
-  content: string;
-  accepted: boolean;
+  content?: string | null;
+  isAccepted: boolean;
+  canViewContent?: boolean;
+  maskedSummary?: string | null;
   deleted: boolean;
   deletedReason?: string | null;
   likeCount?: number;
@@ -246,6 +282,7 @@ export type ToggleFollowResponse = {
 export type UserRelation = {
   id: number;
   username: string;
+  nickname: string;
   avatarUrl?: string | null;
   followedAt: string;
 };

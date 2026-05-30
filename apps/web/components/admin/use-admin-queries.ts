@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { queryKeys, requestApiData } from "@/components/post/client-helpers";
 import type {
   AdminBountySummary,
+  BountyDeleteRequestItem,
   CategorySummary,
   AdminCoinUserSummary,
   AdminDashboardMetrics,
@@ -50,6 +51,11 @@ export type AdminCoinsFilters = {
 };
 
 export type AdminBountiesFilters = {
+  status: string;
+  keyword: string;
+};
+
+export type AdminBountyDeleteRequestsFilters = {
   status: string;
   keyword: string;
 };
@@ -254,6 +260,24 @@ export function useAdminBountiesQuery(filters: AdminBountiesFilters) {
       const query = buildSearchParams(filters);
       return requestApiData<AdminBountySummary[]>(
         `/api/admin/bounties${query ? `?${query}` : ""}`,
+        {
+          withAuth: true,
+          cache: "no-store",
+        },
+      );
+    },
+  });
+}
+
+export function useAdminBountyDeleteRequestsQuery(
+  filters: AdminBountyDeleteRequestsFilters,
+) {
+  return useQuery({
+    queryKey: queryKeys.adminBountyDeleteRequests(filters),
+    queryFn: () => {
+      const query = buildSearchParams(filters);
+      return requestApiData<BountyDeleteRequestItem[]>(
+        `/api/admin/bounty-delete-requests${query ? `?${query}` : ""}`,
         {
           withAuth: true,
           cache: "no-store",

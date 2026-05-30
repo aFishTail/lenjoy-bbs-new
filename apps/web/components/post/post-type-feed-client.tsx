@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { readError } from "@/components/post/client-helpers";
 import { PaginationControls } from "@/components/post/pagination-controls";
@@ -14,6 +14,7 @@ import type {
   PostSummary,
   TagSummary,
 } from "@/components/post/types";
+import styles from "./post-list.module.css";
 import {
   useCategoriesQuery,
   useHotTagsQuery,
@@ -24,7 +25,6 @@ type PostType = "NORMAL" | "RESOURCE" | "BOUNTY";
 type PostTypeFeedClientProps = {
   postType: PostType;
   title: string;
-  subtitle: string;
   initialPosts?: PaginatedResponse<PostSummary> | null;
   initialCategories?: CategorySummary[] | null;
   initialHotTags?: TagSummary[] | null;
@@ -56,14 +56,13 @@ function getTypeText(type: PostType) {
     case "BOUNTY":
       return "悬赏";
     default:
-      return "普通";
+      return "讨论";
   }
 }
 
 export function PostTypeFeedClient({
   postType,
   title,
-  subtitle,
   initialPosts,
   initialCategories,
   initialHotTags,
@@ -105,11 +104,6 @@ export function PostTypeFeedClient({
   const posts = postsPage?.items ?? [];
   const loading = postsQuery.isLoading;
 
-  const navItems = useMemo(
-    () => [navByType.NORMAL, navByType.RESOURCE, navByType.BOUNTY],
-    [],
-  );
-
   function updateFilters(next: {
     categoryId?: string;
     tagId?: string;
@@ -145,73 +139,55 @@ export function PostTypeFeedClient({
 
   return (
     <main className="page">
-      <section className="card-hero mb-6">
-        <div className="hero-content">
-          <h1 className="hero-title">{title}</h1>
-          <p className="hero-subtitle">{subtitle}</p>
-          <div className="flex gap-2 mt-6" role="tablist" aria-label="帖子频道">
-            {navItems.map((item) => {
-              const isActive = item.href === navByType[postType].href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`tab ${isActive ? "active" : ""}`}
-                  aria-current={isActive ? "page" : undefined}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      <section className="card mb-6">
-        <div className="grid gap-4">
+      <section className={`${styles.filterPanel} mb-6`}>
+        <div className="flex flex-col gap-4 w-full overflow-hidden">
           <div>
             <label className="block text-sm mb-2">分类</label>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                className={`tab ${!categoryId ? "active" : ""}`}
-                onClick={() => updateFilters({ categoryId: "" })}
-              >
-                全部
-              </button>
-              {(categoriesQuery.data ?? []).map((category) => (
+            <div className={styles.scrollContainer}>
+              <div className={styles.scrollRow}>
                 <button
-                  key={category.id}
                   type="button"
-                  className={`tab ${categoryId === String(category.id) ? "active" : ""}`}
-                  onClick={() => updateFilters({ categoryId: String(category.id) })}
+                  className={`${styles.filterChip} ${!categoryId ? styles.filterChipActive : ""}`}
+                  onClick={() => updateFilters({ categoryId: "" })}
                 >
-                  {category.name}
+                  全部
                 </button>
-              ))}
+                {(categoriesQuery.data ?? []).map((category) => (
+                  <button
+                    key={category.id}
+                    type="button"
+                    className={`${styles.filterChip} ${categoryId === String(category.id) ? styles.filterChipActive : ""}`}
+                    onClick={() => updateFilters({ categoryId: String(category.id) })}
+                  >
+                    {category.name}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
           <div>
             <label className="block text-sm mb-2">热门标签</label>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                className={`tab ${!tagId ? "active" : ""}`}
-                onClick={() => updateFilters({ tagId: "" })}
-              >
-                全部
-              </button>
-              {(hotTagsQuery.data ?? []).map((tag) => (
+            <div className={styles.scrollContainer}>
+              <div className={styles.scrollRow}>
                 <button
-                  key={tag.id}
                   type="button"
-                  className={`tab ${tagId === String(tag.id) ? "active" : ""}`}
-                  onClick={() => updateFilters({ tagId: String(tag.id) })}
+                  className={`${styles.filterChip} ${!tagId ? styles.filterChipActive : ""}`}
+                  onClick={() => updateFilters({ tagId: "" })}
                 >
-                  #{tag.name}
+                  全部
                 </button>
-              ))}
+                {(hotTagsQuery.data ?? []).map((tag) => (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    className={`${styles.filterChip} ${tagId === String(tag.id) ? styles.filterChipActive : ""}`}
+                    onClick={() => updateFilters({ tagId: String(tag.id) })}
+                  >
+                    #{tag.name}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -237,21 +213,20 @@ export function PostTypeFeedClient({
               <Link
                 key={post.id}
                 href={`/posts/${post.id}`}
-                className="post-item"
+                className={styles.item}
               >
-                <div className="post-item-header">
+                <div className={styles.header}>
                   <span className={getBadgeClass(post.postType)}>
                     {getTypeText(post.postType)}
                   </span>
-                  <span className="badge badge-info">{post.status}</span>
                   {post.categoryName ? (
                     <span className="badge badge-warning">{post.categoryName}</span>
                   ) : null}
-                  <span className="post-item-meta">
+                  <span className={styles.meta}>
                     by {post.authorUsername || post.authorId}
                   </span>
                 </div>
-                <h3 className="post-item-title">{post.title}</h3>
+                <h3 className={styles.title}>{post.title}</h3>
                 {post.tags?.length ? (
                   <div className="flex flex-wrap gap-2 mb-3">
                     {post.tags.slice(0, 4).map((tag) => (

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -33,13 +34,19 @@ export function PostCommentSection({ postId }: Props) {
   const [commentText, setCommentText] = useState("");
   const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({});
   const [submittingComment, setSubmittingComment] = useState(false);
-  const [acceptingCommentId, setAcceptingCommentId] = useState<number | null>(null);
+  const [acceptingCommentId, setAcceptingCommentId] = useState<number | null>(
+    null,
+  );
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deleteTargetCommentId, setDeleteTargetCommentId] = useState<number | null>(null);
+  const [deleteTargetCommentId, setDeleteTargetCommentId] = useState<
+    number | null
+  >(null);
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [reportReason, setReportReason] = useState("");
   const [reportDetail, setReportDetail] = useState("");
-  const [reportTargetCommentId, setReportTargetCommentId] = useState<number | null>(null);
+  const [reportTargetCommentId, setReportTargetCommentId] = useState<
+    number | null
+  >(null);
 
   const postQuery = usePostDetailQuery(postId);
   const commentsQuery = usePostCommentsQuery(postId);
@@ -58,11 +65,48 @@ export function PostCommentSection({ postId }: Props) {
   }
 
   const isAuthor = !!auth && auth.user.id === post.authorId;
+  const visibleTopLevelCount = comments.length;
+  const bountyAnswerCount =
+    post.postType === "BOUNTY"
+      ? (post.answerCount ?? visibleTopLevelCount)
+      : visibleTopLevelCount;
+  const hasOwnVisibleAnswer = comments.some(
+    (comment) =>
+      !!auth &&
+      comment.authorId === auth.user.id &&
+      comment.canViewContent !== false,
+  );
+  const showsAcceptedAnswer = comments.some((comment) => comment.isAccepted);
+  const shouldShowBountyVisibilityHint =
+    post.postType === "BOUNTY" && !isAuthor && bountyAnswerCount > 0;
   const canSubmitBountyAnswer =
     post.postType === "BOUNTY" &&
     post.bountyStatus === "ACTIVE" &&
     !!auth &&
     auth.user.id !== post.authorId;
+  let bountyVisibilityHint: string | null = null;
+
+  if (shouldShowBountyVisibilityHint) {
+    bountyVisibilityHint = `当前共有 ${bountyAnswerCount} 人参与回答，具体内容仅发帖人和答题者本人可见。`;
+
+    if (post.bountyStatus === "RESOLVED") {
+      bountyVisibilityHint =
+        hasOwnVisibleAnswer && showsAcceptedAnswer
+          ? `当前共有 ${bountyAnswerCount} 人参与回答。页面会展示最佳答案，你也可以继续查看自己提交的回答，其余回答不对外展示。`
+          : `当前共有 ${bountyAnswerCount} 人参与回答。页面仅展示最佳答案，其余回答不对外展示。`;
+    } else if (hasOwnVisibleAnswer) {
+      bountyVisibilityHint = `当前共有 ${bountyAnswerCount} 人参与回答。你当前只能查看自己提交的答案。`;
+    }
+  }
+
+  function renderCommentBody(content?: string | null) {
+    return (
+      <RichTextContent
+        html={content || "<p>内容暂不可见</p>"}
+        className="leading-7"
+      />
+    );
+  }
 
   async function submitComment(parentId?: number) {
     const contentValue = parentId
@@ -189,12 +233,16 @@ export function PostCommentSection({ postId }: Props) {
   return (
     <>
       <section className="card mb-4">
-        <div className="flex-between mb-4">
+        <div className="mb-4 flex items-center justify-between">
           <h2 className="section-title">
             {post.postType === "BOUNTY" ? "候选答案" : "评论区"}
           </h2>
           <span className="text-sm text-slate-500">
-            {comments.length} 条一级{post.postType === "BOUNTY" ? "答案" : "评论"}
+            {post.postType === "BOUNTY"
+              ? bountyAnswerCount
+              : visibleTopLevelCount}{" "}
+            条一级
+            {post.postType === "BOUNTY" ? "答案" : "评论"}
           </span>
         </div>
 
@@ -220,7 +268,9 @@ export function PostCommentSection({ postId }: Props) {
               </div>
             </div>
           ) : !auth ? (
-            <div className="banner banner-info mb-6">登录后可参与回答悬赏问题。</div>
+            <div className="banner banner-info mb-6">
+              登录后可参与回答悬赏问题。
+            </div>
           ) : null
         ) : (
           <div className="mb-6 rounded-2xl border border-[var(--border-light)] bg-white/70 p-4">
@@ -244,9 +294,21 @@ export function PostCommentSection({ postId }: Props) {
           </div>
         )}
 
+        {bountyVisibilityHint ? (
+          <div className="mb-4 rounded-2xl border border-dashed border-[var(--border-light)] bg-slate-50 px-4 py-5 text-sm text-slate-500">
+            {bountyVisibilityHint}
+          </div>
+        ) : null}
+
         <div className="space-y-4">
           {comments.length === 0 ? (
-            <div className="text-sm text-slate-500">暂无内容</div>
+            shouldShowBountyVisibilityHint ? (
+              <div className="text-sm text-slate-500">
+                当前暂无你可查看的答案
+              </div>
+            ) : (
+              <div className="text-sm text-slate-500">暂无内容</div>
+            )
           ) : (
             comments.map((comment) => (
               <div
@@ -254,75 +316,90 @@ export function PostCommentSection({ postId }: Props) {
                 className="rounded-2xl border border-[var(--border-light)] bg-white/80 p-4"
               >
                 <div className="mb-3 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-                  <span className="font-medium text-slate-800">
+                  <Link
+                    href={`/users/${comment.authorId}`}
+                    className="font-medium text-slate-800 no-underline hover:text-[var(--color-primary)]"
+                  >
                     {comment.authorUsername || comment.authorId}
+                  </Link>
+                  <span>
+                    {new Date(comment.createdAt).toLocaleString("zh-CN")}
                   </span>
-                  <span>{new Date(comment.createdAt).toLocaleString("zh-CN")}</span>
-                  {comment.accepted ? (
+                  {comment.isAccepted ? (
                     <span className="badge badge-success">已采纳</span>
                   ) : null}
                 </div>
 
-                <RichTextContent
-                  html={comment.deleted ? "<p>该评论已删除</p>" : comment.content}
-                  className="leading-7"
-                />
+                {comment.deleted ? (
+                  renderCommentBody("<p>该评论已删除</p>")
+                ) : comment.canViewContent === false ? (
+                  <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                    {comment.maskedSummary || "该答案当前不可见"}
+                  </div>
+                ) : (
+                  renderCommentBody(comment.content)
+                )}
 
-                <div className="mt-4 flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => void toggleCommentLike(comment.id)}
-                  >
-                    点赞 {comment.likeCount || 0}
-                    {comment.liked ? " (已赞)" : ""}
-                  </button>
-                  {post.postType === "BOUNTY" &&
-                  isAuthor &&
-                  post.bountyStatus === "ACTIVE" &&
-                  !comment.accepted ? (
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      disabled={acceptingCommentId === comment.id}
-                      onClick={() => void acceptAnswer(comment.id)}
-                    >
-                      {acceptingCommentId === comment.id ? "采纳中..." : "采纳答案"}
-                    </button>
-                  ) : null}
-                  {!!auth ? (
+                {comment.canViewContent === false ? null : (
+                  <div className="mt-4 flex flex-wrap gap-3">
                     <button
                       type="button"
                       className="btn btn-ghost btn-sm"
-                      onClick={() =>
-                        setReplyDrafts((prev) => ({
-                          ...prev,
-                          [comment.id]: prev[comment.id] || "",
-                        }))
-                      }
+                      onClick={() => void toggleCommentLike(comment.id)}
                     >
-                      追问 / 回复
+                      点赞 {comment.likeCount || 0}
+                      {comment.liked ? " (已赞)" : ""}
                     </button>
-                  ) : null}
-                  {!!auth && auth.user.id === comment.authorId ? (
+                    {post.postType === "BOUNTY" &&
+                    isAuthor &&
+                    post.bountyStatus === "ACTIVE" &&
+                    !comment.isAccepted ? (
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        disabled={acceptingCommentId === comment.id}
+                        onClick={() => void acceptAnswer(comment.id)}
+                      >
+                        {acceptingCommentId === comment.id
+                          ? "采纳中..."
+                          : "采纳答案"}
+                      </button>
+                    ) : null}
+                    {!!auth ? (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={() =>
+                          setReplyDrafts((prev) => ({
+                            ...prev,
+                            [comment.id]: prev[comment.id] || "",
+                          }))
+                        }
+                      >
+                        追问 / 回复
+                      </button>
+                    ) : null}
+                    {!!auth && auth.user.id === comment.authorId ? (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => openDeleteDialog(comment.id)}
+                      >
+                        删除评论
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       className="btn btn-ghost btn-sm"
-                      onClick={() => openDeleteDialog(comment.id)}
+                      onClick={() => openReportDialog(comment.id)}
                     >
-                      删除评论
+                      举报评论
                     </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => openReportDialog(comment.id)}
-                  >
-                    举报评论
-                  </button>
-                </div>
+                  </div>
+                )}
 
-                {comment.id in replyDrafts ? (
+                {comment.canViewContent !== false &&
+                comment.id in replyDrafts ? (
                   <div className="mt-4 rounded-xl border border-[var(--border-light)] bg-slate-50 p-3">
                     <RichTextEditor
                       value={replyDrafts[comment.id] || ""}
@@ -361,51 +438,72 @@ export function PostCommentSection({ postId }: Props) {
                   </div>
                 ) : null}
 
-                {comment.replies?.length ? (
+                {comment.canViewContent !== false && comment.replies?.length ? (
                   <div className="mt-4 space-y-3 border-t border-[var(--border-light)] pt-4">
                     {comment.replies.map((reply) => (
-                      <div key={reply.id} className="rounded-xl bg-slate-50 p-3 text-sm">
+                      <div
+                        key={reply.id}
+                        className="rounded-xl bg-slate-50 p-3 text-sm"
+                      >
                         <div className="mb-2 flex flex-wrap items-center gap-2 text-slate-500">
-                          <span className="font-medium text-slate-700">
+                          <Link
+                            href={`/users/${reply.authorId}`}
+                            className="font-medium text-slate-700 no-underline hover:text-[var(--color-primary)]"
+                          >
                             {reply.authorUsername || reply.authorId}
-                          </span>
+                          </Link>
                           {reply.replyToUsername ? (
                             <span>回复 {reply.replyToUsername}</span>
                           ) : null}
-                          <span>{new Date(reply.createdAt).toLocaleString("zh-CN")}</span>
+                          <span>
+                            {new Date(reply.createdAt).toLocaleString("zh-CN")}
+                          </span>
                         </div>
 
-                        <RichTextContent
-                          html={reply.deleted ? "<p>该评论已删除</p>" : reply.content}
-                          className="leading-6"
-                        />
+                        {reply.deleted ? (
+                          <RichTextContent
+                            html="<p>该评论已删除</p>"
+                            className="leading-6"
+                          />
+                        ) : reply.canViewContent === false ? (
+                          <div className="rounded-xl bg-white px-3 py-2 text-slate-600">
+                            {reply.maskedSummary || "该回复当前不可见"}
+                          </div>
+                        ) : (
+                          <RichTextContent
+                            html={reply.content || "<p>内容暂不可见</p>"}
+                            className="leading-6"
+                          />
+                        )}
 
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            className="btn btn-ghost btn-sm"
-                            onClick={() => void toggleCommentLike(reply.id)}
-                          >
-                            点赞 {reply.likeCount || 0}
-                            {reply.liked ? " (已赞)" : ""}
-                          </button>
-                          {!!auth && auth.user.id === reply.authorId ? (
+                        {reply.canViewContent === false ? null : (
+                          <div className="mt-2 flex flex-wrap gap-2">
                             <button
                               type="button"
                               className="btn btn-ghost btn-sm"
-                              onClick={() => openDeleteDialog(reply.id)}
+                              onClick={() => void toggleCommentLike(reply.id)}
                             >
-                              删除
+                              点赞 {reply.likeCount || 0}
+                              {reply.liked ? " (已赞)" : ""}
                             </button>
-                          ) : null}
-                          <button
-                            type="button"
-                            className="btn btn-ghost btn-sm"
-                            onClick={() => openReportDialog(reply.id)}
-                          >
-                            举报
-                          </button>
-                        </div>
+                            {!!auth && auth.user.id === reply.authorId ? (
+                              <button
+                                type="button"
+                                className="btn btn-ghost btn-sm"
+                                onClick={() => openDeleteDialog(reply.id)}
+                              >
+                                删除
+                              </button>
+                            ) : null}
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-sm"
+                              onClick={() => openReportDialog(reply.id)}
+                            >
+                              举报
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

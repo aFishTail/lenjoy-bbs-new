@@ -12,6 +12,7 @@ import {
 } from "@/components/post/client-helpers";
 import type { ResourcePurchaseSummary } from "@/components/post/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import pageStyles from "./my-pages.module.css";
 
 export function MySalesClient() {
   const salesQuery = useQuery({
@@ -42,40 +43,35 @@ export function MySalesClient() {
   );
 
   return (
-    <main className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6">
-      <section className="rounded-3xl border border-emerald-200 bg-linear-to-br from-emerald-50 via-white to-lime-50 p-6 shadow-sm">
-        <p className="text-xs uppercase tracking-[0.24em] text-emerald-700">
-          Sales Records
-        </p>
-        <h1 className="mt-2 text-3xl font-semibold text-slate-900">
-          资源销售记录
-        </h1>
-        <p className="mt-2 text-sm text-slate-600">
-          查看资源被购买情况、购买人数和累计净收入。
-        </p>
+    <main className={`${pageStyles.wideShell} ${pageStyles.stack}`}>
+      <section className={pageStyles.intro}>
+        <div>
+          <h1>销售记录</h1>
+          <p>查看资源成交情况、购买人数和累计净收入。</p>
+        </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <Card>
+      <section className={pageStyles.grid3}>
+        <Card className={pageStyles.statCard}>
           <CardContent className="p-5">
             <p className="text-xs text-slate-500">成交笔数</p>
-            <p className="mt-1 text-3xl font-semibold text-slate-900">
+            <p className={`mt-1 ${pageStyles.number}`}>
               {items.length}
             </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className={pageStyles.statCard}>
           <CardContent className="p-5">
             <p className="text-xs text-slate-500">购买人数</p>
-            <p className="mt-1 text-3xl font-semibold text-slate-900">
+            <p className={`mt-1 ${pageStyles.number}`}>
               {new Set(items.map((item) => item.buyerId)).size}
             </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className={pageStyles.statCard}>
           <CardContent className="p-5">
             <p className="text-xs text-slate-500">累计净收入</p>
-            <p className="mt-1 text-3xl font-semibold text-slate-900">
+            <p className={`mt-1 ${pageStyles.number}`}>
               {totalIncome}
             </p>
           </CardContent>
@@ -83,13 +79,13 @@ export function MySalesClient() {
       </section>
 
       {loading ? (
-        <Card>
+        <Card className={pageStyles.contentCard}>
           <CardContent className="p-8 text-sm text-slate-500">
             加载销售记录中...
           </CardContent>
         </Card>
       ) : items.length === 0 ? (
-        <Card>
+        <Card className={pageStyles.contentCard}>
           <CardContent className="p-8 text-sm text-slate-500">
             你的资源还没有成交记录。
           </CardContent>
@@ -97,7 +93,7 @@ export function MySalesClient() {
       ) : (
         <section className="grid gap-4">
           {items.map((item) => (
-            <Card key={item.purchaseId}>
+            <Card key={item.purchaseId} className={pageStyles.contentCard}>
               <CardHeader>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
@@ -107,7 +103,7 @@ export function MySalesClient() {
                       {new Date(item.purchasedAt).toLocaleString()}
                     </p>
                   </div>
-                  <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                  <div className={pageStyles.statusPill}>
                     {item.status}
                   </div>
                 </div>
@@ -117,11 +113,10 @@ export function MySalesClient() {
                   <span>成交金额 {item.price}</span>
                   <span>已退款 {item.refundedAmount}</span>
                   <span>净收入 {item.price - item.refundedAmount}</span>
-                  <span>申诉状态 {item.appealStatus || "无"}</span>
                 </div>
                 <Link
                   href={`/posts/${item.postId}`}
-                  className="text-emerald-700 hover:text-emerald-800"
+                  className={`${pageStyles.blueText} hover:underline`}
                 >
                   查看原帖
                 </Link>

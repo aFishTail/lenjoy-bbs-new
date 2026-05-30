@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import {
   fireMessageChanged,
+  getOrCreateVisitorId,
   queryKeys,
   requestApi,
   requestApiData,
@@ -61,7 +62,7 @@ export function useUpdatePostMutation(postId: string) {
       hiddenContent: string;
       price: number | null;
       bountyAmount: number | null;
-      bountyExpireAt: string | null;
+      bountyExpireAt?: string | null;
     }) =>
       requestApi(`/api/posts/${postId}`, {
         method: "PUT",
@@ -123,13 +124,29 @@ export function usePurchaseResourceMutation(postId: string) {
 
   return useMutation({
     mutationFn: () =>
-      requestApiData<PostDetail>(`/api/posts/${postId}/purchase`, {
+      requestApiData<{
+        id: number;
+        postId: number;
+        buyerId: number;
+        sellerId: number;
+        price: number;
+      }>(`/api/posts/${postId}/purchase`, {
         method: "POST",
         withAuth: true,
       }),
-    onSuccess: (payload) => {
-      queryClient.setQueryData(queryKeys.postDetail(postId), payload);
+    onSuccess: async () => {
       fireMessageChanged();
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.postDetail(postId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.myWallet,
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.myPurchases,
+        }),
+      ]);
     },
   });
 }
@@ -272,6 +289,36 @@ export function useToggleCommentLikeMutation(postId: string) {
   });
 }
 
+export function useRecordPostViewMutation(postId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () =>
+      requestApiData<{ postId: number; viewCount: number }>(
+        `/api/posts/${postId}/views`,
+        {
+          method: "POST",
+          withAuth: true,
+          headers: {
+            "X-Visitor-Id": getOrCreateVisitorId(),
+          },
+        },
+      ),
+    onSuccess: (payload) => {
+      queryClient.setQueryData<PostDetail | null>(
+        queryKeys.postDetail(postId),
+        (prev) =>
+          prev
+            ? {
+                ...prev,
+                viewCount: payload.viewCount,
+              }
+            : prev,
+      );
+    },
+  });
+}
+
 export function useDeleteOwnCommentMutation(postId: string) {
   const queryClient = useQueryClient();
 
@@ -304,6 +351,20 @@ export function useReportPostMutation(postId: string) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ reason, detail }),
+      }),
+  });
+}
+
+export function useCreateBountyDeleteRequestMutation(postId: string) {
+  return useMutation({
+    mutationFn: ({ reason }: { reason: string }) =>
+      requestApi(`/api/posts/${postId}/bounty-delete-requests`, {
+        method: "POST",
+        withAuth: true,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ reason }),
       }),
   });
 }

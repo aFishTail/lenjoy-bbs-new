@@ -3,6 +3,7 @@
 import purify from "dompurify";
 const DOMPurify = (purify as any).default || purify;
 import { useMemo } from "react";
+import styles from "./rich-text.module.css";
 
 type Props = {
   html?: string;
@@ -46,7 +47,7 @@ export function RichTextContent({ html, className }: Props) {
 
   return (
     <div
-      className={`rich-editor-render ${className || ""}`}
+      className={`${styles.render} ${className || ""}`}
       dangerouslySetInnerHTML={{ __html: safeHtml }}
     />
   );

@@ -1,49 +1,160 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import { RichTextEditor } from "@/components/editor/rich-text-editor";
 import { readError } from "@/components/post/client-helpers";
 import { TagPicker } from "@/components/post/tag-picker";
 import {
+  useCreateBountyDeleteRequestMutation,
   useDeletePostMutation,
   useUpdatePostMutation,
 } from "@/components/post/use-post-mutations";
-import { usePostDetailQuery } from "@/components/post/use-post-queries";
+import {
+  usePostCommentsQuery,
+  usePostDetailQuery,
+} from "@/components/post/use-post-queries";
 import {
   useCategoriesQuery,
   useTagsQuery,
 } from "@/components/post/use-taxonomy-queries";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import styles from "./post-author-actions.module.css";
 
 type Props = {
   postId: string;
 };
 
+const editPostSchema = z
+  .object({
+    postType: z.enum(["NORMAL", "RESOURCE", "BOUNTY"]),
+    title: z
+      .string()
+      .trim()
+      .min(1, "请输入标题")
+      .max(255, "标题不能超过 255 个字符"),
+    categoryId: z.string().min(1, "请选择分类"),
+    tagIds: z.array(z.number()).max(5, "最多选择 5 个标签"),
+    content: z.string().max(20_000, "正文不能超过 20000 个字符"),
+    hiddenContent: z.string().max(20_000, "隐藏内容不能超过 20000 个字符"),
+    price: z.string(),
+    bountyAmount: z.string(),
+  })
+  .superRefine((values, ctx) => {
+    if (isRichTextEmpty(values.content)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["content"],
+        message: "请输入正文",
+      });
+    }
+
+    if (values.postType === "RESOURCE") {
+      if (isRichTextEmpty(values.hiddenContent)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["hiddenContent"],
+          message: "请填写资源隐藏内容",
+        });
+      }
+      validatePositiveInteger(values.price, ["price"], "请设置资源售价", ctx);
+    }
+
+    if (values.postType === "BOUNTY") {
+      validatePositiveInteger(
+        values.bountyAmount,
+        ["bountyAmount"],
+        "请设置悬赏金额",
+        ctx,
+      );
+    }
+  });
+
+type EditPostValues = z.infer<typeof editPostSchema>;
+
+function isRichTextEmpty(value: string) {
+  const plain = value
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return !plain;
+}
+
+function validatePositiveInteger(
+  value: string,
+  path: (string | number)[],
+  requiredMessage: string,
+  ctx: z.RefinementCtx,
+) {
+  const normalized = value.trim();
+  if (!normalized) {
+    ctx.addIssue({ code: "custom", path, message: requiredMessage });
+    return;
+  }
+  if (!/^\d+$/.test(normalized)) {
+    ctx.addIssue({ code: "custom", path, message: "请输入整数" });
+    return;
+  }
+  const parsed = Number(normalized);
+  if (parsed < 1 || parsed > 1_000_000) {
+    ctx.addIssue({
+      code: "custom",
+      path,
+      message: "请输入 1 到 1000000 之间的整数",
+    });
+  }
+}
+
 export function PostAuthorActions({ postId }: Props) {
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-
-  const [title, setTitle] = useState("");
-  const [categoryId, setCategoryId] = useState("");
-  const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
-  const [content, setContent] = useState("");
-  const [hiddenContent, setHiddenContent] = useState("");
-  const [price, setPrice] = useState("");
-  const [bountyAmount, setBountyAmount] = useState("");
-  const [bountyExpireAt, setBountyExpireAt] = useState("");
+  const [deleteRequestDialogOpen, setDeleteRequestDialogOpen] = useState(false);
+  const [deleteRequestReason, setDeleteRequestReason] = useState("");
 
   const postQuery = usePostDetailQuery(postId);
+  const commentsQuery = usePostCommentsQuery(postId);
   const post = postQuery.data;
+  const comments = commentsQuery.data ?? [];
 
   const categoriesQuery = useCategoriesQuery(post?.postType || "NORMAL");
   const tagsQuery = useTagsQuery("");
   const updatePostMutation = useUpdatePostMutation(postId);
   const deletePostMutation = useDeletePostMutation(postId);
+  const createBountyDeleteRequestMutation =
+    useCreateBountyDeleteRequestMutation(postId);
+  const form = useForm<EditPostValues>({
+    resolver: zodResolver(editPostSchema),
+    defaultValues: {
+      postType: "NORMAL",
+      title: "",
+      categoryId: "",
+      tagIds: [],
+      content: "",
+      hiddenContent: "",
+      price: "",
+      bountyAmount: "",
+    },
+    reValidateMode: "onChange",
+    shouldFocusError: true,
+  });
+  const {
+    control,
+    handleSubmit,
+    register,
+    reset,
+    setValue,
+    formState: { errors, isSubmitting },
+  } = form;
 
   function getPostTypeLabel(type: string) {
     switch (type) {
@@ -56,51 +167,48 @@ export function PostAuthorActions({ postId }: Props) {
     }
   }
 
-  function getPostStatusLabel(status: string) {
-    switch (status) {
-      case "PUBLISHED":
-        return "已发布";
-      case "CLOSED":
-        return "已关闭";
-      case "OFFLINE":
-        return "已下架";
-      case "DELETED":
-        return "已删除";
-      default:
-        return status;
-    }
-  }
-
-  function formatDateTimeInput(value?: string | null) {
-    return value ? value.slice(0, 16) : "";
-  }
-
   useEffect(() => {
     if (!post) return;
-    setTitle(post.title || "");
-    setCategoryId(post.categoryId ? String(post.categoryId) : "");
-    setSelectedTagIds(post.tags?.map((tag) => tag.id) || []);
-    setContent(post.content || "");
-    setHiddenContent(post.hiddenContent || "");
-    setPrice(post.price ? String(post.price) : "");
-    setBountyAmount(post.bountyAmount ? String(post.bountyAmount) : "");
-    setBountyExpireAt(formatDateTimeInput(post.bountyExpireAt));
-  }, [post]);
+    reset({
+      postType: post.postType,
+      title: post.title || "",
+      categoryId: post.categoryId ? String(post.categoryId) : "",
+      tagIds: post.tags?.map((tag) => tag.id) || [],
+      content: post.content || "",
+      hiddenContent: post.hiddenContent || "",
+      price: post.price ? String(post.price) : "",
+      bountyAmount: post.bountyAmount ? String(post.bountyAmount) : "",
+    });
+  }, [post, reset]);
+
+  useEffect(() => {
+    if (isEditing && post) {
+      setValue("postType", post.postType, { shouldValidate: true });
+    }
+  }, [isEditing, post, setValue]);
 
   if (!post) return null;
 
-  async function submitUpdate(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  const bountyRequiresDeleteReview =
+    post.postType === "BOUNTY" &&
+    comments.some(
+      (comment) =>
+        comment.parentId == null &&
+        !comment.deleted &&
+        comment.authorId !== post.authorId,
+    );
+
+  async function submitUpdate(data: EditPostValues) {
     try {
       await updatePostMutation.mutateAsync({
-        title,
-        categoryId: Number(categoryId),
-        tagIds: selectedTagIds,
-        content,
-        hiddenContent,
-        price: price ? Number(price) : null,
-        bountyAmount: bountyAmount ? Number(bountyAmount) : null,
-        bountyExpireAt: bountyExpireAt || null,
+        title: data.title,
+        categoryId: Number(data.categoryId),
+        tagIds: data.tagIds,
+        content: data.content,
+        hiddenContent: data.hiddenContent,
+        price: data.postType === "RESOURCE" ? Number(data.price) : null,
+        bountyAmount:
+          data.postType === "BOUNTY" ? Number(data.bountyAmount) : null,
       });
       toast.success("更新成功");
       setIsEditing(false);
@@ -121,134 +229,217 @@ export function PostAuthorActions({ postId }: Props) {
     }
   }
 
+  async function submitDeleteRequest() {
+    const detail = deleteRequestReason.trim();
+    if (!detail) {
+      return;
+    }
+
+    try {
+      await createBountyDeleteRequestMutation.mutateAsync({ reason: detail });
+      setDeleteRequestDialogOpen(false);
+      setDeleteRequestReason("");
+      toast.success("删除申请已提交，请等待管理员处理");
+    } catch (error) {
+      toast.error(readError(error));
+    }
+  }
+
   return (
     <>
-      <section className="card author-actions-card">
-        <div className="author-actions-header">
+      <section className={`card ${styles.card}`}>
+        <div className={styles.header}>
           <div>
-            <p className="author-actions-eyebrow">AUTHOR TOOLS</p>
+            <p className={styles.eyebrow}>AUTHOR TOOLS</p>
             <h2 className="section-title">作者操作</h2>
           </div>
-          <div className="author-actions-toolbar">
+          <div className={styles.toolbar}>
             <button
               type="button"
-              className={`btn btn-ghost ${isEditing ? "author-tool-active" : ""}`}
+              className={`btn btn-ghost ${isEditing ? styles.toolActive : ""}`}
               onClick={() => setIsEditing((value) => !value)}
             >
               {isEditing ? "收起编辑" : "编辑帖子"}
             </button>
-            <button
-              type="button"
-              className="btn btn-danger"
-              onClick={() => setDeleteDialogOpen(true)}
-            >
-              删除帖子
-            </button>
+            {bountyRequiresDeleteReview ? (
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={() => setDeleteRequestDialogOpen(true)}
+              >
+                申请删除
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={() => setDeleteDialogOpen(true)}
+              >
+                删除帖子
+              </button>
+            )}
           </div>
         </div>
 
         {isEditing ? (
-          <form onSubmit={submitUpdate} className="author-actions-editor">
-            <div className="author-actions-editor-head">
+          <form
+            noValidate
+            onSubmit={(event) => void handleSubmit(submitUpdate)(event)}
+            className={styles.editor}
+          >
+            <input
+              type="hidden"
+              {...register("postType")}
+              value={post.postType}
+              readOnly
+            />
+
+            <div className={styles.editorHead}>
               <div>
-                <h3 className="author-actions-editor-title">编辑内容</h3>
-                <p className="author-actions-editor-copy">
+                <h3 className={styles.editorTitle}>编辑内容</h3>
+                <p className={styles.editorCopy}>
                   在同一块区域完成内容维护，保存后直接回到作者操作概览。
                 </p>
               </div>
             </div>
 
             <div className="grid gap-4">
-              <div className="form-group">
-                <label className="form-label">标题</label>
-                <input
-                  className="form-input"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  required
+              <Field data-invalid={!!errors.title || undefined}>
+                <FieldLabel htmlFor="edit-title">标题</FieldLabel>
+                <Input
+                  id="edit-title"
+                  aria-invalid={!!errors.title}
+                  {...register("title")}
                 />
-              </div>
+                {errors.title?.message ? (
+                  <FieldError>{errors.title.message}</FieldError>
+                ) : null}
+              </Field>
 
-              <div className="form-group">
-                <label className="form-label">分类</label>
+              <Field data-invalid={!!errors.categoryId || undefined}>
+                <FieldLabel htmlFor="edit-categoryId">分类</FieldLabel>
                 <Select
-                  value={categoryId}
-                  onChange={(event) => setCategoryId(event.target.value)}
+                  id="edit-categoryId"
+                  aria-invalid={!!errors.categoryId}
+                  {...register("categoryId")}
                 >
+                  <option value="">请选择分类</option>
                   {(categoriesQuery.data ?? []).map((category) => (
                     <option key={category.id} value={String(category.id)}>
                       {category.name}
                     </option>
                   ))}
                 </Select>
-              </div>
+                {errors.categoryId?.message ? (
+                  <FieldError>{errors.categoryId.message}</FieldError>
+                ) : null}
+              </Field>
 
-              <div className="form-group">
-                <label className="form-label">标签</label>
-                <TagPicker
-                  tags={tagsQuery.data ?? []}
-                  selectedTagIds={selectedTagIds}
-                  onChange={setSelectedTagIds}
-                />
-              </div>
+              <Controller
+                name="tagIds"
+                control={control}
+                render={({ field }) => (
+                  <Field data-invalid={!!errors.tagIds || undefined}>
+                    <FieldLabel>标签</FieldLabel>
+                    <TagPicker
+                      tags={tagsQuery.data ?? []}
+                      selectedTagIds={field.value}
+                      onChange={field.onChange}
+                    />
+                    {errors.tagIds?.message ? (
+                      <FieldError>{errors.tagIds.message}</FieldError>
+                    ) : null}
+                  </Field>
+                )}
+              />
 
-              <div className="form-group">
-                <label className="form-label">正文</label>
-                <RichTextEditor value={content} onChange={setContent} />
-              </div>
+              <Controller
+                name="content"
+                control={control}
+                render={({ field }) => (
+                  <Field data-invalid={!!errors.content || undefined}>
+                    <FieldLabel>正文</FieldLabel>
+                    <RichTextEditor
+                      value={field.value}
+                      onChange={field.onChange}
+                      invalid={!!errors.content}
+                    />
+                    {errors.content?.message ? (
+                      <FieldError>{errors.content.message}</FieldError>
+                    ) : null}
+                  </Field>
+                )}
+              />
 
               {post.postType === "RESOURCE" ? (
                 <>
-                  <div className="form-group">
-                    <label className="form-label">隐藏内容</label>
-                    <RichTextEditor
-                      value={hiddenContent}
-                      onChange={setHiddenContent}
-                      minHeightClassName="min-h-[160px]"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">售价</label>
-                    <input
-                      className="form-input"
+                  <Controller
+                    name="hiddenContent"
+                    control={control}
+                    render={({ field }) => (
+                      <Field
+                        data-invalid={!!errors.hiddenContent || undefined}
+                      >
+                        <FieldLabel>隐藏内容</FieldLabel>
+                        <RichTextEditor
+                          value={field.value}
+                          onChange={field.onChange}
+                          minHeightClassName="min-h-[160px]"
+                          invalid={!!errors.hiddenContent}
+                        />
+                        {errors.hiddenContent?.message ? (
+                          <FieldError>{errors.hiddenContent.message}</FieldError>
+                        ) : null}
+                      </Field>
+                    )}
+                  />
+                  <Field data-invalid={!!errors.price || undefined}>
+                    <FieldLabel htmlFor="edit-price">售价</FieldLabel>
+                    <Input
+                      id="edit-price"
                       type="number"
                       min="1"
+                      max="1000000"
                       step="1"
-                      value={price}
-                      onChange={(e) => setPrice(e.target.value)}
+                      aria-invalid={!!errors.price}
+                      {...register("price")}
                     />
-                  </div>
+                    {errors.price?.message ? (
+                      <FieldError>{errors.price.message}</FieldError>
+                    ) : null}
+                  </Field>
                 </>
               ) : null}
 
               {post.postType === "BOUNTY" ? (
                 <>
-                  <div className="form-group">
-                    <label className="form-label">悬赏金额</label>
-                    <input
-                      className="form-input"
+                  <Field data-invalid={!!errors.bountyAmount || undefined}>
+                    <FieldLabel htmlFor="edit-bountyAmount">悬赏金额</FieldLabel>
+                    <Input
+                      id="edit-bountyAmount"
                       type="number"
                       min="1"
+                      max="1000000"
                       step="1"
-                      value={bountyAmount}
-                      onChange={(e) => setBountyAmount(e.target.value)}
+                      aria-invalid={!!errors.bountyAmount}
+                      {...register("bountyAmount")}
                     />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">截止时间</label>
-                    <input
-                      className="form-input"
-                      type="datetime-local"
-                      value={bountyExpireAt}
-                      onChange={(e) => setBountyExpireAt(e.target.value)}
-                    />
-                  </div>
+                    {errors.bountyAmount?.message ? (
+                      <FieldError>{errors.bountyAmount.message}</FieldError>
+                    ) : null}
+                  </Field>
                 </>
               ) : null}
 
-              <div className="author-actions-submit-row">
-                <button className="btn btn-primary" type="submit">
-                  保存修改
+              <div className={styles.submitRow}>
+                <button
+                  className="btn btn-primary"
+                  type="submit"
+                  disabled={updatePostMutation.isPending || isSubmitting}
+                >
+                  {updatePostMutation.isPending || isSubmitting
+                    ? "保存中..."
+                    : "保存修改"}
                 </button>
                 <button
                   type="button"
@@ -261,17 +452,13 @@ export function PostAuthorActions({ postId }: Props) {
             </div>
           </form>
         ) : (
-          <div className="author-actions-summary">
-            <div className="author-actions-summary-item">
-              <span className="author-actions-summary-label">当前状态</span>
-              <strong>{getPostStatusLabel(post.status)}</strong>
-            </div>
-            <div className="author-actions-summary-item">
-              <span className="author-actions-summary-label">内容类型</span>
+          <div className={styles.summary}>
+            <div className={styles.summaryItem}>
+              <span className={styles.summaryLabel}>内容类型</span>
               <strong>{getPostTypeLabel(post.postType)}</strong>
             </div>
-            <div className="author-actions-summary-item">
-              <span className="author-actions-summary-label">最近更新</span>
+            <div className={styles.summaryItem}>
+              <span className={styles.summaryLabel}>最近更新</span>
               <strong>{new Date(post.updatedAt).toLocaleString("zh-CN")}</strong>
             </div>
           </div>
@@ -287,6 +474,37 @@ export function PostAuthorActions({ postId }: Props) {
         onConfirm={() => void deletePost()}
         onOpenChange={setDeleteDialogOpen}
       />
+
+      <ConfirmDialog
+        open={deleteRequestDialogOpen}
+        title="申请删除悬赏帖"
+        description="已有用户参与回答的悬赏帖不能直接删除。请填写原因，提交后由管理员处理。"
+        confirmLabel="提交申请"
+        confirmDisabled={!deleteRequestReason.trim()}
+        confirmBusy={createBountyDeleteRequestMutation.isPending}
+        onConfirm={() => void submitDeleteRequest()}
+        onOpenChange={(open) => {
+          setDeleteRequestDialogOpen(open);
+          if (!open) {
+            setDeleteRequestReason("");
+          }
+        }}
+      >
+        <div className="confirm-dialog-form">
+          <label className="confirm-dialog-field">
+            <span>申请原因</span>
+            <textarea
+              className="confirm-dialog-textarea"
+              value={deleteRequestReason}
+              onChange={(event) => setDeleteRequestReason(event.target.value)}
+              placeholder="请说明为什么需要删除该悬赏帖"
+              rows={4}
+              maxLength={300}
+              autoFocus
+            />
+          </label>
+        </div>
+      </ConfirmDialog>
     </>
   );
 }

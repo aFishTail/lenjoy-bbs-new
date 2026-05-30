@@ -1,5 +1,6 @@
 "use client";
 
+import { BarChart2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -23,13 +24,9 @@ type ViewMode = "wallet" | "trades";
 
 function toIntOrUndefined(value: string): number | undefined {
   const trimmed = value.trim();
-  if (!trimmed) {
-    return undefined;
-  }
+  if (!trimmed) return undefined;
   const n = Number(trimmed);
-  if (!Number.isInteger(n) || n <= 0) {
-    return undefined;
-  }
+  if (!Number.isInteger(n) || n <= 0) return undefined;
   return n;
 }
 
@@ -43,6 +40,7 @@ export function AdminAuditClient() {
   const [tradeUserId, setTradeUserId] = useState("");
   const [tradePostId, setTradePostId] = useState("");
   const [tradeLimit, setTradeLimit] = useState("100");
+
   const [walletFilters, setWalletFilters] = useState({
     userId: "",
     bizType: "",
@@ -53,6 +51,7 @@ export function AdminAuditClient() {
     postId: "",
     limit: "100",
   });
+
   const walletQuery = useAdminWalletAuditQuery(walletFilters);
   const tradeQuery = useAdminTradeAuditQuery(tradeFilters);
 
@@ -67,12 +66,8 @@ export function AdminAuditClient() {
     let income = 0;
     let expense = 0;
     for (const item of walletItems) {
-      if (item.direction === "INCOME") {
-        income += item.changeAmount;
-      }
-      if (item.direction === "EXPENSE") {
-        expense += item.changeAmount;
-      }
+      if (item.direction === "IN" || item.direction === "INCOME") income += item.changeAmount;
+      if (item.direction === "OUT" || item.direction === "EXPENSE") expense += item.changeAmount;
     }
     return { income, expense };
   }, [walletItems]);
@@ -89,15 +84,9 @@ export function AdminAuditClient() {
 
   function loadWalletAudit() {
     const resolvedLimit = toIntOrUndefined(walletLimit);
-    if (!resolvedLimit) {
-      toast.error("钱包流水条数必须是正整数");
-      return;
-    }
+    if (!resolvedLimit) { toast.error("钱包流水条数必须是正整数"); return; }
     const userId = toIntOrUndefined(walletUserId);
-    if (walletUserId.trim() && !userId) {
-      toast.error("用户 ID 必须是正整数");
-      return;
-    }
+    if (walletUserId.trim() && !userId) { toast.error("用户 ID 必须是正整数"); return; }
     setWalletFilters({
       userId: walletUserId.trim(),
       bizType: walletBizType.trim(),
@@ -107,20 +96,11 @@ export function AdminAuditClient() {
 
   function loadTradeAudit() {
     const resolvedLimit = toIntOrUndefined(tradeLimit);
-    if (!resolvedLimit) {
-      toast.error("交易流水条数必须是正整数");
-      return;
-    }
+    if (!resolvedLimit) { toast.error("交易流水条数必须是正整数"); return; }
     const userId = toIntOrUndefined(tradeUserId);
     const postId = toIntOrUndefined(tradePostId);
-    if (tradeUserId.trim() && !userId) {
-      toast.error("用户 ID 必须是正整数");
-      return;
-    }
-    if (tradePostId.trim() && !postId) {
-      toast.error("帖子 ID 必须是正整数");
-      return;
-    }
+    if (tradeUserId.trim() && !userId) { toast.error("用户 ID 必须是正整数"); return; }
+    if (tradePostId.trim() && !postId) { toast.error("帖子 ID 必须是正整数"); return; }
     setTradeFilters({
       userId: tradeUserId.trim(),
       postId: tradePostId.trim(),
@@ -130,9 +110,7 @@ export function AdminAuditClient() {
 
   useEffect(() => {
     const error = walletQuery.error ?? tradeQuery.error;
-    if (error) {
-      toast.error(readError(error));
-    }
+    if (error) toast.error(readError(error));
   }, [tradeQuery.error, walletQuery.error]);
 
   return (
@@ -146,14 +124,14 @@ export function AdminAuditClient() {
         <div className="admin-row-actions">
           <Button
             type="button"
-            className={`admin-btn ${viewMode === "wallet" ? "" : "is-soft"}`}
+            className={`admin-btn ${viewMode === "wallet" ? "is-soft" : ""}`}
             onClick={() => setViewMode("wallet")}
           >
             钱包流水
           </Button>
           <Button
             type="button"
-            className={`admin-btn ${viewMode === "trades" ? "" : "is-soft"}`}
+            className={`admin-btn ${viewMode === "trades" ? "is-soft" : ""}`}
             onClick={() => setViewMode("trades")}
           >
             资源交易
@@ -164,7 +142,10 @@ export function AdminAuditClient() {
       {viewMode === "wallet" ? (
         <section className="admin-table-card">
           <div className="admin-table-head">
-            <h2>钱包流水审计</h2>
+            <h2>
+              <BarChart2 size={17} strokeWidth={2} />
+              钱包流水审计
+            </h2>
             <p>
               总收入 {walletStats.income}，总支出 {walletStats.expense}，净流入{" "}
               {walletStats.income - walletStats.expense}
@@ -182,7 +163,7 @@ export function AdminAuditClient() {
               className="admin-input"
               value={walletBizType}
               onChange={(event) => setWalletBizType(event.target.value)}
-              placeholder="业务类型（可选，如 RESOURCE_PURCHASE）"
+              placeholder="业务类型（可选）"
             />
             <Input
               className="admin-input"
@@ -211,7 +192,7 @@ export function AdminAuditClient() {
                     <TableHead>方向</TableHead>
                     <TableHead>变动</TableHead>
                     <TableHead>业务类型</TableHead>
-                    <TableHead>余额/冻结</TableHead>
+                    <TableHead>可用 / 冻结</TableHead>
                     <TableHead>操作人</TableHead>
                     <TableHead>备注</TableHead>
                   </TableRow>
@@ -219,14 +200,18 @@ export function AdminAuditClient() {
                 <TableBody>
                   {walletItems.map((item) => (
                     <TableRow key={item.id}>
+                      <TableCell>{new Date(item.createdAt).toLocaleString()}</TableCell>
                       <TableCell>
-                        {new Date(item.createdAt).toLocaleString()}
+                        <span className={`admin-badge ${item.direction === "IN" || item.direction === "INCOME" ? "is-active" : "is-muted"}`}>
+                          {item.direction === "IN" || item.direction === "INCOME" ? "收入" : "支出"}
+                        </span>
                       </TableCell>
-                      <TableCell>{item.direction}</TableCell>
                       <TableCell>{item.changeAmount}</TableCell>
                       <TableCell>{item.bizType}</TableCell>
                       <TableCell>
-                        可用 {item.balanceAfter} / 冻结 {item.frozenAfter}
+                        <span className="coin-balance-num">{item.balanceAfter}</span>
+                        <span className="coin-balance-sep">/</span>
+                        <span className="coin-balance-frozen">{item.frozenAfter}</span>
                       </TableCell>
                       <TableCell>{item.operatedBy ?? "SYSTEM"}</TableCell>
                       <TableCell>{item.remark || "-"}</TableCell>
@@ -240,7 +225,10 @@ export function AdminAuditClient() {
       ) : (
         <section className="admin-table-card">
           <div className="admin-table-head">
-            <h2>资源交易审计</h2>
+            <h2>
+              <BarChart2 size={17} strokeWidth={2} />
+              资源交易审计
+            </h2>
             <p>
               成交总额 {tradeStats.total}，累计退款 {tradeStats.refunded}
               ，净收入 {tradeStats.net}
@@ -252,7 +240,7 @@ export function AdminAuditClient() {
               className="admin-input"
               value={tradeUserId}
               onChange={(event) => setTradeUserId(event.target.value)}
-              placeholder="用户 ID（买家或卖家，可选）"
+              placeholder="用户 ID（可选）"
             />
             <Input
               className="admin-input"
@@ -294,37 +282,37 @@ export function AdminAuditClient() {
                 <TableBody>
                   {tradeItems.map((item) => (
                     <TableRow key={item.purchaseId}>
-                      <TableCell>
-                        {new Date(item.createdAt).toLocaleString()}
-                      </TableCell>
+                      <TableCell>{new Date(item.createdAt).toLocaleString()}</TableCell>
                       <TableCell>
                         <div className="space-y-1">
-                          <div className="font-medium text-slate-900">
-                            #{item.postId}
-                          </div>
-                          <div className="text-xs text-slate-500">
-                            {item.postTitle || "-"}
-                          </div>
+                          <div className="font-medium text-slate-900">#{item.postId}</div>
+                          <div className="text-xs text-slate-500">{item.postTitle || "-"}</div>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="space-y-1 text-sm">
                           <div>买家 {item.buyerUsername || item.buyerId}</div>
-                          <div className="text-slate-500">
-                            卖家 {item.sellerUsername || item.sellerId}
-                          </div>
+                          <div className="text-slate-500">卖家 {item.sellerUsername || item.sellerId}</div>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="space-y-1 text-sm">
-                          <div>成交 {item.price}</div>
+                          <div>
+                            <span className="coin-balance-num">{item.price}</span>
+                          </div>
                           <div className="text-slate-500">
-                            退款 {item.refundedAmount}
+                            退款 <span className="coin-balance-frozen">{item.refundedAmount}</span>
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>{item.price - item.refundedAmount}</TableCell>
-                      <TableCell>{item.status}</TableCell>
+                      <TableCell>
+                        <span className="coin-balance-num">{item.price - item.refundedAmount}</span>
+                      </TableCell>
+                      <TableCell>
+                        <span className={`admin-badge ${item.status === "COMPLETED" ? "is-active" : "is-muted"}`}>
+                          {item.status === "COMPLETED" ? "已完成" : item.status}
+                        </span>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

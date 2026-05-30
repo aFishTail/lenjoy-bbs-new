@@ -18,6 +18,7 @@ test.describe("PRD authenticated flows", () => {
     baseURL,
   }) => {
     test.skip(!baseURL, "baseURL is required");
+    const resolvedBaseURL = baseURL!;
 
     const userA = requireSession("user_a");
     const userB = requireSession("user_b");
@@ -27,8 +28,8 @@ test.describe("PRD authenticated flows", () => {
 
     const userAPage = await browser.newPage();
     const userBPage = await browser.newPage();
-    await applySession(userAPage.context(), baseURL, userA);
-    await applySession(userBPage.context(), baseURL, userB);
+    await applySession(userAPage.context(), resolvedBaseURL, userA);
+    await applySession(userBPage.context(), resolvedBaseURL, userB);
 
     for (const path of USER_ROUTES) {
       await userAPage.goto(path, { waitUntil: "domcontentloaded" });

@@ -9,24 +9,31 @@ import {
 } from "@/components/layout/use-auth-unread";
 import { useAuth } from "@/components/providers/auth-provider";
 import type { AuthData } from "@/components/post/types";
+import styles from "./user-menu.module.css";
 
 type AuthUser = AuthData["user"];
 
-function Avatar({ user, sizeClass }: { user: AuthUser; sizeClass?: string }) {
+function displayName(user: AuthUser) {
+  return user.nickname || user.username;
+}
+
+function Avatar({ user, small = false }: { user: AuthUser; small?: boolean }) {
+  const className = `${styles.avatar} ${small ? styles.avatarSmall : ""}`;
   const avatarUrl = user.avatarUrl?.trim();
+  const name = displayName(user);
   if (avatarUrl) {
     return (
       <img
         src={avatarUrl}
         alt={`${user.username} 的头像`}
-        className={`avatar avatar-image ${sizeClass || ""}`.trim()}
+        className={`${className} ${styles.avatarImage}`}
       />
     );
   }
 
   return (
-    <div className={`avatar ${sizeClass || ""}`.trim()}>
-      {user.username.charAt(0).toUpperCase()}
+    <div className={className}>
+      {name.charAt(0).toUpperCase()}
     </div>
   );
 }
@@ -73,20 +80,21 @@ export function UserMenu() {
       </Link>
     );
   }
+  const name = displayName(user);
 
   return (
-    <div className="user-menu" ref={menuRef}>
+    <div className={styles.menu} ref={menuRef}>
       <button
         type="button"
-        className="user-menu-trigger"
+        className={styles.trigger}
         onClick={() => setIsOpen(!isOpen)}
         aria-expanded={isOpen}
         aria-haspopup="true"
       >
-        <Avatar user={user} sizeClass="avatar-sm" />
-        <span className="user-menu-name">{user.username}</span>
+        <Avatar user={user} small />
+        <span className={styles.name}>{name}</span>
         <svg
-          className={`user-menu-arrow ${isOpen ? "open" : ""}`}
+          className={`${styles.arrow} ${isOpen ? styles.arrowOpen : ""}`}
           width="12"
           height="12"
           viewBox="0 0 24 24"
@@ -99,20 +107,20 @@ export function UserMenu() {
       </button>
 
       {isOpen && (
-        <div className="user-menu-dropdown">
-          <div className="user-menu-header">
+        <div className={styles.dropdown}>
+          <div className={styles.header}>
             <Avatar user={user} />
-            <div className="user-menu-info">
-              <div className="user-menu-username">{user.username}</div>
-              <div className="user-menu-email">
+            <div className={styles.info}>
+              <div className={styles.username}>{name}</div>
+              <div className={styles.email}>
                 {user.email || user.phone || "未绑定邮箱"}
               </div>
             </div>
           </div>
-          <div className="user-menu-divider" />
+          <div className={styles.divider} />
           <Link
             href="/my/posts"
-            className="user-menu-item"
+            className={styles.item}
             onClick={() => setIsOpen(false)}
           >
             <svg
@@ -133,7 +141,7 @@ export function UserMenu() {
           </Link>
           <Link
             href="/my"
-            className="user-menu-item"
+            className={styles.item}
             onClick={() => setIsOpen(false)}
           >
             <svg
@@ -151,7 +159,7 @@ export function UserMenu() {
           </Link>
           <Link
             href="/my/wallet"
-            className="user-menu-item"
+            className={styles.item}
             onClick={() => setIsOpen(false)}
           >
             <svg
@@ -169,7 +177,7 @@ export function UserMenu() {
           </Link>
           <Link
             href="/my/ledger"
-            className="user-menu-item"
+            className={styles.item}
             onClick={() => setIsOpen(false)}
           >
             <svg
@@ -187,7 +195,7 @@ export function UserMenu() {
           </Link>
           <Link
             href="/my/purchases"
-            className="user-menu-item"
+            className={styles.item}
             onClick={() => setIsOpen(false)}
           >
             <svg
@@ -208,7 +216,7 @@ export function UserMenu() {
           </Link>
           <Link
             href="/my/sales"
-            className="user-menu-item"
+            className={styles.item}
             onClick={() => setIsOpen(false)}
           >
             <svg
@@ -226,7 +234,7 @@ export function UserMenu() {
           </Link>
           <Link
             href="/my/messages"
-            className="user-menu-item"
+            className={styles.item}
             onClick={() => setIsOpen(false)}
           >
             <svg
@@ -241,15 +249,15 @@ export function UserMenu() {
             </svg>
             消息中心
             {unreadCount > 0 ? (
-              <span className="ml-auto rounded-full bg-cyan-100 px-2 py-0.5 text-xs text-cyan-700">
+              <span className="ml-auto rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">
                 {unreadCount}
               </span>
             ) : null}
           </Link>
-          <div className="user-menu-divider" />
+          <div className={styles.divider} />
           <button
             type="button"
-            className="user-menu-item user-menu-logout"
+            className={`${styles.item} ${styles.logout}`}
             onClick={handleLogout}
           >
             <svg

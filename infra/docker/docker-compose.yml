@@ -17,6 +17,7 @@ services:
       context: ../../apps/api
       dockerfile: Dockerfile
     environment:
+      DATABASE_URL: postgresql+psycopg://lenjoy:lenjoy@postgres:5432/lenjoy_bbs
       DB_URL: jdbc:postgresql://postgres:5432/lenjoy_bbs
       DB_USER: lenjoy
       DB_PASSWORD: lenjoy

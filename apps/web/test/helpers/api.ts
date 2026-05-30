@@ -1,6 +1,13 @@
 import type { APIRequestContext } from "@playwright/test";
 
+import { getAccessToken } from "./sessions";
 import type { ApiEnvelope, AuthData } from "./types";
+
+type BackendEnvelope<T> = {
+  data: T;
+  error: { code: string; message: string } | null;
+  meta: Record<string, unknown>;
+};
 
 type ApiRequestOptions = {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
@@ -23,7 +30,7 @@ export async function apiResponse<T>(
       Accept: "application/json",
       ...(options?.auth
         ? {
-            Authorization: `${options.auth.tokenType || "Bearer"} ${options.auth.token}`,
+            Authorization: `${options.auth.tokenType || "Bearer"} ${getAccessToken(options.auth)}`,
           }
         : {}),
       ...(options?.data ? { "Content-Type": "application/json" } : {}),
@@ -31,7 +38,16 @@ export async function apiResponse<T>(
     data: options?.data,
   });
 
-  const payload = (await response.json()) as ApiEnvelope<T>;
+  const rawPayload = (await response.json()) as ApiEnvelope<T> | BackendEnvelope<T>;
+  const payload =
+    "success" in rawPayload
+      ? rawPayload
+      : {
+          success: !rawPayload.error,
+          code: rawPayload.error?.code || "",
+          message: rawPayload.error?.message || "",
+          data: rawPayload.data,
+        };
   return {
     ok: response.ok(),
     status: response.status(),

@@ -16,11 +16,17 @@ import type {
 } from "@/components/post/types";
 import type {
   AdminBountiesFilters,
+  AdminBountyDeleteRequestsFilters,
   AdminReportsFilters,
   AdminResourceAppealsFilters,
   AdminUsersFilters,
   AdminPostsFilters,
 } from "@/components/admin/use-admin-queries";
+
+type ReviewBountyDeleteRequestResponse = {
+  id: number;
+  status: "APPROVED" | "REJECTED";
+};
 
 export function useUpdateAdminUserStatusMutation(filters: AdminUsersFilters) {
   const queryClient = useQueryClient();
@@ -128,6 +134,43 @@ export function useReviewResourceAppealMutation(
   });
 }
 
+export function useReviewBountyDeleteRequestMutation(
+  filters: AdminBountyDeleteRequestsFilters,
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      requestId,
+      action,
+      resolutionNote,
+    }: {
+      requestId: number;
+      action: "APPROVE" | "REJECT";
+      resolutionNote: string;
+    }) =>
+      requestApi<ReviewBountyDeleteRequestResponse>(
+        `/api/admin/bounty-delete-requests/${requestId}`,
+        {
+          method: "PATCH",
+          withAuth: true,
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ action, resolutionNote }),
+        },
+      ),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.adminBountyDeleteRequests(filters),
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "bounties"],
+      });
+    },
+  });
+}
+
 export function useUpdateAdminCoinsMutation() {
   return useMutation({
     mutationFn: ({
@@ -140,15 +183,17 @@ export function useUpdateAdminCoinsMutation() {
       operation: "CREDIT" | "DEBIT";
       amount: number;
       reason: string;
-    }) =>
-      requestApiData<WalletSummary>(`/api/admin/coins/users/${userId}`, {
+    }) => {
+      const signedAmount = operation === "DEBIT" ? -amount : amount;
+      return requestApiData<WalletSummary>(`/api/admin/coins/users/${userId}`, {
         method: "PATCH",
         withAuth: true,
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ operation, amount, reason }),
-      }),
+        body: JSON.stringify({ amount: signedAmount, reason }),
+      });
+    },
   });
 }
 

@@ -1,9 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { readError } from "@/components/post/client-helpers";
-import { usePostDetailQuery, usePostCommentsQuery } from "@/components/post/use-post-queries";
+import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys, readError } from "@/components/post/client-helpers";
+import { useRecordPostViewMutation } from "@/components/post/use-post-mutations";
+import {
+  usePostDetailQuery,
+  usePostCommentsQuery,
+} from "@/components/post/use-post-queries";
 import type { PostComment, PostDetail } from "@/components/post/types";
 import { useAuth } from "@/components/providers/auth-provider";
 
@@ -17,13 +22,21 @@ type Props = {
   initialComments?: PostComment[] | null;
 };
 
-export function PostDetailClient({ postId, initialPost, initialComments }: Props) {
-  const { authData: auth } = useAuth();
+export function PostDetailClient({
+  postId,
+  initialPost,
+  initialComments,
+}: Props) {
+  const queryClient = useQueryClient();
+  const { authData: auth, authReady } = useAuth();
   const [errorText, setErrorText] = useState("");
+  const hasRecordedView = useRef(false);
+  const lastViewerScope = useRef<string | null>(null);
 
   // Seed the cache with the data prefetched from the Server Component
   const postQuery = usePostDetailQuery(postId, initialPost);
   usePostCommentsQuery(postId, initialComments);
+  const recordPostViewMutation = useRecordPostViewMutation(postId);
 
   const post = postQuery.data;
   const loading = postQuery.isLoading;
@@ -33,6 +46,47 @@ export function PostDetailClient({ postId, initialPost, initialComments }: Props
       setErrorText(readError(postQuery.error));
     }
   }, [postQuery.error]);
+
+  useEffect(() => {
+    if (!authReady) {
+      return;
+    }
+
+    const nextViewerScope = auth?.user.id ? `user:${auth.user.id}` : "guest";
+    if (lastViewerScope.current === null) {
+      lastViewerScope.current = nextViewerScope;
+      if (auth) {
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.postDetail(postId),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.postComments(postId),
+        });
+      }
+      return;
+    }
+
+    if (lastViewerScope.current !== nextViewerScope) {
+      lastViewerScope.current = nextViewerScope;
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.postDetail(postId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.postComments(postId),
+      });
+    }
+  }, [auth, authReady, postId, queryClient]);
+
+  useEffect(() => {
+    if (!post || hasRecordedView.current) {
+      return;
+    }
+
+    hasRecordedView.current = true;
+    void recordPostViewMutation.mutateAsync().catch((error) => {
+      console.error("Record post view failed", error);
+    });
+  }, [post, recordPostViewMutation]);
 
   if (loading && !post) {
     return (
@@ -51,7 +105,10 @@ export function PostDetailClient({ postId, initialPost, initialComments }: Props
     <main className="page">
       {/* Back Link */}
       <div className="mb-4">
-        <Link href="/" className="nav-link">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 rounded-[10px] px-4 py-2 font-medium text-[var(--text-sub)] no-underline hover:bg-[rgba(47,111,237,0.08)] hover:text-[var(--color-primary)]"
+        >
           <svg
             className="icon-sm"
             viewBox="0 0 24 24"
@@ -68,7 +125,13 @@ export function PostDetailClient({ postId, initialPost, initialComments }: Props
 
       {errorText && (
         <div className="banner banner-error mb-4">
-          <svg className="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            className="icon-sm"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <circle cx="12" cy="12" r="10" />
             <line x1="15" y1="9" x2="9" y2="15" />
             <line x1="9" y1="9" x2="15" y2="15" />
