@@ -355,6 +355,20 @@ export function useReportPostMutation(postId: string) {
   });
 }
 
+export function useCreateBountyDeleteRequestMutation(postId: string) {
+  return useMutation({
+    mutationFn: ({ reason }: { reason: string }) =>
+      requestApi(`/api/posts/${postId}/bounty-delete-requests`, {
+        method: "POST",
+        withAuth: true,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ reason }),
+      }),
+  });
+}
+
 export function useReportCommentMutation() {
   return useMutation({
     mutationFn: ({

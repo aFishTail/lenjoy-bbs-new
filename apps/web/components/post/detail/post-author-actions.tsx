@@ -11,8 +11,8 @@ import { RichTextEditor } from "@/components/editor/rich-text-editor";
 import { readError } from "@/components/post/client-helpers";
 import { TagPicker } from "@/components/post/tag-picker";
 import {
+  useCreateBountyDeleteRequestMutation,
   useDeletePostMutation,
-  useReportPostMutation,
   useUpdatePostMutation,
 } from "@/components/post/use-post-mutations";
 import {
@@ -130,7 +130,8 @@ export function PostAuthorActions({ postId }: Props) {
   const tagsQuery = useTagsQuery("");
   const updatePostMutation = useUpdatePostMutation(postId);
   const deletePostMutation = useDeletePostMutation(postId);
-  const reportPostMutation = useReportPostMutation(postId);
+  const createBountyDeleteRequestMutation =
+    useCreateBountyDeleteRequestMutation(postId);
   const form = useForm<EditPostValues>({
     resolver: zodResolver(editPostSchema),
     defaultValues: {
@@ -235,10 +236,7 @@ export function PostAuthorActions({ postId }: Props) {
     }
 
     try {
-      await reportPostMutation.mutateAsync({
-        reason: "AUTHOR_DELETE_REQUEST",
-        detail,
-      });
+      await createBountyDeleteRequestMutation.mutateAsync({ reason: detail });
       setDeleteRequestDialogOpen(false);
       setDeleteRequestReason("");
       toast.success("删除申请已提交，请等待管理员处理");
@@ -483,7 +481,7 @@ export function PostAuthorActions({ postId }: Props) {
         description="已有用户参与回答的悬赏帖不能直接删除。请填写原因，提交后由管理员处理。"
         confirmLabel="提交申请"
         confirmDisabled={!deleteRequestReason.trim()}
-        confirmBusy={reportPostMutation.isPending}
+        confirmBusy={createBountyDeleteRequestMutation.isPending}
         onConfirm={() => void submitDeleteRequest()}
         onOpenChange={(open) => {
           setDeleteRequestDialogOpen(open);
