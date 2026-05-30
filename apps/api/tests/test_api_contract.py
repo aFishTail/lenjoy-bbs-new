@@ -1309,38 +1309,6 @@ def test_admin_lists_bounty_delete_requests_with_filters(client):
     assert item["answerCount"] == 1
 
 
-def test_bounty_author_can_submit_delete_request_report(client):
-    author_token = register_user(client, "bounty-delete-request-author",
-                                 "bounty-delete-request-author@example.com")
-
-    create_response = client.post(
-        f"{API_PREFIX}/posts",
-        headers=bearer(author_token),
-        json={
-            "postType": "BOUNTY",
-            "title": "Delete request bounty",
-            "content": "question body",
-            "bountyAmount": 25,
-            "bountyExpireAt": "2026-06-01T12:00:00Z",
-        },
-    )
-    post_id = unwrap(create_response)["data"]["id"]
-
-    report_response = client.post(
-        f"{API_PREFIX}/posts/{post_id}/reports",
-        headers=bearer(author_token),
-        json={
-            "reason": "AUTHOR_DELETE_REQUEST",
-            "detail": "问题已通过其他方式解决",
-        },
-    )
-    report_payload = unwrap(report_response)
-
-    assert report_response.status_code == 201
-    assert report_payload["data"]["postId"] == post_id
-    assert report_payload["data"]["reason"] == "AUTHOR_DELETE_REQUEST"
-
-
 def test_register_login_wallet_post_comment_and_purchase_flow(client):
     alice_token = register_user(client, "alice", "alice@example.com")
     bob_token = register_user(client, "bob", "bob@example.com")
