@@ -20,6 +20,7 @@ class UserAccount(Base):
 
     id: Mapped[int] = mapped_column(IdType, primary_key=True, autoincrement=True)
     username: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    nickname: Mapped[str] = mapped_column(String(64), nullable=False)
     email: Mapped[str | None] = mapped_column(String(128), unique=True)
     phone: Mapped[str | None] = mapped_column(String(32), unique=True)
     avatar_url: Mapped[str | None] = mapped_column(String(512))

@@ -1,10 +1,12 @@
 from sqlalchemy import or_, select
 from sqlalchemy.orm import aliased
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import status
 
 from lenjoy_bbs.core.errors import ApiError
+from lenjoy_bbs.core.messages import Admin
 from lenjoy_bbs.db.base import now_utc
+from lenjoy_bbs.modules.admin.posts.service import apply_post_offline
+from lenjoy_bbs.modules.messages.service import create_site_message
 from lenjoy_bbs.modules.posts.models import Post, PostComment, ResourcePurchase
 from lenjoy_bbs.modules.reports.models import CommentReport, PostReport, ResourceAppeal
 from lenjoy_bbs.modules.users.models import UserAccount
@@ -116,21 +118,33 @@ async def review_post_report(
     action: str | None,
     admin_id: int,
 ) -> dict:
-    report = await db.get(PostReport, report_id)
-    if not report:
-        raise ApiError("REPORT_NOT_FOUND", "Report does not exist", status.HTTP_404_NOT_FOUND)
-    report.status = status_value
-    report.resolution_note = note
-    report.handled_by = admin_id
-    report.handled_at = now_utc()
-    if action == "OFFLINE_POST":
-        post = await db.get(Post, report.post_id)
-        if post:
-            post.status = "OFFLINE"
-            post.offlined_by = admin_id
-            post.offlined_at = now_utc()
-    await db.commit()
-    return {"id": report.id, "status": report.status}
+    try:
+        report = await db.get(PostReport, report_id)
+        if not report:
+            raise ApiError(Admin.REPORT_NOT_FOUND)
+        report.status = status_value
+        report.resolution_note = note
+        report.handled_by = admin_id
+        report.handled_at = now_utc()
+        if action == "OFFLINE_POST":
+            post = await db.get(Post, report.post_id)
+            if post:
+                await apply_post_offline(db, post, admin_id)
+                content = f"你的帖子《{post.title}》因举报处理被下架。"
+                if note:
+                    content = f"{content}处理说明：{note}"
+                await create_site_message(
+                    db,
+                    user_id=post.author_id,
+                    title="帖子已下架",
+                    content=content,
+                    message_type="POST_OFFLINED",
+                )
+        await db.commit()
+        return {"id": report.id, "status": report.status}
+    except Exception:
+        await db.rollback()
+        raise
 
 
 async def review_comment_report(
@@ -144,7 +158,7 @@ async def review_comment_report(
 ) -> dict:
     report = await db.get(CommentReport, report_id)
     if not report:
-        raise ApiError("REPORT_NOT_FOUND", "Report does not exist", status.HTTP_404_NOT_FOUND)
+        raise ApiError(Admin.REPORT_NOT_FOUND)
     report.status = status_value
     report.resolution_note = note
     report.handled_by = admin_id
@@ -221,7 +235,7 @@ async def review_resource_appeal(
 ) -> dict:
     appeal = await db.get(ResourceAppeal, appeal_id)
     if not appeal:
-        raise ApiError("APPEAL_NOT_FOUND", "Appeal does not exist", status.HTTP_404_NOT_FOUND)
+        raise ApiError(Admin.APPEAL_NOT_FOUND)
     appeal.status = "APPROVED" if action == "APPROVE" else "REJECTED"
     appeal.resolved_refund_amount = refund_amount if action == "APPROVE" else 0
     appeal.resolution_note = note

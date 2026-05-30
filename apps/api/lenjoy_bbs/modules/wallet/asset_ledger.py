@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from lenjoy_bbs.core.config import get_settings
 from lenjoy_bbs.core.errors import ApiError
+from lenjoy_bbs.core.messages import Wallet as WalletMessages
 from lenjoy_bbs.modules.wallet.models import Wallet
 from lenjoy_bbs.modules.wallet.service import adjust_available, ensure_wallet, freeze_available, lock_wallet, spend_frozen, unfreeze_available
 
@@ -109,7 +110,7 @@ async def settle_resource_purchase(
 ) -> tuple[Wallet, Wallet]:
     buyer_wallet = await lock_wallet(db, buyer_id)
     if buyer_wallet.available_coins < price:
-        raise ApiError("INSUFFICIENT_COINS", "Insufficient coins")
+        raise ApiError(WalletMessages.INSUFFICIENT_COINS)
 
     buyer_wallet = await adjust_available(
         db,

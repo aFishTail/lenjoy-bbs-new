@@ -8,6 +8,7 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { uploadImage } from "@/lib/upload-client";
+import { cn } from "@/lib/utils";
 import styles from "./rich-text.module.css";
 
 type Props = {
@@ -15,6 +16,7 @@ type Props = {
   onChange: (value: string) => void;
   placeholder?: string;
   minHeightClassName?: string;
+  invalid?: boolean;
 };
 
 export function RichTextEditor({
@@ -22,6 +24,7 @@ export function RichTextEditor({
   onChange,
   placeholder,
   minHeightClassName = "min-h-[220px]",
+  invalid = false,
 }: Props) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploadError, setUploadError] = useState("");
@@ -109,7 +112,13 @@ export function RichTextEditor({
   }
 
   return (
-    <div className="rounded-xl border border-(--border-medium) bg-white/50 overflow-hidden">
+    <div
+      aria-invalid={invalid}
+      className={cn(
+        "overflow-hidden rounded-xl border border-(--border-medium) bg-white/50 transition-colors",
+        "field-error-control",
+      )}
+    >
       <div className={styles.toolbar}>
         <button
           type="button"

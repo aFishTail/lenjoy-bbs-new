@@ -37,6 +37,7 @@ def upgrade() -> None:
         "user_account",
         pk_col(),
         sa.Column("username", sa.String(64), nullable=False, unique=True),
+        sa.Column("nickname", sa.String(64), nullable=False),
         sa.Column("email", sa.String(128), unique=True),
         sa.Column("phone", sa.String(32), unique=True),
         sa.Column("avatar_url", sa.String(512)),

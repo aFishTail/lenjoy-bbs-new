@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -315,9 +316,12 @@ export function PostCommentSection({ postId }: Props) {
                 className="rounded-2xl border border-[var(--border-light)] bg-white/80 p-4"
               >
                 <div className="mb-3 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-                  <span className="font-medium text-slate-800">
+                  <Link
+                    href={`/users/${comment.authorId}`}
+                    className="font-medium text-slate-800 no-underline hover:text-[var(--color-primary)]"
+                  >
                     {comment.authorUsername || comment.authorId}
-                  </span>
+                  </Link>
                   <span>
                     {new Date(comment.createdAt).toLocaleString("zh-CN")}
                   </span>
@@ -442,9 +446,12 @@ export function PostCommentSection({ postId }: Props) {
                         className="rounded-xl bg-slate-50 p-3 text-sm"
                       >
                         <div className="mb-2 flex flex-wrap items-center gap-2 text-slate-500">
-                          <span className="font-medium text-slate-700">
+                          <Link
+                            href={`/users/${reply.authorId}`}
+                            className="font-medium text-slate-700 no-underline hover:text-[var(--color-primary)]"
+                          >
                             {reply.authorUsername || reply.authorId}
-                          </span>
+                          </Link>
                           {reply.replyToUsername ? (
                             <span>回复 {reply.replyToUsername}</span>
                           ) : null}

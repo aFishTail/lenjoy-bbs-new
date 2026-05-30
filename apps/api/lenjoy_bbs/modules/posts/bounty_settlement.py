@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from lenjoy_bbs.core.errors import ApiError
 from lenjoy_bbs.core.logging import log_event
+from lenjoy_bbs.core.messages import Posts
 from lenjoy_bbs.db.base import now_utc
 from lenjoy_bbs.modules.messages.service import create_site_message
 from lenjoy_bbs.modules.posts.lifecycle import refund_active_bounty_reserve
@@ -22,20 +23,15 @@ async def accept_bounty_answer_settlement(db: AsyncSession, post_id: int,
                                           actor: UserAccount) -> PostComment:
     post = await find_post(db, post_id)
     if not post or post.is_deleted:
-        raise ApiError("POST_NOT_FOUND", "Post does not exist",
-                       status.HTTP_404_NOT_FOUND)
+        raise ApiError(Posts.POST_NOT_FOUND)
     if post.post_type != "BOUNTY":
-        raise ApiError("POST_NOT_BOUNTY", "Post is not a bounty post",
-                       status.HTTP_400_BAD_REQUEST)
+        raise ApiError(Posts.POST_NOT_BOUNTY)
     if post.author_id != actor.id:
-        raise ApiError("FORBIDDEN", "Only the author can accept an answer",
-                       status.HTTP_403_FORBIDDEN)
+        raise ApiError(Posts.ACCEPT_FORBIDDEN)
     if post.bounty_status != "ACTIVE":
-        raise ApiError("BOUNTY_NOT_ACTIVE",
-                       "Bounty is not active and cannot accept answers")
+        raise ApiError(Posts.BOUNTY_NOT_ACTIVE)
     if post.accepted_comment_id is not None:
-        raise ApiError("BOUNTY_ALREADY_RESOLVED",
-                       "Bounty answer has already been accepted")
+        raise ApiError(Posts.BOUNTY_ALREADY_RESOLVED)
     if post.bounty_expire_at and post.bounty_expire_at <= now_utc():
         try:
             await refund_active_bounty_reserve(db, post, "expired", actor.id)
@@ -50,24 +46,19 @@ async def accept_bounty_answer_settlement(db: AsyncSession, post_id: int,
                                  "user_id": actor.id,
                              })
             raise
-        raise ApiError("BOUNTY_EXPIRED",
-                       "Bounty has expired and cannot accept answers")
+        raise ApiError(Posts.BOUNTY_EXPIRED)
 
     comment = await db.scalar(
         select(PostComment).where(PostComment.id == comment_id,
                                   PostComment.post_id == post_id))
     if not comment:
-        raise ApiError("COMMENT_NOT_FOUND", "Comment does not exist",
-                       status.HTTP_404_NOT_FOUND)
+        raise ApiError(Posts.COMMENT_NOT_FOUND)
     if comment.parent_id is not None:
-        raise ApiError("COMMENT_NOT_ACCEPTABLE",
-                       "Only top-level answers can be accepted")
+        raise ApiError(Posts.COMMENT_REPLY_NOT_ACCEPTABLE)
     if comment.is_deleted:
-        raise ApiError("COMMENT_NOT_ACCEPTABLE",
-                       "Deleted comments cannot be accepted")
+        raise ApiError(Posts.COMMENT_DELETED_NOT_ACCEPTABLE)
     if comment.author_id == actor.id:
-        raise ApiError("SELF_ACCEPT_DENIED",
-                       "Author cannot accept their own answer")
+        raise ApiError(Posts.SELF_ACCEPT_DENIED)
 
     bounty_amount = post.bounty_amount or 0
 

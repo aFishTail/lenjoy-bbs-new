@@ -110,6 +110,8 @@ class CommentResponse(BaseModel):
     can_view_content: bool = Field(default=True, alias="canViewContent")
     masked_summary: str | None = Field(default=None, alias="maskedSummary")
     deleted: bool = False
+    like_count: int = Field(default=0, alias="likeCount")
+    liked: bool = False
     created_at: str = Field(alias="createdAt")
     updated_at: str | None = Field(default=None, alias="updatedAt")
     replies: list["CommentResponse"] = Field(default_factory=list)

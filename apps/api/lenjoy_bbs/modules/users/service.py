@@ -3,9 +3,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import aliased
 
 from lenjoy_bbs.core.errors import ApiError
-from lenjoy_bbs.modules.auth.repository import find_user_by_any_identifier
+from lenjoy_bbs.core.messages import Users
 from lenjoy_bbs.modules.messages.service import create_site_message
-from lenjoy_bbs.modules.open_api.constants import OPEN_API_SYSTEM_EMAIL, OPEN_API_SYSTEM_USERNAME
 from lenjoy_bbs.modules.posts.models import Post, ResourcePurchase
 from lenjoy_bbs.modules.reports.models import ResourceAppeal
 from lenjoy_bbs.modules.common import user_public
@@ -40,6 +39,50 @@ async def build_my_profile(db: AsyncSession, user: UserAccount) -> dict:
     }
 
 
+async def build_public_profile(db: AsyncSession,
+                               target_user_id: int,
+                               viewer: UserAccount | None = None) -> dict:
+    user = await db.scalar(
+        select(UserAccount).where(UserAccount.id == target_user_id))
+    if user is None:
+        raise ApiError(Users.USER_NOT_FOUND)
+
+    post_count = await db.scalar(
+        select(func.count()).select_from(Post).where(
+            Post.author_id == target_user_id,
+            Post.is_deleted.is_(False),
+            Post.status == "PUBLISHED",
+        )) or 0
+    following_count = await db.scalar(
+        select(func.count()).select_from(UserFollow).where(
+            UserFollow.follower_id == target_user_id, )) or 0
+    follower_count = await db.scalar(
+        select(func.count()).select_from(UserFollow).where(
+            UserFollow.following_id == target_user_id, )) or 0
+
+    followed_by_me = False
+    is_self = viewer is not None and viewer.id == target_user_id
+    if viewer is not None and not is_self:
+        followed_by_me = bool(await db.scalar(
+            select(UserFollow).where(
+                UserFollow.follower_id == viewer.id,
+                UserFollow.following_id == target_user_id,
+            )))
+
+    return {
+        "id": user.id,
+        "username": user.username,
+        "nickname": user.nickname,
+        "avatarUrl": user.avatar_url,
+        "bio": user.bio,
+        "postCount": post_count,
+        "followingCount": following_count,
+        "followerCount": follower_count,
+        "followedByMe": followed_by_me,
+        "isSelf": is_self,
+    }
+
+
 def _serialize_purchase_summary(row) -> dict:
     purchase, post_title, buyer_username, seller_username, appeal_status = row
     return {
@@ -61,14 +104,15 @@ def _serialize_purchase_summary(row) -> dict:
 
 async def list_my_followers(db: AsyncSession, user_id: int) -> list[dict]:
     rows = (await db.execute(
-        select(UserAccount.id, UserAccount.username, UserAccount.avatar_url,
-               UserFollow.created_at).join(
+        select(UserAccount.id, UserAccount.username, UserAccount.nickname,
+               UserAccount.avatar_url, UserFollow.created_at).join(
                    UserFollow, UserFollow.follower_id == UserAccount.id).where(
                        UserFollow.following_id == user_id).order_by(
                            UserFollow.created_at.desc()))).all()
     return [{
         "id": row.id,
         "username": row.username,
+        "nickname": row.nickname,
         "avatarUrl": row.avatar_url,
         "followedAt": row.created_at.isoformat(),
     } for row in rows]
@@ -76,8 +120,8 @@ async def list_my_followers(db: AsyncSession, user_id: int) -> list[dict]:
 
 async def list_my_following(db: AsyncSession, user_id: int) -> list[dict]:
     rows = (await db.execute(
-        select(UserAccount.id, UserAccount.username, UserAccount.avatar_url,
-               UserFollow.created_at).join(
+        select(UserAccount.id, UserAccount.username, UserAccount.nickname,
+               UserAccount.avatar_url, UserFollow.created_at).join(
                    UserFollow,
                    UserFollow.following_id == UserAccount.id).where(
                        UserFollow.follower_id == user_id).order_by(
@@ -85,6 +129,7 @@ async def list_my_following(db: AsyncSession, user_id: int) -> list[dict]:
     return [{
         "id": row.id,
         "username": row.username,
+        "nickname": row.nickname,
         "avatarUrl": row.avatar_url,
         "followedAt": row.created_at.isoformat(),
     } for row in rows]
@@ -93,12 +138,12 @@ async def list_my_following(db: AsyncSession, user_id: int) -> list[dict]:
 async def toggle_follow(db: AsyncSession, current_user: UserAccount,
                         target_user_id: int) -> dict:
     if current_user.id == target_user_id:
-        raise ApiError("INVALID_OPERATION", "User cannot follow themselves")
+        raise ApiError(Users.SELF_FOLLOW_DENIED)
 
     target_user = await db.scalar(
         select(UserAccount).where(UserAccount.id == target_user_id))
     if target_user is None:
-        raise ApiError("USER_NOT_FOUND", "User does not exist", 404)
+        raise ApiError(Users.USER_NOT_FOUND)
 
     relation = await db.scalar(
         select(UserFollow).where(UserFollow.follower_id == current_user.id,
@@ -141,8 +186,8 @@ async def list_my_resource_purchases(db: AsyncSession,
         select(
             ResourcePurchase,
             Post.title,
-            buyer.username,
-            seller.username,
+            func.coalesce(buyer.nickname, buyer.username),
+            func.coalesce(seller.nickname, seller.username),
             ResourceAppeal.status,
         ).join(Post, Post.id == ResourcePurchase.post_id).join(
             buyer, buyer.id == ResourcePurchase.buyer_id).join(
@@ -161,8 +206,8 @@ async def list_my_resource_sales(db: AsyncSession, user_id: int) -> list[dict]:
         select(
             ResourcePurchase,
             Post.title,
-            buyer.username,
-            seller.username,
+            func.coalesce(buyer.nickname, buyer.username),
+            func.coalesce(seller.nickname, seller.username),
             ResourceAppeal.status,
         ).join(Post, Post.id == ResourcePurchase.post_id).join(
             buyer, buyer.id == ResourcePurchase.buyer_id).join(
@@ -176,17 +221,8 @@ async def list_my_resource_sales(db: AsyncSession, user_id: int) -> list[dict]:
 
 async def update_profile(db: AsyncSession, user: UserAccount,
                          payload: ProfileUpdateRequest) -> dict:
-    next_username = (payload.username or user.username).strip()
-    if next_username.lower() == OPEN_API_SYSTEM_USERNAME or (
-        (user.email or "").lower() == OPEN_API_SYSTEM_EMAIL
-            and next_username != user.username):
-        raise ApiError("ACCOUNT_RESERVED", "Account identifier is reserved")
-    if next_username != user.username:
-        conflict = await find_user_by_any_identifier(db, [next_username])
-        if conflict and conflict.id != user.id:
-            raise ApiError("ACCOUNT_IDENTIFIER_CONFLICT",
-                           "Account identifiers must be globally unique")
-        user.username = next_username
+    if payload.nickname is not None:
+        user.nickname = payload.nickname.strip()
     user.avatar_url = payload.avatar_url
     user.bio = payload.bio
     await db.flush()
@@ -196,6 +232,7 @@ async def update_profile(db: AsyncSession, user: UserAccount,
 
 
 __all__ = [
+    "build_public_profile",
     "build_my_profile",
     "list_my_followers",
     "list_my_following",

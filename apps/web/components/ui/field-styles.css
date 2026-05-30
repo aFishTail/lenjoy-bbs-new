@@ -1,0 +1,11 @@
+@utility field-error-control {
+  &[aria-invalid="true"] {
+    border-color: var(--color-red-400);
+  }
+
+  &[aria-invalid="true"]:focus-visible,
+  &[aria-invalid="true"]:focus-within {
+    border-color: var(--color-red-500);
+    box-shadow: 0 0 0 4px rgba(248, 113, 113, 0.18) !important;
+  }
+}

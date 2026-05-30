@@ -5,9 +5,10 @@ from fastapi import APIRouter, Query, Request, status
 from lenjoy_bbs.core.api_schemas import ApiEnvelope, PageData
 from lenjoy_bbs.core.dependencies import CurrentUser, DbSession, OptionalCurrentUser
 from lenjoy_bbs.core.errors import ApiError
+from lenjoy_bbs.core.messages import Posts
 from lenjoy_bbs.core.responses import success
 from lenjoy_bbs.modules.posts.bounty_settlement import accept_bounty_answer_settlement
-from lenjoy_bbs.modules.posts.engagement import create_comment, record_post_view, toggle_post_favorite, toggle_post_like
+from lenjoy_bbs.modules.posts.engagement import create_comment, record_post_view, toggle_comment_like, toggle_post_favorite, toggle_post_like
 from lenjoy_bbs.modules.posts.lifecycle import create_post, delete_post, update_post
 from lenjoy_bbs.modules.posts.presenters import serialize_comment, serialize_post
 from lenjoy_bbs.modules.posts.read_service import list_my_posts_feed, list_posts_feed, read_post_comments, read_post_detail
@@ -15,6 +16,7 @@ from lenjoy_bbs.modules.posts.resource_trade import purchase_resource_post
 from lenjoy_bbs.modules.posts.schemas import CommentCreateRequest, CommentResponse, InteractionToggleResponse, PostCreateRequest, PostPurchaseResponse, PostResponse, PostUpdateRequest, PostViewResponse
 
 router = APIRouter(prefix="/posts", tags=["posts"])
+comments_router = APIRouter(prefix="/comments", tags=["comments"])
 
 
 def _resolve_client_ip(request: Request) -> str:
@@ -48,15 +50,16 @@ async def list_posts(db: DbSession,
                      postType: str | None = Query(default=None),
                      categoryId: int | None = Query(default=None),
                      tagId: int | None = Query(default=None),
+                     authorId: int | None = Query(default=None, ge=1),
                      keyword: str | None = Query(default=None),
                      pageSize: int = Query(20, ge=1, le=100)):
     normalized_keyword = (keyword or "").strip()
     if len(normalized_keyword) > 100:
-        raise ApiError("INVALID_KEYWORD", "Keyword is too long",
-                       status.HTTP_422_UNPROCESSABLE_CONTENT)
+        raise ApiError(Posts.INVALID_KEYWORD)
     keyword_filter = normalized_keyword or None
     return success(await list_posts_feed(db, page, pageSize, postType,
-                                         categoryId, tagId, keyword_filter))
+                                         categoryId, tagId, keyword_filter,
+                                         authorId))
 
 
 @router.get("/mine")
@@ -99,6 +102,13 @@ async def toggle_like(post_id: int, db: DbSession, user: CurrentUser):
              response_model=ApiEnvelope[InteractionToggleResponse])
 async def toggle_favorite(post_id: int, db: DbSession, user: CurrentUser):
     return success(await toggle_post_favorite(db, post_id, user))
+
+
+@comments_router.post("/{comment_id}/likes/toggle",
+                      response_model=ApiEnvelope[InteractionToggleResponse])
+async def toggle_comment_like_endpoint(comment_id: int, db: DbSession,
+                                       user: CurrentUser):
+    return success(await toggle_comment_like(db, comment_id, user))
 
 
 @router.put("/{post_id}", response_model=ApiEnvelope[PostResponse])

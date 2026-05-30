@@ -1,7 +1,7 @@
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from lenjoy_bbs.modules.posts.models import Post, PostComment, PostFavorite, PostLike, PostTag, ResourcePurchase
+from lenjoy_bbs.modules.posts.models import CommentLike, Post, PostComment, PostFavorite, PostLike, PostTag, ResourcePurchase
 from lenjoy_bbs.modules.posts.repository import user_purchased_post
 from lenjoy_bbs.modules.reports.models import ResourceAppeal
 from lenjoy_bbs.modules.taxonomy.models import Category, Tag
@@ -18,9 +18,12 @@ async def load_usernames(db: AsyncSession,
         return {}
 
     rows = await db.execute(
-        select(UserAccount.id, UserAccount.username).where(
+        select(UserAccount.id, UserAccount.nickname, UserAccount.username).where(
             UserAccount.id.in_(filtered_user_ids)))
-    return {user_id: username for user_id, username in rows.all()}
+    return {
+        user_id: nickname or username
+        for user_id, nickname, username in rows.all()
+    }
 
 
 async def load_post_stats(
@@ -75,6 +78,46 @@ async def load_post_stats(
         stats[post_id]["answerCount"] = count
 
     return stats
+
+
+async def load_comment_like_counts(db: AsyncSession,
+                                   comment_ids: set[int | None]) -> dict[int,
+                                                                          int]:
+    filtered_comment_ids = {
+        comment_id
+        for comment_id in comment_ids if comment_id is not None
+    }
+    if not filtered_comment_ids:
+        return {}
+
+    counts = {comment_id: 0 for comment_id in filtered_comment_ids}
+    rows = await db.execute(
+        select(CommentLike.comment_id, func.count(CommentLike.id)).where(
+            CommentLike.comment_id.in_(filtered_comment_ids)).group_by(
+                CommentLike.comment_id))
+    for comment_id, count in rows.all():
+        counts[comment_id] = count
+    return counts
+
+
+async def load_viewer_liked_comment_ids(
+        db: AsyncSession, comment_ids: set[int | None],
+        viewer: UserAccount | None) -> set[int]:
+    if viewer is None:
+        return set()
+    filtered_comment_ids = {
+        comment_id
+        for comment_id in comment_ids if comment_id is not None
+    }
+    if not filtered_comment_ids:
+        return set()
+
+    rows = await db.scalars(
+        select(CommentLike.comment_id).where(
+            CommentLike.comment_id.in_(filtered_comment_ids),
+            CommentLike.user_id == viewer.id,
+        ))
+    return set(rows.all())
 
 
 async def load_category_names(db: AsyncSession,
@@ -301,6 +344,8 @@ async def serialize_comment(db: AsyncSession,
                             content: str | None = None,
                             can_view_content: bool = True,
                             masked_summary: str | None = None,
+                            like_count: int = 0,
+                            liked: bool = False,
                             replies: list[dict] | None = None) -> dict:
     usernames = usernames or await load_usernames(
         db, {comment.author_id, comment.reply_to_user_id})
@@ -333,6 +378,10 @@ async def serialize_comment(db: AsyncSession,
         masked_summary,
         "deleted":
         comment.is_deleted,
+        "likeCount":
+        like_count,
+        "liked":
+        liked,
         "updatedAt":
         comment.updated_at.isoformat(),
         "replies":
@@ -376,35 +425,48 @@ def _order_comments_with_accepted_first(
 async def _serialize_comment_tree(db: AsyncSession, comment: PostComment,
                                   comments_by_parent_id: dict[
                                       int | None, list[PostComment]],
-                                  usernames: dict[int, str]) -> dict:
+                                  usernames: dict[int, str],
+                                  like_counts: dict[int, int],
+                                  liked_comment_ids: set[int]) -> dict:
     reply_items = [
         await _serialize_comment_tree(db, reply, comments_by_parent_id,
-                                      usernames)
+                                      usernames, like_counts,
+                                      liked_comment_ids)
         for reply in comments_by_parent_id.get(comment.id, [])
     ]
     return await serialize_comment(db,
                                    comment,
                                    usernames=usernames,
+                                   like_count=like_counts.get(comment.id, 0),
+                                   liked=comment.id in liked_comment_ids,
                                    replies=reply_items)
 
 
 async def _serialize_full_comment_tree_list(
         db: AsyncSession, comments: list[PostComment],
         comments_by_parent_id: dict[int | None, list[PostComment]],
-        usernames: dict[int, str]) -> list[dict]:
+        usernames: dict[int, str], like_counts: dict[int, int],
+        liked_comment_ids: set[int]) -> list[dict]:
     return [
         await _serialize_comment_tree(db, comment, comments_by_parent_id,
-                                      usernames) for comment in comments
+                                      usernames, like_counts,
+                                      liked_comment_ids) for comment in comments
     ]
 
 
 async def _serialize_bounty_viewer_comments(
         db: AsyncSession, post: Post, top_level_comments: list[PostComment],
-        viewer_id: int | None, usernames: dict[int, str]) -> list[dict]:
+        viewer_id: int | None, usernames: dict[int, str],
+        like_counts: dict[int, int], liked_comment_ids: set[int]) -> list[dict]:
     accepted_comment = _find_comment_by_id(top_level_comments,
                                            post.accepted_comment_id)
     visible_comments = [
-        await serialize_comment(db, comment, usernames=usernames, replies=[])
+        await serialize_comment(db,
+                                comment,
+                                usernames=usernames,
+                                like_count=like_counts.get(comment.id, 0),
+                                liked=comment.id in liked_comment_ids,
+                                replies=[])
         for comment in top_level_comments if comment.author_id == viewer_id
     ] if viewer_id is not None else []
 
@@ -418,6 +480,8 @@ async def _serialize_bounty_viewer_comments(
                 content=None,
                 can_view_content=False,
                 masked_summary=_accepted_summary(accepted_comment, usernames),
+                like_count=like_counts.get(accepted_comment.id, 0),
+                liked=accepted_comment.id in liked_comment_ids,
                 replies=[],
             ),
         )
@@ -444,19 +508,27 @@ async def serialize_post_comments(
     top_level_comments = comments_by_parent_id.get(None, [])
     viewer_id = viewer.id if viewer else None
     is_post_author = viewer_id == post.author_id
+    comment_ids = {comment.id for comment in comments}
+    like_counts = await load_comment_like_counts(db, comment_ids)
+    liked_comment_ids = await load_viewer_liked_comment_ids(
+        db, comment_ids, viewer)
 
     if post.post_type != "BOUNTY":
         return await _serialize_full_comment_tree_list(db, top_level_comments,
                                                        comments_by_parent_id,
-                                                       usernames)
+                                                       usernames, like_counts,
+                                                       liked_comment_ids)
 
     if is_post_author:
         ordered_comments = _order_comments_with_accepted_first(
             top_level_comments, post.accepted_comment_id)
         return await _serialize_full_comment_tree_list(db, ordered_comments,
                                                        comments_by_parent_id,
-                                                       usernames)
+                                                       usernames, like_counts,
+                                                       liked_comment_ids)
 
     return await _serialize_bounty_viewer_comments(db, post,
                                                    top_level_comments,
-                                                   viewer_id, usernames)
+                                                   viewer_id, usernames,
+                                                   like_counts,
+                                                   liked_comment_ids)

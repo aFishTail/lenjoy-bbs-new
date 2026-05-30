@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from lenjoy_bbs.core.errors import ApiError
 from lenjoy_bbs.core.logging import log_event
+from lenjoy_bbs.core.messages import Posts
 from lenjoy_bbs.modules.messages.service import create_site_message
 from lenjoy_bbs.modules.posts.models import ResourcePurchase
 from lenjoy_bbs.modules.posts.repository import find_published_post
@@ -20,14 +21,11 @@ async def purchase_resource_post(db: AsyncSession, post_id: int,
     buyer_id = buyer.id
     post = await find_published_post(db, post_id)
     if not post:
-        raise ApiError("POST_NOT_FOUND", "Post does not exist",
-                       status.HTTP_404_NOT_FOUND)
+        raise ApiError(Posts.POST_NOT_FOUND)
     if post.post_type != "RESOURCE" or not post.hidden_content:
-        raise ApiError("POST_NOT_PURCHASABLE",
-                       "Post is not a purchasable resource")
+        raise ApiError(Posts.POST_NOT_PURCHASABLE)
     if post.author_id == buyer_id:
-        raise ApiError("SELF_PURCHASE_DENIED",
-                       "Author cannot purchase their own post")
+        raise ApiError(Posts.SELF_PURCHASE_DENIED)
 
     price = post.price or 0
 
@@ -64,8 +62,7 @@ async def purchase_resource_post(db: AsyncSession, post_id: int,
                   "posts.purchase_conflict",
                   post_id=post_id,
                   user_id=buyer_id)
-        raise ApiError("ALREADY_PURCHASED",
-                       "Resource has already been purchased") from exc
+        raise ApiError(Posts.ALREADY_PURCHASED) from exc
     except Exception:
         await db.rollback()
         logger.exception("posts.purchase_failed",

@@ -11,6 +11,7 @@ from redis.asyncio import Redis
 from lenjoy_bbs.core.config import get_settings
 from lenjoy_bbs.core.errors import ApiError
 from lenjoy_bbs.core.logging import log_event
+from lenjoy_bbs.core.messages import Auth
 
 CAPTCHA_KEY_PREFIX = "auth:captcha:"
 CAPTCHA_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -60,7 +61,7 @@ class RedisCaptchaStore:
                 "captcha.redis_set_failed",
                 extra={"event": "captcha.redis_set_failed", "dependency": "redis", "operation": "set", "error_type": type(exc).__name__},
             )
-            raise ApiError("CAPTCHA_UNAVAILABLE", "Captcha service is unavailable", 500) from exc
+            raise ApiError(Auth.CAPTCHA_UNAVAILABLE) from exc
 
     async def get(self, captcha_id: str) -> str | None:
         try:
@@ -70,7 +71,7 @@ class RedisCaptchaStore:
                 "captcha.redis_get_failed",
                 extra={"event": "captcha.redis_get_failed", "dependency": "redis", "operation": "get", "error_type": type(exc).__name__},
             )
-            raise ApiError("CAPTCHA_UNAVAILABLE", "Captcha service is unavailable", 500) from exc
+            raise ApiError(Auth.CAPTCHA_UNAVAILABLE) from exc
 
     async def pop(self, captcha_id: str) -> str | None:
         try:
@@ -80,7 +81,7 @@ class RedisCaptchaStore:
                 "captcha.redis_pop_failed",
                 extra={"event": "captcha.redis_pop_failed", "dependency": "redis", "operation": "getdel", "error_type": type(exc).__name__},
             )
-            raise ApiError("CAPTCHA_UNAVAILABLE", "Captcha service is unavailable", 500) from exc
+            raise ApiError(Auth.CAPTCHA_UNAVAILABLE) from exc
 
     def _key(self, captcha_id: str) -> str:
         return CAPTCHA_KEY_PREFIX + captcha_id
@@ -117,16 +118,16 @@ async def issue_captcha() -> dict[str, str | int]:
 async def get_captcha_image(captcha_id: str) -> bytes:
     code = await get_captcha_store().get(captcha_id)
     if not code:
-        raise ApiError("CAPTCHA_EXPIRED", "Captcha is invalid or expired", 404)
+        raise ApiError(Auth.CAPTCHA_EXPIRED)
     return render_captcha_png(code.upper())
 
 
 async def verify_captcha(captcha_id: str, captcha_code: str) -> None:
     expected = await get_captcha_store().pop(captcha_id)
     if not expected:
-        raise ApiError("CAPTCHA_INVALID", "Captcha is invalid or expired")
+        raise ApiError(Auth.CAPTCHA_INVALID)
     if expected != captcha_code.strip().lower():
-        raise ApiError("CAPTCHA_INVALID", "Captcha is invalid or expired")
+        raise ApiError(Auth.CAPTCHA_INVALID)
 
 
 def render_captcha_png(code: str) -> bytes:

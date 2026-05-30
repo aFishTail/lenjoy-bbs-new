@@ -113,7 +113,6 @@ export function MySalesClient() {
                   <span>成交金额 {item.price}</span>
                   <span>已退款 {item.refundedAmount}</span>
                   <span>净收入 {item.price - item.refundedAmount}</span>
-                  <span>申诉状态 {item.appealStatus || "无"}</span>
                 </div>
                 <Link
                   href={`/posts/${item.postId}`}

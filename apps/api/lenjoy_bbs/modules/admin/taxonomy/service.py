@@ -2,11 +2,11 @@ import logging
 import re
 
 from sqlalchemy import select
-from fastapi import status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lenjoy_bbs.core.errors import ApiError
 from lenjoy_bbs.core.logging import log_event
+from lenjoy_bbs.core.messages import Admin
 from lenjoy_bbs.modules.common import model_dict
 from lenjoy_bbs.modules.taxonomy.models import Category, Tag
 
@@ -95,7 +95,7 @@ async def update_category(
 ) -> dict:
     category = await db.get(Category, category_id)
     if not category:
-        raise ApiError("CATEGORY_NOT_FOUND", "Category does not exist", status.HTTP_404_NOT_FOUND)
+        raise ApiError(Admin.CATEGORY_NOT_FOUND)
     category.name = name
     category.slug = slug or _slugify(name)
     category.content_type = content_type
@@ -111,7 +111,7 @@ async def update_category(
 async def update_category_status(db: AsyncSession, category_id: int, status_value: str) -> dict:
     category = await db.get(Category, category_id)
     if not category:
-        raise ApiError("CATEGORY_NOT_FOUND", "Category does not exist", status.HTTP_404_NOT_FOUND)
+        raise ApiError(Admin.CATEGORY_NOT_FOUND)
     category.status = status_value
     await db.commit()
     await db.refresh(category)
@@ -121,7 +121,7 @@ async def update_category_status(db: AsyncSession, category_id: int, status_valu
 async def delete_category(db: AsyncSession, category_id: int) -> None:
     category = await db.get(Category, category_id)
     if not category:
-        raise ApiError("CATEGORY_NOT_FOUND", "Category does not exist", status.HTTP_404_NOT_FOUND)
+        raise ApiError(Admin.CATEGORY_NOT_FOUND)
     await db.delete(category)
     await db.commit()
 
@@ -139,7 +139,7 @@ async def create_tag(db: AsyncSession, *, name: str, slug: str | None, status_va
 async def update_tag(db: AsyncSession, tag_id: int, *, name: str, slug: str | None, status_value: str, source: str) -> dict:
     tag = await db.get(Tag, tag_id)
     if not tag:
-        raise ApiError("TAG_NOT_FOUND", "Tag does not exist", status.HTTP_404_NOT_FOUND)
+        raise ApiError(Admin.TAG_NOT_FOUND)
     tag.name = name
     tag.slug = slug or _slugify(name)
     tag.status = status_value
@@ -152,7 +152,7 @@ async def update_tag(db: AsyncSession, tag_id: int, *, name: str, slug: str | No
 async def update_tag_status(db: AsyncSession, tag_id: int, status_value: str) -> dict:
     tag = await db.get(Tag, tag_id)
     if not tag:
-        raise ApiError("TAG_NOT_FOUND", "Tag does not exist", status.HTTP_404_NOT_FOUND)
+        raise ApiError(Admin.TAG_NOT_FOUND)
     tag.status = status_value
     await db.commit()
     await db.refresh(tag)
@@ -163,9 +163,9 @@ async def merge_tag(db: AsyncSession, tag_id: int, target_tag_id: int) -> dict:
     tag = await db.get(Tag, tag_id)
     target = await db.get(Tag, target_tag_id)
     if not tag or not target:
-        raise ApiError("TAG_NOT_FOUND", "Tag does not exist", status.HTTP_404_NOT_FOUND)
+        raise ApiError(Admin.TAG_NOT_FOUND)
     if tag.id == target.id:
-        raise ApiError("TAG_MERGE_INVALID", "Cannot merge tag into itself")
+        raise ApiError(Admin.TAG_MERGE_INVALID)
     tag.status = "MERGED"
     await db.commit()
     await db.refresh(tag)
@@ -175,7 +175,7 @@ async def merge_tag(db: AsyncSession, tag_id: int, target_tag_id: int) -> dict:
 async def delete_tag(db: AsyncSession, tag_id: int) -> None:
     tag = await db.get(Tag, tag_id)
     if not tag:
-        raise ApiError("TAG_NOT_FOUND", "Tag does not exist", status.HTTP_404_NOT_FOUND)
+        raise ApiError(Admin.TAG_NOT_FOUND)
     await db.delete(tag)
     await db.commit()
 

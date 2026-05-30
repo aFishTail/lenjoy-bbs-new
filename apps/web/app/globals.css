@@ -1,5 +1,6 @@
 @import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;760;800&family=Newsreader:wght@400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;600;700&family=Noto+Serif+SC:wght@500;600;700;800&display=swap");
 @import "tailwindcss";
+@import "../components/ui/field-styles.css";
 
 :root {
   --color-primary: #2f6fed;

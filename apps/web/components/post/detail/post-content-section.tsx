@@ -166,7 +166,6 @@ export function PostContentSection({ postId }: Props) {
                 ? "悬赏"
                 : "讨论"}
           </span>
-          <span className="badge badge-info">{post.status}</span>
           {post.categoryName ? (
             <span className="badge badge-warning">{post.categoryName}</span>
           ) : null}
@@ -188,10 +187,15 @@ export function PostContentSection({ postId }: Props) {
         </h1>
 
         <div className="mb-4 flex items-center gap-3 text-sm text-muted">
-          <div className={styles.authorAvatar}>
-            {post.authorUsername?.charAt(0).toUpperCase() || "U"}
-          </div>
-          <span>{post.authorUsername || post.authorId}</span>
+          <Link
+            href={`/users/${post.authorId}`}
+            className="inline-flex items-center gap-3 rounded-lg text-inherit no-underline hover:text-[var(--color-primary)]"
+          >
+            <div className={styles.authorAvatar}>
+              {post.authorUsername?.charAt(0).toUpperCase() || "U"}
+            </div>
+            <span>{post.authorUsername || post.authorId}</span>
+          </Link>
           <span>•</span>
           <span>{new Date(post.createdAt).toLocaleString("zh-CN")}</span>
         </div>

@@ -10,7 +10,7 @@ os.environ["DATABASE_URL"] = "sqlite://"
 from lenjoy_bbs.main import app
 from lenjoy_bbs.db.session import SessionLocal
 from lenjoy_bbs.modules.messages.models import SiteMessage
-from lenjoy_bbs.modules.posts.models import PostFavorite, PostLike, PostTag
+from lenjoy_bbs.modules.posts.models import Post, PostComment, PostFavorite, PostLike, PostTag
 from lenjoy_bbs.modules.reports.models import ResourceAppeal
 from lenjoy_bbs.modules.taxonomy.models import Category, Tag
 from lenjoy_bbs.modules.users.models import UserAccount
@@ -52,6 +52,7 @@ def register_user(client: TestClient, username: str, email: str) -> str:
     assert response.status_code == 201
     assert payload["error"] is None
     assert payload["data"]["user"]["username"] == username
+    assert payload["data"]["user"]["nickname"] == username
     return payload["data"]["accessToken"]
 
 
@@ -552,6 +553,132 @@ def test_post_like_toggle_endpoint_updates_count(client):
     second_payload = unwrap(second_toggle)
     assert second_toggle.status_code == 200
     assert second_payload["data"] == {"active": False, "count": 0}
+
+
+def test_comment_like_toggle_endpoint_updates_counts_and_viewer_state(client):
+    author_token = register_user(client, "comment-like-author",
+                                 "comment-like-author@example.com")
+    commenter_token = register_user(client, "comment-like-commenter",
+                                    "comment-like-commenter@example.com")
+    liker_token = register_user(client, "comment-like-user",
+                                "comment-like-user@example.com")
+
+    create_response = client.post(
+        f"{API_PREFIX}/posts",
+        headers=bearer(author_token),
+        json={
+            "postType": "NORMAL",
+            "title": "Comment likable post",
+            "content": "body",
+        },
+    )
+    post_id = unwrap(create_response)["data"]["id"]
+    comment_response = client.post(
+        f"{API_PREFIX}/posts/{post_id}/comments",
+        headers=bearer(commenter_token),
+        json={"content": "A useful comment."},
+    )
+    comment_id = unwrap(comment_response)["data"]["id"]
+    reply_response = client.post(
+        f"{API_PREFIX}/posts/{post_id}/comments",
+        headers=bearer(liker_token),
+        json={
+            "parentId": comment_id,
+            "content": "A nested reply.",
+        },
+    )
+    reply_id = unwrap(reply_response)["data"]["id"]
+
+    first_toggle = client.post(
+        f"{API_PREFIX}/comments/{comment_id}/likes/toggle",
+        headers=bearer(liker_token),
+    )
+    second_toggle = client.post(
+        f"{API_PREFIX}/comments/{comment_id}/likes/toggle",
+        headers=bearer(liker_token),
+    )
+    third_toggle = client.post(
+        f"{API_PREFIX}/comments/{comment_id}/likes/toggle",
+        headers=bearer(liker_token),
+    )
+    reply_toggle = client.post(
+        f"{API_PREFIX}/comments/{reply_id}/likes/toggle",
+        headers=bearer(commenter_token),
+    )
+
+    assert first_toggle.status_code == 200
+    assert unwrap(first_toggle)["data"] == {"active": True, "count": 1}
+    assert second_toggle.status_code == 200
+    assert unwrap(second_toggle)["data"] == {"active": False, "count": 0}
+    assert third_toggle.status_code == 200
+    assert unwrap(third_toggle)["data"] == {"active": True, "count": 1}
+    assert reply_toggle.status_code == 200
+    assert unwrap(reply_toggle)["data"] == {"active": True, "count": 1}
+
+    liker_view = unwrap(
+        client.get(f"{API_PREFIX}/posts/{post_id}/comments",
+                   headers=bearer(liker_token)))["data"]
+    commenter_view = unwrap(
+        client.get(f"{API_PREFIX}/posts/{post_id}/comments",
+                   headers=bearer(commenter_token)))["data"]
+
+    assert liker_view[0]["id"] == comment_id
+    assert liker_view[0]["likeCount"] == 1
+    assert liker_view[0]["liked"] is True
+    assert liker_view[0]["replies"][0]["id"] == reply_id
+    assert liker_view[0]["replies"][0]["likeCount"] == 1
+    assert liker_view[0]["replies"][0]["liked"] is False
+    assert commenter_view[0]["likeCount"] == 1
+    assert commenter_view[0]["liked"] is False
+    assert commenter_view[0]["replies"][0]["likeCount"] == 1
+    assert commenter_view[0]["replies"][0]["liked"] is True
+
+
+def test_comment_like_rejects_missing_or_deleted_comment(client):
+    author_token = register_user(client, "comment-like-delete-author",
+                                 "comment-like-delete-author@example.com")
+    liker_token = register_user(client, "comment-like-delete-user",
+                                "comment-like-delete-user@example.com")
+
+    create_response = client.post(
+        f"{API_PREFIX}/posts",
+        headers=bearer(author_token),
+        json={
+            "postType": "NORMAL",
+            "title": "Deleted comment like post",
+            "content": "body",
+        },
+    )
+    post_id = unwrap(create_response)["data"]["id"]
+    comment_response = client.post(
+        f"{API_PREFIX}/posts/{post_id}/comments",
+        headers=bearer(author_token),
+        json={"content": "Comment to delete."},
+    )
+    comment_id = unwrap(comment_response)["data"]["id"]
+
+    async def mark_deleted() -> None:
+        async with SessionLocal() as db:
+            comment = await db.get(PostComment, comment_id)
+            assert comment is not None
+            comment.is_deleted = True
+            await db.commit()
+
+    asyncio.run(mark_deleted())
+
+    missing_response = client.post(
+        f"{API_PREFIX}/comments/999999/likes/toggle",
+        headers=bearer(liker_token),
+    )
+    deleted_response = client.post(
+        f"{API_PREFIX}/comments/{comment_id}/likes/toggle",
+        headers=bearer(liker_token),
+    )
+
+    assert missing_response.status_code == 404
+    assert unwrap(missing_response)["error"]["code"] == "COMMENT_NOT_FOUND"
+    assert deleted_response.status_code == 404
+    assert unwrap(deleted_response)["error"]["code"] == "COMMENT_NOT_FOUND"
 
 
 def test_bounty_post_detail_exposes_bounty_fields(client):
@@ -1143,7 +1270,7 @@ def test_wallet_read_endpoint_returns_zero_summary_when_wallet_row_is_missing(
     assert payload["data"]["updatedAt"]
 
 
-def test_my_profile_endpoint_returns_counts_and_updates_username(client):
+def test_my_profile_endpoint_returns_counts_and_updates_nickname(client):
     token = register_user(client, "profile-owner", "profile-owner@example.com")
 
     create_response = client.post(
@@ -1163,6 +1290,7 @@ def test_my_profile_endpoint_returns_counts_and_updates_username(client):
 
     assert profile_response.status_code == 200
     assert profile_payload["data"]["username"] == "profile-owner"
+    assert profile_payload["data"]["nickname"] == "profile-owner"
     assert profile_payload["data"]["postCount"] == 1
     assert profile_payload["data"]["followingCount"] == 0
     assert profile_payload["data"]["followerCount"] == 0
@@ -1171,7 +1299,7 @@ def test_my_profile_endpoint_returns_counts_and_updates_username(client):
         f"{API_PREFIX}/users/me",
         headers=bearer(token),
         json={
-            "username": "profile-renamed",
+            "nickname": "profile-renamed",
             "avatarUrl": "https://example.com/avatar.png",
             "bio": "updated bio",
         },
@@ -1179,10 +1307,143 @@ def test_my_profile_endpoint_returns_counts_and_updates_username(client):
     update_payload = unwrap(update_response)
 
     assert update_response.status_code == 200
-    assert update_payload["data"]["username"] == "profile-renamed"
+    assert update_payload["data"]["username"] == "profile-owner"
+    assert update_payload["data"]["nickname"] == "profile-renamed"
     assert update_payload["data"][
         "avatarUrl"] == "https://example.com/avatar.png"
     assert update_payload["data"]["bio"] == "updated bio"
+
+    login_captcha = unwrap(client.get(f"{API_PREFIX}/auth/captcha"))["data"]
+    login_response = client.post(
+        f"{API_PREFIX}/auth/login",
+        json={
+            "account": "profile-owner",
+            "password": "correct horse battery staple",
+            "captchaId": login_captcha["captchaId"],
+            "captchaCode": login_captcha["debugCode"],
+        },
+    )
+    login_payload = unwrap(login_response)
+    assert login_response.status_code == 200
+    assert login_payload["data"]["user"]["username"] == "profile-owner"
+    assert login_payload["data"]["user"]["nickname"] == "profile-renamed"
+
+
+def test_public_profile_endpoint_returns_public_fields_and_follow_state(client):
+    leader_token = register_user(client, "public-profile-leader",
+                                 "public-profile-leader@example.com")
+    follower_token = register_user(client, "public-profile-follower",
+                                   "public-profile-follower@example.com")
+
+    leader_profile = unwrap(
+        client.get(f"{API_PREFIX}/users/me",
+                   headers=bearer(leader_token)))["data"]
+    follower_profile = unwrap(
+        client.get(f"{API_PREFIX}/users/me",
+                   headers=bearer(follower_token)))["data"]
+    leader_id = leader_profile["id"]
+
+    create_response = client.post(
+        f"{API_PREFIX}/posts",
+        headers=bearer(leader_token),
+        json={
+            "type": "NORMAL",
+            "title": "Public profile post",
+            "content": "body",
+        },
+    )
+    assert create_response.status_code == 201
+
+    client.post(f"{API_PREFIX}/users/{leader_id}/follow/toggle",
+                headers=bearer(follower_token))
+
+    guest_response = client.get(f"{API_PREFIX}/users/{leader_id}")
+    guest_payload = unwrap(guest_response)
+    follower_response = client.get(f"{API_PREFIX}/users/{leader_id}",
+                                   headers=bearer(follower_token))
+    follower_payload = unwrap(follower_response)
+    self_response = client.get(f"{API_PREFIX}/users/{follower_profile['id']}",
+                               headers=bearer(follower_token))
+    self_payload = unwrap(self_response)
+
+    assert guest_response.status_code == 200
+    assert guest_payload["data"]["username"] == "public-profile-leader"
+    assert guest_payload["data"]["postCount"] == 1
+    assert guest_payload["data"]["followerCount"] == 1
+    assert guest_payload["data"]["followedByMe"] is False
+    assert guest_payload["data"]["isSelf"] is False
+    assert "email" not in guest_payload["data"]
+    assert "phone" not in guest_payload["data"]
+    assert "roles" not in guest_payload["data"]
+
+    assert follower_payload["data"]["followedByMe"] is True
+    assert follower_payload["data"]["isSelf"] is False
+    assert self_payload["data"]["isSelf"] is True
+    assert self_payload["data"]["followedByMe"] is False
+
+
+def test_posts_list_filters_by_author_id_and_excludes_hidden_posts(client):
+    target_token = register_user(client, "author-filter-target",
+                                 "author-filter-target@example.com")
+    other_token = register_user(client, "author-filter-other",
+                                "author-filter-other@example.com")
+
+    target_id = unwrap(
+        client.get(f"{API_PREFIX}/users/me",
+                   headers=bearer(target_token)))["data"]["id"]
+
+    visible_response = client.post(
+        f"{API_PREFIX}/posts",
+        headers=bearer(target_token),
+        json={
+            "type": "NORMAL",
+            "title": "Visible author post",
+            "content": "body",
+        },
+    )
+    offline_response = client.post(
+        f"{API_PREFIX}/posts",
+        headers=bearer(target_token),
+        json={
+            "type": "NORMAL",
+            "title": "Offline author post",
+            "content": "body",
+        },
+    )
+    other_response = client.post(
+        f"{API_PREFIX}/posts",
+        headers=bearer(other_token),
+        json={
+            "type": "NORMAL",
+            "title": "Other author post",
+            "content": "body",
+        },
+    )
+    assert visible_response.status_code == 201
+    assert offline_response.status_code == 201
+    assert other_response.status_code == 201
+
+    visible_id = unwrap(visible_response)["data"]["id"]
+    offline_id = unwrap(offline_response)["data"]["id"]
+    other_id = unwrap(other_response)["data"]["id"]
+
+    async def hide_post() -> None:
+        async with SessionLocal() as db:
+            offline_post = await db.get(Post, offline_id)
+            offline_post.status = "OFFLINE"
+            await db.commit()
+
+    asyncio.run(hide_post())
+
+    response = client.get(
+        f"{API_PREFIX}/posts?page=1&pageSize=20&authorId={target_id}")
+    payload = unwrap(response)
+    ids = {item["id"] for item in payload["data"]["items"]}
+
+    assert response.status_code == 200
+    assert visible_id in ids
+    assert offline_id not in ids
+    assert other_id not in ids
 
 
 def test_my_posts_endpoint_returns_paginated_response(client):

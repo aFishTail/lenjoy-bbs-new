@@ -34,7 +34,7 @@ function StatCard({ label, value }: { label: string; value: number }) {
 export function MyProfileClient() {
   const { authData: currentAuth, setAuth } = useAuth();
   const [uploading, setUploading] = useState(false);
-  const [username, setUsername] = useState("");
+  const [nickname, setNickname] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [bio, setBio] = useState("");
   const profileQuery = useMyProfileQuery();
@@ -56,7 +56,7 @@ export function MyProfileClient() {
       ...currentAuth,
       user: {
         ...currentAuth.user,
-        username: nextProfile.username,
+        nickname: nextProfile.nickname,
         avatarUrl: nextProfile.avatarUrl ?? null,
         bio: nextProfile.bio ?? null,
       },
@@ -67,7 +67,7 @@ export function MyProfileClient() {
     if (!profileQuery.data) {
       return;
     }
-    setUsername(profileQuery.data.username || "");
+    setNickname(profileQuery.data.nickname || profileQuery.data.username || "");
     setAvatarUrl(profileQuery.data.avatarUrl || "");
     setBio(profileQuery.data.bio || "");
   }, [profileQuery.data]);
@@ -93,7 +93,7 @@ export function MyProfileClient() {
   }
 
   async function onSave() {
-    const normalizedName = username.trim();
+    const normalizedName = nickname.trim();
     if (normalizedName.length < 2 || normalizedName.length > 20) {
       toast.error("昵称长度需为 2-20 个字符");
       return;
@@ -109,13 +109,13 @@ export function MyProfileClient() {
 
     try {
       const nextProfile = await saveProfileMutation.mutateAsync({
-        username: normalizedName,
+        nickname: normalizedName,
         avatarUrl: avatarUrl.trim(),
         bio: bio.trim(),
       });
       syncAuthUser(nextProfile);
       toast.success("个人资料已保存");
-      setUsername(nextProfile.username || "");
+      setNickname(nextProfile.nickname || nextProfile.username || "");
       setAvatarUrl(nextProfile.avatarUrl || "");
       setBio(nextProfile.bio || "");
     } catch (error) {
@@ -253,7 +253,7 @@ export function MyProfileClient() {
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-2xl font-semibold text-slate-500">
-                  {(username || profile?.username || "?")
+                  {(nickname || profile?.nickname || profile?.username || "?")
                     .charAt(0)
                     .toUpperCase()}
                 </div>
@@ -293,8 +293,8 @@ export function MyProfileClient() {
             <Label htmlFor="username">昵称</Label>
             <Input
               id="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              value={nickname}
+              onChange={(e) => setNickname(e.target.value)}
               maxLength={20}
             />
             <p className="text-xs text-slate-500">

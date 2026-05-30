@@ -2,13 +2,13 @@ from datetime import UTC, datetime, timedelta
 import logging
 
 import jwt
-from fastapi import status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lenjoy_bbs.core.config import get_settings
 from lenjoy_bbs.core.errors import ApiError
 from lenjoy_bbs.core.logging import log_event
+from lenjoy_bbs.core.messages import Auth
 from lenjoy_bbs.modules.users.models import Role, UserAccount, UserRole
 
 logger = logging.getLogger("lenjoy_bbs.auth")
@@ -47,4 +47,4 @@ def decode_access_token(token: str) -> dict:
         return claims
     except (jwt.PyJWTError, TypeError, ValueError) as exc:
         log_event(logger, logging.WARNING, "auth.token_invalid", error_type=type(exc).__name__)
-        raise ApiError("UNAUTHORIZED", "Authentication token is invalid", status.HTTP_401_UNAUTHORIZED) from exc
+        raise ApiError(Auth.TOKEN_INVALID) from exc

@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from lenjoy_bbs.core.errors import ApiError
 from lenjoy_bbs.core.logging import log_event
+from lenjoy_bbs.core.messages import Posts
 from lenjoy_bbs.modules.posts.models import Post, PostTag
 from lenjoy_bbs.modules.posts.repository import find_post
 from lenjoy_bbs.modules.posts.schemas import PostCreateRequest, PostUpdateRequest
@@ -42,8 +43,7 @@ async def _validated_tag_ids(db: AsyncSession,
         if tag_id not in existing_tag_ids
     ]
     if missing_tag_ids:
-        raise ApiError("TAG_NOT_FOUND", "One or more tags do not exist",
-                       status.HTTP_400_BAD_REQUEST)
+        raise ApiError(Posts.TAG_NOT_FOUND)
     return normalized_tag_ids
 
 
@@ -115,11 +115,9 @@ async def update_post(db: AsyncSession, post_id: int,
     try:
         post = await find_post(db, post_id)
         if not post:
-            raise ApiError("POST_NOT_FOUND", "Post does not exist",
-                           status.HTTP_404_NOT_FOUND)
+            raise ApiError(Posts.POST_NOT_FOUND)
         if post.author_id != author_id:
-            raise ApiError("FORBIDDEN", "Only the author can update this post",
-                           status.HTTP_403_FORBIDDEN)
+            raise ApiError(Posts.UPDATE_FORBIDDEN)
         if payload.title is not None:
             post.title = payload.title
         for field in ["content", "hidden_content", "price", "category_id"]:
@@ -152,11 +150,9 @@ async def delete_post(db: AsyncSession, post_id: int,
     author_id = author.id
     post = await find_post(db, post_id)
     if not post:
-        raise ApiError("POST_NOT_FOUND", "Post does not exist",
-                       status.HTTP_404_NOT_FOUND)
+        raise ApiError(Posts.POST_NOT_FOUND)
     if post.author_id != author_id:
-        raise ApiError("FORBIDDEN", "Only the author can delete this post",
-                       status.HTTP_403_FORBIDDEN)
+        raise ApiError(Posts.DELETE_FORBIDDEN)
     try:
         await refund_active_bounty_reserve(db, post, "deleted", author_id)
         if post.post_type == "BOUNTY" and post.bounty_status == "ACTIVE":

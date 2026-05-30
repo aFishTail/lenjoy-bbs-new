@@ -215,7 +215,6 @@ export function PostTypeFeedClient({
                   <span className={getBadgeClass(post.postType)}>
                     {getTypeText(post.postType)}
                   </span>
-                  <span className="badge badge-info">{post.status}</span>
                   {post.categoryName ? (
                     <span className="badge badge-warning">{post.categoryName}</span>
                   ) : null}

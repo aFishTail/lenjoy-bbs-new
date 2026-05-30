@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from lenjoy_bbs.core.config import get_settings
 from lenjoy_bbs.core.errors import ApiError
 from lenjoy_bbs.core.logging import log_event
+from lenjoy_bbs.core.messages import Auth
 from lenjoy_bbs.core.security import create_access_token, hash_password, verify_password
 from lenjoy_bbs.core.tokens import load_role_codes
 from lenjoy_bbs.modules.auth.captcha import verify_captcha
@@ -33,24 +34,20 @@ async def register_user(db: AsyncSession, payload: RegisterRequest) -> dict:
     await verify_captcha(payload.captcha_id, payload.captcha_code)
     if payload.username.lower() == OPEN_API_SYSTEM_USERNAME or (
             payload.email and payload.email.lower() == OPEN_API_SYSTEM_EMAIL):
-        raise ApiError("ACCOUNT_RESERVED", "Account identifier is reserved",
-                       status.HTTP_400_BAD_REQUEST)
+        raise ApiError(Auth.ACCOUNT_RESERVED)
     identifiers = [payload.username]
     if payload.email:
         identifiers.append(payload.email)
     if payload.phone:
         identifiers.append(payload.phone)
     if len(set(identifiers)) != len(identifiers):
-        raise ApiError("ACCOUNT_IDENTIFIER_CONFLICT",
-                       "Account identifiers must be globally unique",
-                       status.HTTP_400_BAD_REQUEST)
+        raise ApiError(Auth.ACCOUNT_IDENTIFIER_CONFLICT)
     if await find_user_by_any_identifier(db, identifiers):
-        raise ApiError("ACCOUNT_IDENTIFIER_CONFLICT",
-                       "Account identifiers must be globally unique",
-                       status.HTTP_400_BAD_REQUEST)
+        raise ApiError(Auth.ACCOUNT_IDENTIFIER_CONFLICT)
 
     user = UserAccount(
         username=payload.username,
+        nickname=payload.username,
         email=payload.email,
         phone=payload.phone,
         password_hash=hash_password(payload.password),
@@ -68,8 +65,7 @@ async def register_user(db: AsyncSession, payload: RegisterRequest) -> dict:
                   logging.WARNING,
                   "auth.register_conflict",
                   username=payload.username)
-        raise ApiError("ACCOUNT_EXISTS",
-                       "Username, email, or phone already exists") from exc
+        raise ApiError(Auth.ACCOUNT_EXISTS) from exc
     except Exception:
         await db.rollback()
         logger.exception(
@@ -95,16 +91,14 @@ async def login_user(db: AsyncSession, payload: LoginRequest) -> dict:
                   "auth.login_failed",
                   account=payload.account,
                   reason="bad_credentials")
-        raise ApiError("BAD_CREDENTIALS", "Account or password is incorrect",
-                       status.HTTP_401_UNAUTHORIZED)
+        raise ApiError(Auth.BAD_CREDENTIALS)
     if user.status != "ACTIVE":
         log_event(logger,
                   logging.WARNING,
                   "auth.login_failed",
                   user_id=user.id,
                   reason="account_disabled")
-        raise ApiError("ACCOUNT_DISABLED", "Account is not active",
-                       status.HTTP_403_FORBIDDEN)
+        raise ApiError(Auth.ACCOUNT_DISABLED)
     log_event(logger, logging.INFO, "auth.login_succeeded", user_id=user.id)
     return auth_payload(user, await load_role_codes(db, user.id))
 

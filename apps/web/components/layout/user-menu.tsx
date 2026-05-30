@@ -13,9 +13,14 @@ import styles from "./user-menu.module.css";
 
 type AuthUser = AuthData["user"];
 
+function displayName(user: AuthUser) {
+  return user.nickname || user.username;
+}
+
 function Avatar({ user, small = false }: { user: AuthUser; small?: boolean }) {
   const className = `${styles.avatar} ${small ? styles.avatarSmall : ""}`;
   const avatarUrl = user.avatarUrl?.trim();
+  const name = displayName(user);
   if (avatarUrl) {
     return (
       <img
@@ -28,7 +33,7 @@ function Avatar({ user, small = false }: { user: AuthUser; small?: boolean }) {
 
   return (
     <div className={className}>
-      {user.username.charAt(0).toUpperCase()}
+      {name.charAt(0).toUpperCase()}
     </div>
   );
 }
@@ -75,6 +80,7 @@ export function UserMenu() {
       </Link>
     );
   }
+  const name = displayName(user);
 
   return (
     <div className={styles.menu} ref={menuRef}>
@@ -86,7 +92,7 @@ export function UserMenu() {
         aria-haspopup="true"
       >
         <Avatar user={user} small />
-        <span className={styles.name}>{user.username}</span>
+        <span className={styles.name}>{name}</span>
         <svg
           className={`${styles.arrow} ${isOpen ? styles.arrowOpen : ""}`}
           width="12"
@@ -105,7 +111,7 @@ export function UserMenu() {
           <div className={styles.header}>
             <Avatar user={user} />
             <div className={styles.info}>
-              <div className={styles.username}>{user.username}</div>
+              <div className={styles.username}>{name}</div>
               <div className={styles.email}>
                 {user.email || user.phone || "未绑定邮箱"}
               </div>

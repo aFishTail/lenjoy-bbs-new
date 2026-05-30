@@ -10,7 +10,10 @@ test.describe("post create", { tag: ["@p0", "@core"] }, () => {
     test.skip(!baseURL, "baseURL is required");
 
     const auth = getSession("user_a");
-    test.skip(!auth, "missing session: user_a");
+    if (!auth) {
+      test.skip(true, "missing session: user_a");
+      return;
+    }
 
     const { page } = await createRoleSession("user_a");
     const title = uniqueTitle(testInfo, "E2E Normal Post");

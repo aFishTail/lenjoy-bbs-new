@@ -41,7 +41,7 @@ export function useSaveProfileMutation() {
 
   return useMutation({
     mutationFn: (payload: {
-      username: string;
+      nickname: string;
       avatarUrl: string;
       bio: string;
     }) =>

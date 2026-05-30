@@ -2,6 +2,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lenjoy_bbs.core.errors import ApiError
+from lenjoy_bbs.core.messages import Posts
 from lenjoy_bbs.modules.posts import repository
 from lenjoy_bbs.modules.posts.models import Post
 from lenjoy_bbs.modules.posts.presenters import load_category_names, load_post_stats, load_post_tags, load_usernames, load_viewer_post_state, serialize_post, serialize_post_comments
@@ -14,11 +15,12 @@ async def list_posts_feed(db: AsyncSession,
                           post_type: str | None = None,
                           category_id: int | None = None,
                           tag_id: int | None = None,
-                          keyword: str | None = None) -> dict:
+                          keyword: str | None = None,
+                          author_id: int | None = None) -> dict:
     offset = max(page - 1, 0) * page_size
     posts = await repository.list_published_posts(db, page_size, offset,
                                                   post_type, category_id,
-                                                  tag_id, keyword)
+                                                  tag_id, keyword, author_id)
     usernames = await load_usernames(db, {post.author_id for post in posts})
     post_stats = await load_post_stats(db, {post.id for post in posts})
     category_names = await load_category_names(
@@ -28,7 +30,8 @@ async def list_posts_feed(db: AsyncSession,
     total = await db.scalar(
         select(func.count()).select_from(
             repository.build_published_posts_query(
-                post_type, category_id, tag_id, keyword).subquery())) or 0
+                post_type, category_id, tag_id, keyword,
+                author_id).subquery())) or 0
     total_pages = max(1, (total + page_size - 1) // page_size)
     return {
         "items": [
@@ -104,7 +107,7 @@ async def read_post_detail(db: AsyncSession, post_id: int,
                            viewer: UserAccount | None) -> dict:
     post = await repository.find_published_post(db, post_id)
     if post is None:
-        raise ApiError("POST_NOT_FOUND", "Post does not exist", 404)
+        raise ApiError(Posts.POST_NOT_FOUND)
     return await serialize_post(db, post, viewer)
 
 
@@ -112,7 +115,7 @@ async def read_post_comments(db: AsyncSession, post_id: int,
                              viewer: UserAccount | None) -> list[dict]:
     post = await repository.find_published_post(db, post_id)
     if not post:
-        raise ApiError("POST_NOT_FOUND", "Post does not exist", 404)
+        raise ApiError(Posts.POST_NOT_FOUND)
     items = await repository.list_comments(db, post_id)
     usernames = await load_usernames(
         db,

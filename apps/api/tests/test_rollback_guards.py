@@ -263,7 +263,7 @@ async def test_purchase_post_checks_funds_on_locked_wallet(monkeypatch):
                 UserAccount.username == "buyer-locked-wallet"))
         assert buyer is not None
 
-        with pytest.raises(ApiError, match="Insufficient coins"):
+        with pytest.raises(ApiError, match="金币余额不足"):
             await resource_trade.purchase_resource_post(db, post.id, buyer)
 
     assert observed["lock_wallet_called"] is True
@@ -276,7 +276,7 @@ async def test_create_post_rolls_back_when_tag_validation_fails():
         author = await _register_account(db, "tag-rollback-author",
                                          "tag-rollback-author@example.com")
 
-        with pytest.raises(ApiError, match="One or more tags do not exist"):
+        with pytest.raises(ApiError, match="一个或多个标签不存在"):
             await posts_lifecycle.create_post(
                 db,
                 PostCreateRequest(
@@ -383,7 +383,7 @@ async def test_update_post_rolls_back_when_tag_validation_fails():
         )
         post_id = post.id
 
-        with pytest.raises(ApiError, match="One or more tags do not exist"):
+        with pytest.raises(ApiError, match="一个或多个标签不存在"):
             await posts_lifecycle.update_post(
                 db,
                 post_id,

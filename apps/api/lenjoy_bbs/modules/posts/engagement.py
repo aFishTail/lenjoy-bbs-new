@@ -2,7 +2,6 @@ import logging
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
-from fastapi import status
 from redis.asyncio import Redis
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,8 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from lenjoy_bbs.core.config import get_settings
 from lenjoy_bbs.core.errors import ApiError
 from lenjoy_bbs.core.logging import log_event
+from lenjoy_bbs.core.messages import Posts
 from lenjoy_bbs.modules.messages.service import create_site_message
-from lenjoy_bbs.modules.posts.models import Post, PostComment, PostFavorite, PostLike
+from lenjoy_bbs.modules.posts.models import CommentLike, Post, PostComment, PostFavorite, PostLike
 from lenjoy_bbs.modules.posts.repository import find_published_post
 from lenjoy_bbs.modules.posts.schemas import CommentCreateRequest
 from lenjoy_bbs.modules.users.models import UserAccount
@@ -89,8 +89,7 @@ async def create_comment(db: AsyncSession, post_id: int,
                          author: UserAccount) -> PostComment:
     author_id = author.id
     if not await find_published_post(db, post_id):
-        raise ApiError("POST_NOT_FOUND", "Post does not exist",
-                       status.HTTP_404_NOT_FOUND)
+        raise ApiError(Posts.POST_NOT_FOUND)
     comment = PostComment(
         post_id=post_id,
         author_id=author.id,
@@ -118,8 +117,7 @@ async def _toggle_post_interaction(
         message_action: str) -> dict[str, int | bool]:
     post = await find_published_post(db, post_id)
     if not post:
-        raise ApiError("POST_NOT_FOUND", "Post does not exist",
-                       status.HTTP_404_NOT_FOUND)
+        raise ApiError(Posts.POST_NOT_FOUND)
 
     user_id = user.id
     statement = select(model).where(model.post_id == post_id,
@@ -194,12 +192,57 @@ async def toggle_post_favorite(db: AsyncSession, post_id: int,
     )
 
 
+async def toggle_comment_like(db: AsyncSession, comment_id: int,
+                              user: UserAccount) -> dict[str, int | bool]:
+    comment = await db.scalar(
+        select(PostComment).join(Post, Post.id == PostComment.post_id).where(
+            PostComment.id == comment_id,
+            PostComment.is_deleted.is_(False),
+            Post.is_deleted.is_(False),
+            Post.status == "PUBLISHED",
+        ))
+    if not comment:
+        raise ApiError(Posts.COMMENT_NOT_FOUND)
+
+    user_id = user.id
+    existing = await db.scalar(
+        select(CommentLike).where(CommentLike.comment_id == comment_id,
+                                  CommentLike.user_id == user_id))
+    active = existing is None
+
+    try:
+        if existing is None:
+            db.add(CommentLike(comment_id=comment_id, user_id=user_id))
+        else:
+            await db.delete(existing)
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        logger.exception("posts.comment_like_toggle_failed",
+                         extra={
+                             "event": "posts.comment_like_toggle_failed",
+                             "comment_id": comment_id,
+                             "user_id": user_id,
+                         })
+        raise
+
+    count = await db.scalar(
+        select(func.count()).select_from(CommentLike).where(
+            CommentLike.comment_id == comment_id)) or 0
+    log_event(logger,
+              logging.INFO,
+              "posts.comment_like_added" if active else
+              "posts.comment_like_removed",
+              comment_id=comment_id,
+              user_id=user_id)
+    return {"active": active, "count": count}
+
+
 async def record_post_view(db: AsyncSession, post_id: int,
                            viewer_key: str) -> tuple[Post, bool]:
     post = await find_published_post(db, post_id)
     if not post:
-        raise ApiError("POST_NOT_FOUND", "Post does not exist",
-                       status.HTTP_404_NOT_FOUND)
+        raise ApiError(Posts.POST_NOT_FOUND)
 
     counted = await get_post_view_store().mark_seen(post_id, viewer_key,
                                                     POST_VIEW_TTL_SECONDS)
@@ -223,8 +266,7 @@ async def record_post_view(db: AsyncSession, post_id: int,
 
     refreshed_post = await find_published_post(db, post_id)
     if not refreshed_post:
-        raise ApiError("POST_NOT_FOUND", "Post does not exist",
-                       status.HTTP_404_NOT_FOUND)
+        raise ApiError(Posts.POST_NOT_FOUND)
 
     log_event(logger,
               logging.INFO,
@@ -236,5 +278,5 @@ async def record_post_view(db: AsyncSession, post_id: int,
 
 __all__ = [
     "create_comment", "record_post_view", "toggle_post_favorite",
-    "toggle_post_like"
+    "toggle_post_like", "toggle_comment_like"
 ]

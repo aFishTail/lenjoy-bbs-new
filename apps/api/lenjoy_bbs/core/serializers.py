@@ -21,6 +21,7 @@ def user_public(user, roles: list[str] | None = None) -> dict[str, Any]:
     return {
         "id": user.id,
         "username": user.username,
+        "nickname": user.nickname,
         "email": user.email,
         "phone": user.phone,
         "avatarUrl": user.avatar_url,

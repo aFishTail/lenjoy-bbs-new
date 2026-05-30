@@ -310,7 +310,6 @@ export function PostHomeClient({ initialPosts }: PostHomeClientProps = {}) {
                     <span className={getBadgeClass(post.postType)}>
                       {getTypeText(post.postType)}
                     </span>
-                    <span className="badge badge-info">{post.status}</span>
                     <span className={styles.meta}>
                       by {post.authorUsername || post.authorId}
                     </span>

@@ -2,9 +2,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class ProfileUpdateRequest(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
-    username: str | None = None
+    nickname: str | None = Field(default=None, min_length=2, max_length=20)
     avatar_url: str | None = Field(default=None, alias="avatarUrl")
     bio: str | None = None
 
@@ -14,6 +14,7 @@ class UserPublicResponse(BaseModel):
 
     id: int
     username: str
+    nickname: str
     email: str | None = None
     phone: str | None = None
     avatar_url: str | None = Field(default=None, alias="avatarUrl")
@@ -26,6 +27,7 @@ class MyProfileResponse(BaseModel):
 
     id: int
     username: str
+    nickname: str
     email: str | None = None
     phone: str | None = None
     avatar_url: str | None = Field(default=None, alias="avatarUrl")
@@ -33,6 +35,21 @@ class MyProfileResponse(BaseModel):
     post_count: int = Field(default=0, alias="postCount")
     following_count: int = Field(default=0, alias="followingCount")
     follower_count: int = Field(default=0, alias="followerCount")
+
+
+class PublicUserProfileResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: int
+    username: str
+    nickname: str
+    avatar_url: str | None = Field(default=None, alias="avatarUrl")
+    bio: str | None = None
+    post_count: int = Field(default=0, alias="postCount")
+    following_count: int = Field(default=0, alias="followingCount")
+    follower_count: int = Field(default=0, alias="followerCount")
+    followed_by_me: bool = Field(default=False, alias="followedByMe")
+    is_self: bool = Field(default=False, alias="isSelf")
 
 
 class ResourcePurchaseSummaryResponse(BaseModel):
@@ -66,5 +83,6 @@ class UserRelationResponse(BaseModel):
 
     id: int
     username: str
+    nickname: str
     avatar_url: str | None = Field(default=None, alias="avatarUrl")
     followed_at: str = Field(alias="followedAt")

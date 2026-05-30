@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from lenjoy_bbs.core.config import get_settings
 from lenjoy_bbs.core.errors import ApiError
+from lenjoy_bbs.core.messages import Wallet as WalletMessages
 from lenjoy_bbs.db.base import now_utc
 from lenjoy_bbs.modules.wallet.models import Wallet, WalletLedger
 
@@ -94,7 +95,7 @@ async def freeze_available(
 ) -> Wallet:
     wallet = await lock_wallet(db, user_id)
     if wallet.available_coins < amount:
-        raise ApiError("INSUFFICIENT_COINS", "Insufficient coins")
+        raise ApiError(WalletMessages.INSUFFICIENT_COINS)
     wallet.available_coins -= amount
     wallet.frozen_coins += amount
     wallet.updated_at = now_utc()
@@ -114,7 +115,7 @@ async def spend_frozen(
 ) -> Wallet:
     wallet = await lock_wallet(db, user_id)
     if wallet.frozen_coins < amount:
-        raise ApiError("INSUFFICIENT_COINS", "Insufficient frozen coins")
+        raise ApiError(WalletMessages.INSUFFICIENT_COINS)
     wallet.frozen_coins -= amount
     wallet.updated_at = now_utc()
     await add_ledger(db, wallet, user_id, "OUT", amount, biz_type, biz_key,
@@ -133,7 +134,7 @@ async def unfreeze_available(
 ) -> Wallet:
     wallet = await lock_wallet(db, user_id)
     if wallet.frozen_coins < amount:
-        raise ApiError("INSUFFICIENT_COINS", "Insufficient frozen coins")
+        raise ApiError(WalletMessages.INSUFFICIENT_COINS)
     wallet.frozen_coins -= amount
     wallet.available_coins += amount
     wallet.updated_at = now_utc()
@@ -153,7 +154,7 @@ async def freeze_available(
 ) -> Wallet:
     wallet = await lock_wallet(db, user_id)
     if wallet.available_coins < amount:
-        raise ApiError("INSUFFICIENT_COINS", "Insufficient coins")
+        raise ApiError(WalletMessages.INSUFFICIENT_COINS)
     wallet.available_coins -= amount
     wallet.frozen_coins += amount
     wallet.updated_at = now_utc()
@@ -173,7 +174,7 @@ async def spend_frozen(
 ) -> Wallet:
     wallet = await lock_wallet(db, user_id)
     if wallet.frozen_coins < amount:
-        raise ApiError("INSUFFICIENT_FROZEN_COINS", "Insufficient frozen coins")
+        raise ApiError(WalletMessages.INSUFFICIENT_FROZEN_COINS)
     wallet.frozen_coins -= amount
     wallet.updated_at = now_utc()
     await add_ledger(db, wallet, user_id, "OUT", amount, biz_type, biz_key,
@@ -192,7 +193,7 @@ async def unfreeze_to_available(
 ) -> Wallet:
     wallet = await lock_wallet(db, user_id)
     if wallet.frozen_coins < amount:
-        raise ApiError("INSUFFICIENT_FROZEN_COINS", "Insufficient frozen coins")
+        raise ApiError(WalletMessages.INSUFFICIENT_FROZEN_COINS)
     wallet.frozen_coins -= amount
     wallet.available_coins += amount
     wallet.updated_at = now_utc()

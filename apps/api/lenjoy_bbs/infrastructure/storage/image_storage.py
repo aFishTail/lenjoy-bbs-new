@@ -12,6 +12,7 @@ from minio.error import S3Error
 from lenjoy_bbs.core.config import get_settings
 from lenjoy_bbs.core.errors import ApiError
 from lenjoy_bbs.core.logging import log_event
+from lenjoy_bbs.core.messages import Files
 
 ALLOWED_IMAGE_TYPES = {
     "image/jpeg": "jpg",
@@ -24,12 +25,12 @@ logger = logging.getLogger("lenjoy_bbs.files")
 
 def validate_image_upload(file: UploadFile, size: int) -> str:
     if size <= 0:
-        raise ApiError("FILE_REQUIRED", "Please choose an image to upload")
+        raise ApiError(Files.FILE_REQUIRED)
     if size > get_settings().minio_max_file_size_bytes:
-        raise ApiError("FILE_TOO_LARGE", "Image size exceeds the upload limit")
+        raise ApiError(Files.FILE_TOO_LARGE)
     content_type = (file.content_type or "").lower()
     if content_type not in ALLOWED_IMAGE_TYPES:
-        raise ApiError("FILE_TYPE_INVALID", "Only jpg, png, webp, and gif images are supported")
+        raise ApiError(Files.FILE_TYPE_INVALID)
     return content_type
 
 
@@ -68,7 +69,7 @@ class MinioImageStorage:
                 "files.upload_failed",
                 extra={"event": "files.upload_failed", "dependency": "minio", "operation": "put_object", "error_type": type(exc).__name__},
             )
-            raise ApiError("UPLOAD_FAILED", "Image upload failed", 500) from exc
+            raise ApiError(Files.UPLOAD_FAILED) from exc
         log_event(logger, logging.INFO, "files.upload_succeeded", object_key=object_key, size=len(content))
         return {
             "url": self._public_url(object_key),
@@ -94,7 +95,7 @@ class MinioImageStorage:
                     "files.bucket_prepare_failed",
                     extra={"event": "files.bucket_prepare_failed", "dependency": "minio", "operation": "bucket_policy", "error_type": type(exc).__name__},
                 )
-                raise ApiError("STORAGE_UNAVAILABLE", "Storage service is unavailable", 500) from exc
+                raise ApiError(Files.STORAGE_UNAVAILABLE) from exc
             cls._bucket_ready = True
 
     def _object_key(self, content_type: str) -> str:

@@ -301,7 +301,7 @@ async def test_open_api_post_creation_rejects_unknown_tag_ids():
         db.add(client)
         await db.flush()
 
-        with pytest.raises(ApiError, match="One or more tags do not exist"):
+        with pytest.raises(ApiError, match="一个或多个标签不存在"):
             await create_open_post(
                 db,
                 api_key="open-invalid-tag",
@@ -331,12 +331,13 @@ async def test_open_api_post_creation_rejects_conflicting_system_user():
         db.add(
             UserAccount(
                 username=OPEN_API_SYSTEM_USERNAME,
+                nickname=OPEN_API_SYSTEM_USERNAME,
                 email="different@example.com",
                 password_hash="hashed",
             ))
         await db.flush()
 
-        with pytest.raises(ApiError, match="Open API system user is reserved"):
+        with pytest.raises(ApiError, match="Open API 系统用户配置冲突"):
             await create_open_post(
                 db,
                 api_key="open-conflict",
@@ -359,12 +360,13 @@ async def test_open_api_post_creation_rejects_conflicting_system_email():
         db.add(
             UserAccount(
                 username="not-openapi",
+                nickname="not-openapi",
                 email=OPEN_API_SYSTEM_EMAIL,
                 password_hash="hashed",
             ))
         await db.flush()
 
-        with pytest.raises(ApiError, match="Open API system user is reserved"):
+        with pytest.raises(ApiError, match="Open API 系统用户配置冲突"):
             await create_open_post(
                 db,
                 api_key="open-conflict-email",
@@ -591,7 +593,7 @@ def test_image_storage_rejects_oversized_upload_before_put_object(monkeypatch):
         headers=Headers({"content-type": "image/png"}),
     )
 
-    with pytest.raises(ApiError, match="Image size exceeds the upload limit"):
+    with pytest.raises(ApiError, match="图片大小超过上传限制"):
         asyncio.run(MinioImageStorage().upload_image(upload))
 
     assert FakeMinioClient.put_object_calls == 0
@@ -787,13 +789,149 @@ def test_admin_offline_active_bounty_refunds_frozen_balance(client):
     assert wallet_payload["data"]["frozenCoins"] == 0
 
 
+def test_admin_report_offline_post_notifies_author_only(client):
+    author_token = register_user(client, "report-offline-author",
+                                 "report-offline-author@example.com")
+    reporter_token = register_user(client, "report-offline-reporter",
+                                   "report-offline-reporter@example.com")
+    register_user(client, "report-offline-admin",
+                  "report-offline-admin@example.com")
+
+    post_response = client.post(
+        f"{API_PREFIX}/posts",
+        headers=bearer(author_token),
+        json={
+            "postType": "NORMAL",
+            "title": "Reported offline post",
+            "content": "body",
+        },
+    )
+    post_id = unwrap(post_response)["data"]["id"]
+
+    report_response = client.post(
+        f"{API_PREFIX}/posts/{post_id}/reports",
+        headers=bearer(reporter_token),
+        json={
+            "reason": "spam",
+            "detail": "bad content"
+        },
+    )
+    report_id = unwrap(report_response)["data"]["id"]
+
+    async def promote_admin() -> str:
+        async with SessionLocal() as db:
+            user = await db.scalar(
+                select(UserAccount).where(
+                    UserAccount.username == "report-offline-admin"))
+            role = await db.scalar(
+                select(Role).where(Role.role_code == "ADMIN"))
+            assert user is not None
+            assert role is not None
+            db.add(UserRole(user_id=user.id, role_id=role.id))
+            await db.commit()
+            return create_access_token(user, ["ADMIN"])
+
+    admin_token = asyncio.run(promote_admin())
+
+    review_response = client.patch(
+        f"{API_PREFIX}/admin/reports/posts/{report_id}",
+        headers=bearer(admin_token),
+        json={
+            "status": "VALID",
+            "resolutionNote": "违规内容",
+            "action": "OFFLINE_POST",
+        },
+    )
+    author_messages = unwrap(
+        client.get(f"{API_PREFIX}/users/me/messages",
+                   headers=bearer(author_token)))["data"]
+    reporter_messages = unwrap(
+        client.get(f"{API_PREFIX}/users/me/messages",
+                   headers=bearer(reporter_token)))["data"]
+    detail_response = client.get(f"{API_PREFIX}/posts/{post_id}",
+                                 headers=bearer(author_token))
+
+    assert review_response.status_code == 200
+    assert detail_response.status_code == 404
+    assert any(message["messageType"] == "POST_OFFLINED"
+               for message in author_messages)
+    assert all(message["messageType"] != "POST_OFFLINED"
+               for message in reporter_messages)
+
+
+def test_admin_report_offline_active_bounty_refunds_frozen_balance(client):
+    author_token = register_user(client, "report-bounty-author",
+                                 "report-bounty-author@example.com")
+    reporter_token = register_user(client, "report-bounty-reporter",
+                                   "report-bounty-reporter@example.com")
+    register_user(client, "report-bounty-admin",
+                  "report-bounty-admin@example.com")
+
+    post_response = client.post(
+        f"{API_PREFIX}/posts",
+        headers=bearer(author_token),
+        json={
+            "postType": "BOUNTY",
+            "title": "Reported bounty",
+            "content": "question",
+            "bountyAmount": 25,
+            "bountyExpireAt": "2026-06-01T12:00:00Z",
+        },
+    )
+    post_id = unwrap(post_response)["data"]["id"]
+
+    report_response = client.post(
+        f"{API_PREFIX}/posts/{post_id}/reports",
+        headers=bearer(reporter_token),
+        json={
+            "reason": "spam",
+            "detail": "bad bounty"
+        },
+    )
+    report_id = unwrap(report_response)["data"]["id"]
+
+    async def promote_admin() -> str:
+        async with SessionLocal() as db:
+            user = await db.scalar(
+                select(UserAccount).where(
+                    UserAccount.username == "report-bounty-admin"))
+            role = await db.scalar(
+                select(Role).where(Role.role_code == "ADMIN"))
+            assert user is not None
+            assert role is not None
+            db.add(UserRole(user_id=user.id, role_id=role.id))
+            await db.commit()
+            return create_access_token(user, ["ADMIN"])
+
+    admin_token = asyncio.run(promote_admin())
+
+    review_response = client.patch(
+        f"{API_PREFIX}/admin/reports/posts/{report_id}",
+        headers=bearer(admin_token),
+        json={
+            "status": "VALID",
+            "resolutionNote": "违规悬赏",
+            "action": "OFFLINE_POST",
+        },
+    )
+    wallet_payload = unwrap(
+        client.get(f"{API_PREFIX}/users/me/wallet",
+                   headers=bearer(author_token)))
+
+    assert review_response.status_code == 200
+    assert wallet_payload["data"]["availableCoins"] == 100
+    assert wallet_payload["data"]["frozenCoins"] == 0
+
+
 @pytest.mark.asyncio
 async def test_accepting_expired_bounty_refunds_frozen_balance():
     async with SessionLocal() as db:
         author = UserAccount(username="expired-bounty-author",
+                             nickname="expired-bounty-author",
                              email="expired-bounty-author@example.com",
                              password_hash="hashed")
         answerer = UserAccount(username="expired-bounty-answerer",
+                               nickname="expired-bounty-answerer",
                                email="expired-bounty-answerer@example.com",
                                password_hash="hashed")
         db.add_all([author, answerer])
@@ -824,7 +962,7 @@ async def test_accepting_expired_bounty_refunds_frozen_balance():
             select(UserAccount).where(
                 UserAccount.username == "expired-bounty-author"))
         assert author is not None
-        with pytest.raises(ApiError, match="Bounty has expired"):
+        with pytest.raises(ApiError, match="悬赏已过期"):
             await accept_bounty_answer_settlement(db, post_id, comment_id,
                                                   author)
 

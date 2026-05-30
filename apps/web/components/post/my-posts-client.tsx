@@ -96,7 +96,6 @@ export function MyPostsClient() {
                   <span className={getBadgeClass(post.postType)}>
                     {getTypeText(post.postType)}
                   </span>
-                  <span className="badge badge-info">{post.status}</span>
                 </div>
                 <h3 className={styles.title}>{post.title}</h3>
                 <PostCardStats

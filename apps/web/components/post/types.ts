@@ -42,6 +42,7 @@ export type AuthData = {
   user: {
     id: number;
     username: string;
+    nickname?: string | null;
     email?: string;
     phone?: string;
     avatarUrl?: string | null;
@@ -53,6 +54,7 @@ export type AuthData = {
 export type MyProfile = {
   id: number;
   username: string;
+  nickname: string;
   email?: string | null;
   phone?: string | null;
   avatarUrl?: string | null;
@@ -60,6 +62,19 @@ export type MyProfile = {
   postCount: number;
   followingCount: number;
   followerCount: number;
+};
+
+export type PublicUserProfile = {
+  id: number;
+  username: string;
+  nickname: string;
+  avatarUrl?: string | null;
+  bio?: string | null;
+  postCount: number;
+  followingCount: number;
+  followerCount: number;
+  followedByMe: boolean;
+  isSelf: boolean;
 };
 
 export type WalletSummary = {
@@ -193,6 +208,7 @@ export type SiteMessage = {
 export type AdminUserSummary = {
   id: number;
   username: string;
+  nickname: string;
   email?: string;
   phone?: string;
   status: "ACTIVE" | "MUTED" | "BANNED";
@@ -204,6 +220,7 @@ export type AdminUserSummary = {
 export type AdminCoinUserSummary = {
   id: number;
   username: string;
+  nickname?: string | null;
   email?: string;
   phone?: string;
   status: "ACTIVE" | "MUTED" | "BANNED";
@@ -249,6 +266,7 @@ export type ToggleFollowResponse = {
 export type UserRelation = {
   id: number;
   username: string;
+  nickname: string;
   avatarUrl?: string | null;
   followedAt: string;
 };

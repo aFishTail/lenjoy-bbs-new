@@ -6,16 +6,18 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .logging import log_event
+from .messages import ApiMessage, Common
 from .responses import failure
 
 logger = logging.getLogger("lenjoy_bbs.errors")
 
 
 class ApiError(Exception):
-    def __init__(self, code: str, message: str, http_status: int = status.HTTP_400_BAD_REQUEST):
-        self.code = code
-        self.message = message
-        self.http_status = http_status
+    def __init__(self, message: ApiMessage):
+        super().__init__(message.text)
+        self.code = message.code
+        self.message = message.text
+        self.http_status = message.http_status
 
 
 def install_error_handlers(app) -> None:
@@ -43,21 +45,20 @@ def install_error_handlers(app) -> None:
         return _response(
             request,
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            content=failure("VALIDATION_ERROR", "Request validation failed", details=exc.errors()),
+            content=failure(Common.VALIDATION_ERROR.code, Common.VALIDATION_ERROR.text, details=exc.errors()),
         )
 
     @app.exception_handler(StarletteHTTPException)
     def handle_http_error(request: Request, exc: StarletteHTTPException) -> JSONResponse:
-        code = "NOT_FOUND" if exc.status_code == status.HTTP_404_NOT_FOUND else "HTTP_ERROR"
-        message = "Route does not exist" if exc.status_code == status.HTTP_404_NOT_FOUND else str(exc.detail)
+        message = Common.ROUTE_NOT_FOUND if exc.status_code == status.HTTP_404_NOT_FOUND else Common.HTTP_ERROR
         level = logging.INFO if exc.status_code == status.HTTP_404_NOT_FOUND else logging.WARNING
-        log_event(logger, level, "request.http_error", error_code=code, status_code=exc.status_code)
-        return _response(request, exc.status_code, failure(code, message))
+        log_event(logger, level, "request.http_error", error_code=message.code, status_code=exc.status_code)
+        return _response(request, exc.status_code, failure(message.code, message.text))
 
     @app.exception_handler(Exception)
     def handle_unexpected_error(request: Request, exc: Exception) -> JSONResponse:
         return _response(
             request,
             status.HTTP_500_INTERNAL_SERVER_ERROR,
-            failure("INTERNAL_SERVER_ERROR", "Internal server error"),
+            failure(Common.INTERNAL_SERVER_ERROR.code, Common.INTERNAL_SERVER_ERROR.text),
         )

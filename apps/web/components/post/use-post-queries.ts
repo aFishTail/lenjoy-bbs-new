@@ -147,6 +147,22 @@ export function useMyPostsQuery(page: number, pageSize: number) {
   });
 }
 
+export function useUserPostsQuery(
+  userId: string,
+  page: number,
+  pageSize: number,
+) {
+  return useQuery({
+    queryKey: queryKeys.publicUserPosts(userId, page, pageSize),
+    queryFn: () =>
+      requestApiData<PaginatedResponse<PostSummary>>(
+        `/api/posts?authorId=${encodeURIComponent(userId)}&page=${page}&pageSize=${pageSize}`,
+        { cache: "no-store" },
+      ),
+    enabled: userId.trim().length > 0,
+  });
+}
+
 export function usePostDetailQuery(postId: string, initialData?: PostDetail | null) {
   return useQuery({
     queryKey: queryKeys.postDetail(postId),

@@ -8,13 +8,14 @@ type AuthSessionCardProps = {
 };
 
 export function AuthSessionCard({ auth, onLogout }: AuthSessionCardProps) {
+  const displayName = auth.user.nickname || auth.user.username;
   return (
     <Card className="mt-5">
       <CardHeader className="pb-3">
         <CardTitle className="text-base">当前登录信息</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-1.5 text-sm text-slate-700">
-        <p>用户：{auth.user.username}</p>
+        <p>用户：{displayName}</p>
         <p>邮箱：{auth.user.email || "未绑定"}</p>
         <p>手机：{auth.user.phone || "未绑定"}</p>
         <p>令牌类型：{auth.tokenType}</p>

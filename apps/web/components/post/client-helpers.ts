@@ -51,6 +51,9 @@ export const queryKeys = {
   taxonomyHotTags: (contentType: string) =>
     ["taxonomy", "tags", "hot", contentType] as const,
   myProfile: ["users", "me"] as const,
+  publicUserProfile: (userId: string) => ["users", userId] as const,
+  publicUserPosts: (userId: string, page: number, pageSize: number) =>
+    ["users", userId, "posts", page, pageSize] as const,
   myWallet: ["users", "me", "wallet"] as const,
   mySales: ["users", "me", "resource-sales"] as const,
   myPurchases: ["users", "me", "resource-purchases"] as const,

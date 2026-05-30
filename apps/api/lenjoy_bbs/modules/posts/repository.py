@@ -27,6 +27,7 @@ def build_published_posts_query(
     category_id: int | None = None,
     tag_id: int | None = None,
     keyword: str | None = None,
+    author_id: int | None = None,
 ):
     query = select(Post).where(
         Post.is_deleted.is_(False),
@@ -40,6 +41,8 @@ def build_published_posts_query(
         query = query.where(
             Post.id.in_(
                 select(PostTag.post_id).where(PostTag.tag_id == tag_id)))
+    if author_id is not None:
+        query = query.where(Post.author_id == author_id)
     normalized_keyword = (keyword or "").strip()
     if normalized_keyword:
         pattern = f"%{normalized_keyword}%"
@@ -56,10 +59,11 @@ async def list_published_posts(
     category_id: int | None = None,
     tag_id: int | None = None,
     keyword: str | None = None,
+    author_id: int | None = None,
 ) -> list[Post]:
     result = await db.scalars(
         build_published_posts_query(
-            post_type, category_id, tag_id, keyword).order_by(
+            post_type, category_id, tag_id, keyword, author_id).order_by(
                 desc(Post.created_at)).limit(limit).offset(offset))
     return result.unique().all()
 
