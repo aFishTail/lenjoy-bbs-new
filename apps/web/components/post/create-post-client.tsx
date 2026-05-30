@@ -51,7 +51,6 @@ const postFormSchema = z
     hiddenContent: z.string().max(20_000, "隐藏内容不能超过 20000 个字符"),
     price: z.string(),
     bountyAmount: z.string(),
-    bountyExpireAt: z.string(),
   })
   .superRefine((values, ctx) => {
     if (isRichTextEmpty(values.content)) {
@@ -80,13 +79,6 @@ const postFormSchema = z
         "请设置悬赏金额",
         ctx,
       );
-      if (!values.bountyExpireAt) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["bountyExpireAt"],
-          message: "请设置截止时间",
-        });
-      }
     }
   });
 
@@ -142,7 +134,6 @@ export function CreatePostClient() {
       hiddenContent: "",
       price: "",
       bountyAmount: "",
-      bountyExpireAt: "",
     },
     reValidateMode: "onChange",
     shouldFocusError: true,
@@ -201,8 +192,6 @@ export function CreatePostClient() {
         price: data.postType === "RESOURCE" ? parseInt(data.price, 10) : undefined,
         bountyAmount:
           data.postType === "BOUNTY" ? parseInt(data.bountyAmount, 10) : undefined,
-        bountyExpireAt:
-          data.postType === "BOUNTY" ? data.bountyExpireAt : undefined,
       };
 
       const payload = await createPostMutation.mutateAsync(request);
@@ -440,18 +429,6 @@ export function CreatePostClient() {
                       />
                       {errors.bountyAmount?.message ? (
                         <FieldError>{errors.bountyAmount.message}</FieldError>
-                      ) : null}
-                    </Field>
-                    <Field data-invalid={!!errors.bountyExpireAt || undefined}>
-                      <FieldLabel htmlFor="bountyExpireAt">截止时间</FieldLabel>
-                      <Input
-                        id="bountyExpireAt"
-                        type="datetime-local"
-                        aria-invalid={!!errors.bountyExpireAt}
-                        {...register("bountyExpireAt")}
-                      />
-                      {errors.bountyExpireAt?.message ? (
-                        <FieldError>{errors.bountyExpireAt.message}</FieldError>
                       ) : null}
                     </Field>
                   </FieldGroup>

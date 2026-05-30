@@ -37,6 +37,7 @@ class Posts:
     TAG_NOT_FOUND = ApiMessage("TAG_NOT_FOUND", "一个或多个标签不存在")
     UPDATE_FORBIDDEN = ApiMessage("FORBIDDEN", "只能修改自己的帖子", status.HTTP_403_FORBIDDEN)
     DELETE_FORBIDDEN = ApiMessage("FORBIDDEN", "只能删除自己的帖子", status.HTTP_403_FORBIDDEN)
+    BOUNTY_DELETE_REQUIRES_REVIEW = ApiMessage("BOUNTY_DELETE_REQUIRES_REVIEW", "悬赏已有用户参与，需提交删除申请")
     INVALID_KEYWORD = ApiMessage("INVALID_KEYWORD", "搜索关键词过长", status.HTTP_422_UNPROCESSABLE_CONTENT)
     POST_NOT_BOUNTY = ApiMessage("POST_NOT_BOUNTY", "该帖子不是悬赏帖")
     ACCEPT_FORBIDDEN = ApiMessage("FORBIDDEN", "只有帖子作者可以采纳答案", status.HTTP_403_FORBIDDEN)

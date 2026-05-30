@@ -767,6 +767,190 @@ def test_deleting_active_bounty_refunds_frozen_balance(client):
     assert wallet_payload["data"]["totalCoins"] == 100
 
 
+def test_deleting_active_bounty_with_missing_reserve_does_not_block_delete(client):
+    author_token = register_user(client, "bounty-delete-missing-reserve",
+                                 "bounty-delete-missing-reserve@example.com")
+
+    create_response = client.post(
+        f"{API_PREFIX}/posts",
+        headers=bearer(author_token),
+        json={
+            "postType": "BOUNTY",
+            "title": "Delete bounty with missing reserve",
+            "content": "question body",
+            "bountyAmount": 25,
+            "bountyExpireAt": "2026-06-01T12:00:00Z",
+        },
+    )
+    post_id = unwrap(create_response)["data"]["id"]
+
+    async def remove_frozen_reserve():
+        async with SessionLocal() as db:
+            user = await db.scalar(
+                select(UserAccount).where(
+                    UserAccount.username == "bounty-delete-missing-reserve"))
+            wallet = await db.scalar(
+                select(Wallet).where(Wallet.user_id == user.id))
+            wallet.frozen_coins = 0
+            await db.commit()
+
+    asyncio.run(remove_frozen_reserve())
+
+    delete_response = client.delete(f"{API_PREFIX}/posts/{post_id}",
+                                    headers=bearer(author_token))
+    wallet_payload = unwrap(
+        client.get(f"{API_PREFIX}/users/me/wallet",
+                   headers=bearer(author_token)))
+
+    assert delete_response.status_code == 200
+    assert wallet_payload["data"]["availableCoins"] == 75
+    assert wallet_payload["data"]["frozenCoins"] == 0
+
+
+def test_bounty_with_other_user_answer_requires_delete_review(client):
+    author_token = register_user(client, "bounty-delete-review-author",
+                                 "bounty-delete-review-author@example.com")
+    answerer_token = register_user(client, "bounty-delete-review-answerer",
+                                   "bounty-delete-review-answerer@example.com")
+
+    create_response = client.post(
+        f"{API_PREFIX}/posts",
+        headers=bearer(author_token),
+        json={
+            "postType": "BOUNTY",
+            "title": "Delete review bounty",
+            "content": "question body",
+            "bountyAmount": 25,
+            "bountyExpireAt": "2026-06-01T12:00:00Z",
+        },
+    )
+    post_id = unwrap(create_response)["data"]["id"]
+
+    answer_response = client.post(
+        f"{API_PREFIX}/posts/{post_id}/comments",
+        headers=bearer(answerer_token),
+        json={"content": "candidate answer"},
+    )
+    assert answer_response.status_code == 201
+
+    delete_response = client.delete(f"{API_PREFIX}/posts/{post_id}",
+                                    headers=bearer(author_token))
+    delete_payload = unwrap(delete_response)
+    wallet_payload = unwrap(
+        client.get(f"{API_PREFIX}/users/me/wallet",
+                   headers=bearer(author_token)))
+    detail_payload = unwrap(
+        client.get(f"{API_PREFIX}/posts/{post_id}",
+                   headers=bearer(author_token)))
+
+    assert delete_response.status_code == 400
+    assert delete_payload["error"]["code"] == "BOUNTY_DELETE_REQUIRES_REVIEW"
+    assert detail_payload["data"]["id"] == post_id
+    assert wallet_payload["data"]["availableCoins"] == 75
+    assert wallet_payload["data"]["frozenCoins"] == 25
+
+
+def test_bounty_author_own_top_level_comment_does_not_block_delete(client):
+    author_token = register_user(client, "bounty-delete-own-comment",
+                                 "bounty-delete-own-comment@example.com")
+
+    create_response = client.post(
+        f"{API_PREFIX}/posts",
+        headers=bearer(author_token),
+        json={
+            "postType": "BOUNTY",
+            "title": "Own comment bounty",
+            "content": "question body",
+            "bountyAmount": 25,
+            "bountyExpireAt": "2026-06-01T12:00:00Z",
+        },
+    )
+    post_id = unwrap(create_response)["data"]["id"]
+
+    comment_response = client.post(
+        f"{API_PREFIX}/posts/{post_id}/comments",
+        headers=bearer(author_token),
+        json={"content": "author clarification"},
+    )
+    assert comment_response.status_code == 201
+
+    delete_response = client.delete(f"{API_PREFIX}/posts/{post_id}",
+                                    headers=bearer(author_token))
+
+    assert delete_response.status_code == 200
+
+
+def test_bounty_other_user_reply_does_not_block_delete(client):
+    author_token = register_user(client, "bounty-delete-reply-author",
+                                 "bounty-delete-reply-author@example.com")
+    replier_token = register_user(client, "bounty-delete-reply-user",
+                                  "bounty-delete-reply-user@example.com")
+
+    create_response = client.post(
+        f"{API_PREFIX}/posts",
+        headers=bearer(author_token),
+        json={
+            "postType": "BOUNTY",
+            "title": "Reply only bounty",
+            "content": "question body",
+            "bountyAmount": 25,
+            "bountyExpireAt": "2026-06-01T12:00:00Z",
+        },
+    )
+    post_id = unwrap(create_response)["data"]["id"]
+
+    parent_response = client.post(
+        f"{API_PREFIX}/posts/{post_id}/comments",
+        headers=bearer(author_token),
+        json={"content": "author clarification"},
+    )
+    parent_id = unwrap(parent_response)["data"]["id"]
+
+    reply_response = client.post(
+        f"{API_PREFIX}/posts/{post_id}/comments",
+        headers=bearer(replier_token),
+        json={"parentId": parent_id, "content": "reply only"},
+    )
+    assert reply_response.status_code == 201
+
+    delete_response = client.delete(f"{API_PREFIX}/posts/{post_id}",
+                                    headers=bearer(author_token))
+
+    assert delete_response.status_code == 200
+
+
+def test_bounty_author_can_submit_delete_request_report(client):
+    author_token = register_user(client, "bounty-delete-request-author",
+                                 "bounty-delete-request-author@example.com")
+
+    create_response = client.post(
+        f"{API_PREFIX}/posts",
+        headers=bearer(author_token),
+        json={
+            "postType": "BOUNTY",
+            "title": "Delete request bounty",
+            "content": "question body",
+            "bountyAmount": 25,
+            "bountyExpireAt": "2026-06-01T12:00:00Z",
+        },
+    )
+    post_id = unwrap(create_response)["data"]["id"]
+
+    report_response = client.post(
+        f"{API_PREFIX}/posts/{post_id}/reports",
+        headers=bearer(author_token),
+        json={
+            "reason": "AUTHOR_DELETE_REQUEST",
+            "detail": "问题已通过其他方式解决",
+        },
+    )
+    report_payload = unwrap(report_response)
+
+    assert report_response.status_code == 201
+    assert report_payload["data"]["postId"] == post_id
+    assert report_payload["data"]["reason"] == "AUTHOR_DELETE_REQUEST"
+
+
 def test_register_login_wallet_post_comment_and_purchase_flow(client):
     alice_token = register_user(client, "alice", "alice@example.com")
     bob_token = register_user(client, "bob", "bob@example.com")

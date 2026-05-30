@@ -62,7 +62,7 @@ export function useUpdatePostMutation(postId: string) {
       hiddenContent: string;
       price: number | null;
       bountyAmount: number | null;
-      bountyExpireAt: string | null;
+      bountyExpireAt?: string | null;
     }) =>
       requestApi(`/api/posts/${postId}`, {
         method: "PUT",

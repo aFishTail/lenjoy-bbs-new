@@ -12,9 +12,13 @@ import { readError } from "@/components/post/client-helpers";
 import { TagPicker } from "@/components/post/tag-picker";
 import {
   useDeletePostMutation,
+  useReportPostMutation,
   useUpdatePostMutation,
 } from "@/components/post/use-post-mutations";
-import { usePostDetailQuery } from "@/components/post/use-post-queries";
+import {
+  usePostCommentsQuery,
+  usePostDetailQuery,
+} from "@/components/post/use-post-queries";
 import {
   useCategoriesQuery,
   useTagsQuery,
@@ -43,7 +47,6 @@ const editPostSchema = z
     hiddenContent: z.string().max(20_000, "隐藏内容不能超过 20000 个字符"),
     price: z.string(),
     bountyAmount: z.string(),
-    bountyExpireAt: z.string(),
   })
   .superRefine((values, ctx) => {
     if (isRichTextEmpty(values.content)) {
@@ -72,13 +75,6 @@ const editPostSchema = z
         "请设置悬赏金额",
         ctx,
       );
-      if (!values.bountyExpireAt) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["bountyExpireAt"],
-          message: "请设置截止时间",
-        });
-      }
     }
   });
 
@@ -122,14 +118,19 @@ export function PostAuthorActions({ postId }: Props) {
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteRequestDialogOpen, setDeleteRequestDialogOpen] = useState(false);
+  const [deleteRequestReason, setDeleteRequestReason] = useState("");
 
   const postQuery = usePostDetailQuery(postId);
+  const commentsQuery = usePostCommentsQuery(postId);
   const post = postQuery.data;
+  const comments = commentsQuery.data ?? [];
 
   const categoriesQuery = useCategoriesQuery(post?.postType || "NORMAL");
   const tagsQuery = useTagsQuery("");
   const updatePostMutation = useUpdatePostMutation(postId);
   const deletePostMutation = useDeletePostMutation(postId);
+  const reportPostMutation = useReportPostMutation(postId);
   const form = useForm<EditPostValues>({
     resolver: zodResolver(editPostSchema),
     defaultValues: {
@@ -141,7 +142,6 @@ export function PostAuthorActions({ postId }: Props) {
       hiddenContent: "",
       price: "",
       bountyAmount: "",
-      bountyExpireAt: "",
     },
     reValidateMode: "onChange",
     shouldFocusError: true,
@@ -166,10 +166,6 @@ export function PostAuthorActions({ postId }: Props) {
     }
   }
 
-  function formatDateTimeInput(value?: string | null) {
-    return value ? value.slice(0, 16) : "";
-  }
-
   useEffect(() => {
     if (!post) return;
     reset({
@@ -181,7 +177,6 @@ export function PostAuthorActions({ postId }: Props) {
       hiddenContent: post.hiddenContent || "",
       price: post.price ? String(post.price) : "",
       bountyAmount: post.bountyAmount ? String(post.bountyAmount) : "",
-      bountyExpireAt: formatDateTimeInput(post.bountyExpireAt),
     });
   }, [post, reset]);
 
@@ -192,6 +187,15 @@ export function PostAuthorActions({ postId }: Props) {
   }, [isEditing, post, setValue]);
 
   if (!post) return null;
+
+  const bountyRequiresDeleteReview =
+    post.postType === "BOUNTY" &&
+    comments.some(
+      (comment) =>
+        comment.parentId == null &&
+        !comment.deleted &&
+        comment.authorId !== post.authorId,
+    );
 
   async function submitUpdate(data: EditPostValues) {
     try {
@@ -204,8 +208,6 @@ export function PostAuthorActions({ postId }: Props) {
         price: data.postType === "RESOURCE" ? Number(data.price) : null,
         bountyAmount:
           data.postType === "BOUNTY" ? Number(data.bountyAmount) : null,
-        bountyExpireAt:
-          data.postType === "BOUNTY" ? data.bountyExpireAt : null,
       });
       toast.success("更新成功");
       setIsEditing(false);
@@ -221,6 +223,25 @@ export function PostAuthorActions({ postId }: Props) {
       toast.success("帖子已删除");
       router.replace("/");
       router.refresh();
+    } catch (error) {
+      toast.error(readError(error));
+    }
+  }
+
+  async function submitDeleteRequest() {
+    const detail = deleteRequestReason.trim();
+    if (!detail) {
+      return;
+    }
+
+    try {
+      await reportPostMutation.mutateAsync({
+        reason: "AUTHOR_DELETE_REQUEST",
+        detail,
+      });
+      setDeleteRequestDialogOpen(false);
+      setDeleteRequestReason("");
+      toast.success("删除申请已提交，请等待管理员处理");
     } catch (error) {
       toast.error(readError(error));
     }
@@ -242,13 +263,23 @@ export function PostAuthorActions({ postId }: Props) {
             >
               {isEditing ? "收起编辑" : "编辑帖子"}
             </button>
-            <button
-              type="button"
-              className="btn btn-danger"
-              onClick={() => setDeleteDialogOpen(true)}
-            >
-              删除帖子
-            </button>
+            {bountyRequiresDeleteReview ? (
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={() => setDeleteRequestDialogOpen(true)}
+              >
+                申请删除
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={() => setDeleteDialogOpen(true)}
+              >
+                删除帖子
+              </button>
+            )}
           </div>
         </div>
 
@@ -399,18 +430,6 @@ export function PostAuthorActions({ postId }: Props) {
                       <FieldError>{errors.bountyAmount.message}</FieldError>
                     ) : null}
                   </Field>
-                  <Field data-invalid={!!errors.bountyExpireAt || undefined}>
-                    <FieldLabel htmlFor="edit-bountyExpireAt">截止时间</FieldLabel>
-                    <Input
-                      id="edit-bountyExpireAt"
-                      type="datetime-local"
-                      aria-invalid={!!errors.bountyExpireAt}
-                      {...register("bountyExpireAt")}
-                    />
-                    {errors.bountyExpireAt?.message ? (
-                      <FieldError>{errors.bountyExpireAt.message}</FieldError>
-                    ) : null}
-                  </Field>
                 </>
               ) : null}
 
@@ -457,6 +476,37 @@ export function PostAuthorActions({ postId }: Props) {
         onConfirm={() => void deletePost()}
         onOpenChange={setDeleteDialogOpen}
       />
+
+      <ConfirmDialog
+        open={deleteRequestDialogOpen}
+        title="申请删除悬赏帖"
+        description="已有用户参与回答的悬赏帖不能直接删除。请填写原因，提交后由管理员处理。"
+        confirmLabel="提交申请"
+        confirmDisabled={!deleteRequestReason.trim()}
+        confirmBusy={reportPostMutation.isPending}
+        onConfirm={() => void submitDeleteRequest()}
+        onOpenChange={(open) => {
+          setDeleteRequestDialogOpen(open);
+          if (!open) {
+            setDeleteRequestReason("");
+          }
+        }}
+      >
+        <div className="confirm-dialog-form">
+          <label className="confirm-dialog-field">
+            <span>申请原因</span>
+            <textarea
+              className="confirm-dialog-textarea"
+              value={deleteRequestReason}
+              onChange={(event) => setDeleteRequestReason(event.target.value)}
+              placeholder="请说明为什么需要删除该悬赏帖"
+              rows={4}
+              maxLength={300}
+              autoFocus
+            />
+          </label>
+        </div>
+      </ConfirmDialog>
     </>
   );
 }

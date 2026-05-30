@@ -1,13 +1,13 @@
 import logging
 
 from fastapi import status
-from sqlalchemy import delete, select
+from sqlalchemy import delete, exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lenjoy_bbs.core.errors import ApiError
 from lenjoy_bbs.core.logging import log_event
 from lenjoy_bbs.core.messages import Posts
-from lenjoy_bbs.modules.posts.models import Post, PostTag
+from lenjoy_bbs.modules.posts.models import Post, PostComment, PostTag
 from lenjoy_bbs.modules.posts.repository import find_post
 from lenjoy_bbs.modules.posts.schemas import PostCreateRequest, PostUpdateRequest
 from lenjoy_bbs.modules.taxonomy.models import Tag
@@ -24,8 +24,20 @@ async def refund_active_bounty_reserve(db: AsyncSession, post: Post,
     if (post.post_type != "BOUNTY" or post.bounty_status != "ACTIVE"
             or post.accepted_comment_id is not None or bounty_amount <= 0):
         return
-    await refund_bounty_reserve(db, post.author_id, post.id, bounty_amount,
-                                reason, operated_by)
+    try:
+        await refund_bounty_reserve(db, post.author_id, post.id, bounty_amount,
+                                    reason, operated_by)
+    except ApiError as exc:
+        if exc.code not in {"INSUFFICIENT_COINS", "INSUFFICIENT_FROZEN_COINS"}:
+            raise
+        log_event(logger,
+                  logging.WARNING,
+                  "posts.bounty_refund_missing_reserve",
+                  post_id=post.id,
+                  user_id=post.author_id,
+                  bounty_amount=bounty_amount,
+                  reason=reason,
+                  operated_by=operated_by)
 
 
 async def _validated_tag_ids(db: AsyncSession,
@@ -145,6 +157,20 @@ async def update_post(db: AsyncSession, post_id: int,
         raise
 
 
+async def _bounty_has_external_answer(db: AsyncSession, post: Post) -> bool:
+    if post.post_type != "BOUNTY":
+        return False
+    return bool(await db.scalar(
+        select(
+            exists().where(
+                PostComment.post_id == post.id,
+                PostComment.parent_id.is_(None),
+                PostComment.is_deleted.is_(False),
+                PostComment.author_id != post.author_id,
+            ))
+    ))
+
+
 async def delete_post(db: AsyncSession, post_id: int,
                       author: UserAccount) -> None:
     author_id = author.id
@@ -153,6 +179,8 @@ async def delete_post(db: AsyncSession, post_id: int,
         raise ApiError(Posts.POST_NOT_FOUND)
     if post.author_id != author_id:
         raise ApiError(Posts.DELETE_FORBIDDEN)
+    if await _bounty_has_external_answer(db, post):
+        raise ApiError(Posts.BOUNTY_DELETE_REQUIRES_REVIEW)
     try:
         await refund_active_bounty_reserve(db, post, "deleted", author_id)
         if post.post_type == "BOUNTY" and post.bounty_status == "ACTIVE":
