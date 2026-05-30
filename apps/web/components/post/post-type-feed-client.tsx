@@ -140,50 +140,54 @@ export function PostTypeFeedClient({
   return (
     <main className="page">
       <section className={`${styles.filterPanel} mb-6`}>
-        <div className="grid gap-4">
+        <div className="flex flex-col gap-4 w-full overflow-hidden">
           <div>
             <label className="block text-sm mb-2">分类</label>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                className={`tab ${!categoryId ? "active" : ""}`}
-                onClick={() => updateFilters({ categoryId: "" })}
-              >
-                全部
-              </button>
-              {(categoriesQuery.data ?? []).map((category) => (
+            <div className={styles.scrollContainer}>
+              <div className={styles.scrollRow}>
                 <button
-                  key={category.id}
                   type="button"
-                  className={`tab ${categoryId === String(category.id) ? "active" : ""}`}
-                  onClick={() => updateFilters({ categoryId: String(category.id) })}
+                  className={`${styles.filterChip} ${!categoryId ? styles.filterChipActive : ""}`}
+                  onClick={() => updateFilters({ categoryId: "" })}
                 >
-                  {category.name}
+                  全部
                 </button>
-              ))}
+                {(categoriesQuery.data ?? []).map((category) => (
+                  <button
+                    key={category.id}
+                    type="button"
+                    className={`${styles.filterChip} ${categoryId === String(category.id) ? styles.filterChipActive : ""}`}
+                    onClick={() => updateFilters({ categoryId: String(category.id) })}
+                  >
+                    {category.name}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
           <div>
             <label className="block text-sm mb-2">热门标签</label>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                className={`tab ${!tagId ? "active" : ""}`}
-                onClick={() => updateFilters({ tagId: "" })}
-              >
-                全部
-              </button>
-              {(hotTagsQuery.data ?? []).map((tag) => (
+            <div className={styles.scrollContainer}>
+              <div className={styles.scrollRow}>
                 <button
-                  key={tag.id}
                   type="button"
-                  className={`tab ${tagId === String(tag.id) ? "active" : ""}`}
-                  onClick={() => updateFilters({ tagId: String(tag.id) })}
+                  className={`${styles.filterChip} ${!tagId ? styles.filterChipActive : ""}`}
+                  onClick={() => updateFilters({ tagId: "" })}
                 >
-                  #{tag.name}
+                  全部
                 </button>
-              ))}
+                {(hotTagsQuery.data ?? []).map((tag) => (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    className={`${styles.filterChip} ${tagId === String(tag.id) ? styles.filterChipActive : ""}`}
+                    onClick={() => updateFilters({ tagId: String(tag.id) })}
+                  >
+                    #{tag.name}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
