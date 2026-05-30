@@ -49,6 +49,12 @@ class CommentCreateRequest(BaseModel):
     reply_to_user_id: int | None = Field(default=None, alias="replyToUserId")
 
 
+class BountyDeleteRequestCreate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    reason: str = Field(min_length=1, max_length=1000)
+
+
 class PostResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -132,6 +138,17 @@ class PostViewResponse(BaseModel):
 
     post_id: int = Field(alias="postId")
     view_count: int = Field(alias="viewCount")
+
+
+class BountyDeleteRequestResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: int
+    post_id: int = Field(alias="postId")
+    author_id: int = Field(alias="authorId")
+    reason: str
+    status: str
+    created_at: str = Field(alias="createdAt")
 
 
 class InteractionToggleResponse(BaseModel):

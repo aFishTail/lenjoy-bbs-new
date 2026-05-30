@@ -30,9 +30,18 @@ def upgrade() -> None:
     )
     op.create_index("ix_bounty_delete_request_post_id", "bounty_delete_request", ["post_id"])
     op.create_index("ix_bounty_delete_request_status", "bounty_delete_request", ["status"])
+    op.create_index(
+        "ux_bounty_delete_request_pending_post",
+        "bounty_delete_request",
+        ["post_id"],
+        unique=True,
+        sqlite_where=sa.text("status = 'PENDING'"),
+        postgresql_where=sa.text("status = 'PENDING'"),
+    )
 
 
 def downgrade() -> None:
+    op.drop_index("ux_bounty_delete_request_pending_post", table_name="bounty_delete_request")
     op.drop_index("ix_bounty_delete_request_status", table_name="bounty_delete_request")
     op.drop_index("ix_bounty_delete_request_post_id", table_name="bounty_delete_request")
     op.drop_table("bounty_delete_request")

@@ -8,12 +8,27 @@ from lenjoy_bbs.core.errors import ApiError
 from lenjoy_bbs.core.messages import Posts
 from lenjoy_bbs.core.responses import success
 from lenjoy_bbs.modules.posts.bounty_settlement import accept_bounty_answer_settlement
+from lenjoy_bbs.modules.posts.bounty_delete_requests import (
+    create_bounty_delete_request,
+    serialize_bounty_delete_request,
+)
 from lenjoy_bbs.modules.posts.engagement import create_comment, record_post_view, toggle_comment_like, toggle_post_favorite, toggle_post_like
 from lenjoy_bbs.modules.posts.lifecycle import create_post, delete_post, update_post
 from lenjoy_bbs.modules.posts.presenters import serialize_comment, serialize_post
 from lenjoy_bbs.modules.posts.read_service import list_my_posts_feed, list_posts_feed, read_post_comments, read_post_detail
 from lenjoy_bbs.modules.posts.resource_trade import purchase_resource_post
-from lenjoy_bbs.modules.posts.schemas import CommentCreateRequest, CommentResponse, InteractionToggleResponse, PostCreateRequest, PostPurchaseResponse, PostResponse, PostUpdateRequest, PostViewResponse
+from lenjoy_bbs.modules.posts.schemas import (
+    BountyDeleteRequestCreate,
+    BountyDeleteRequestResponse,
+    CommentCreateRequest,
+    CommentResponse,
+    InteractionToggleResponse,
+    PostCreateRequest,
+    PostPurchaseResponse,
+    PostResponse,
+    PostUpdateRequest,
+    PostViewResponse,
+)
 
 router = APIRouter(prefix="/posts", tags=["posts"])
 comments_router = APIRouter(prefix="/comments", tags=["comments"])
@@ -126,6 +141,20 @@ async def update(
 async def delete(post_id: int, db: DbSession, user: CurrentUser):
     await delete_post(db, post_id, user)
     return success(None)
+
+
+@router.post("/{post_id}/bounty-delete-requests",
+             status_code=status.HTTP_201_CREATED,
+             response_model=ApiEnvelope[BountyDeleteRequestResponse])
+async def create_bounty_delete_request_endpoint(
+    post_id: int,
+    payload: BountyDeleteRequestCreate,
+    db: DbSession,
+    user: CurrentUser,
+):
+    item = await create_bounty_delete_request(db, post_id, user,
+                                              payload.reason)
+    return success(serialize_bounty_delete_request(item))
 
 
 @router.get("/{post_id}/comments",

@@ -157,7 +157,7 @@ async def update_post(db: AsyncSession, post_id: int,
         raise
 
 
-async def _bounty_has_external_answer(db: AsyncSession, post: Post) -> bool:
+async def bounty_has_external_answer(db: AsyncSession, post: Post) -> bool:
     if post.post_type != "BOUNTY":
         return False
     return bool(await db.scalar(
@@ -179,7 +179,7 @@ async def delete_post(db: AsyncSession, post_id: int,
         raise ApiError(Posts.POST_NOT_FOUND)
     if post.author_id != author_id:
         raise ApiError(Posts.DELETE_FORBIDDEN)
-    if await _bounty_has_external_answer(db, post):
+    if await bounty_has_external_answer(db, post):
         raise ApiError(Posts.BOUNTY_DELETE_REQUIRES_REVIEW)
     try:
         await refund_active_bounty_reserve(db, post, "deleted", author_id)
@@ -204,6 +204,10 @@ async def delete_post(db: AsyncSession, post_id: int,
 
 
 __all__ = [
-    "create_post", "create_post_for_author_id", "delete_post",
-    "refund_active_bounty_reserve", "update_post"
+    "bounty_has_external_answer",
+    "create_post",
+    "create_post_for_author_id",
+    "delete_post",
+    "refund_active_bounty_reserve",
+    "update_post",
 ]
