@@ -42,6 +42,21 @@ class PostReport(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, onupdate=now_utc, nullable=False)
 
 
+class BountyDeleteRequest(Base):
+    __tablename__ = "bounty_delete_request"
+
+    id: Mapped[int] = mapped_column(IdType, primary_key=True, autoincrement=True)
+    post_id: Mapped[int] = mapped_column(ForeignKey("bbs_post.id"), nullable=False)
+    author_id: Mapped[int] = mapped_column(ForeignKey("user_account.id"), nullable=False)
+    reason: Mapped[str] = mapped_column(String(1000), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="PENDING", nullable=False)
+    resolution_note: Mapped[str | None] = mapped_column(String(255))
+    handled_by: Mapped[int | None] = mapped_column(BigInteger)
+    handled_at: Mapped[datetime | None] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, onupdate=now_utc, nullable=False)
+
+
 class CommentReport(Base):
     __tablename__ = "comment_report"
 

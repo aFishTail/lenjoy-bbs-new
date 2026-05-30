@@ -1,9 +1,10 @@
 import asyncio
 import os
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 
 os.environ["DATABASE_URL"] = "sqlite://"
 
@@ -11,12 +12,17 @@ from lenjoy_bbs.main import app
 from lenjoy_bbs.db.session import SessionLocal
 from lenjoy_bbs.modules.messages.models import SiteMessage
 from lenjoy_bbs.modules.posts.models import Post, PostComment, PostFavorite, PostLike, PostTag
-from lenjoy_bbs.modules.reports.models import ResourceAppeal
+from lenjoy_bbs.modules.reports.models import BountyDeleteRequest, PostReport, ResourceAppeal
 from lenjoy_bbs.modules.taxonomy.models import Category, Tag
 from lenjoy_bbs.modules.users.models import UserAccount
 from lenjoy_bbs.modules.wallet.models import Wallet
 
 API_PREFIX = "/api/v1"
+
+
+def future_utc_timestamp() -> str:
+    return (datetime.now(UTC) + timedelta(days=1)).replace(
+        microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 @pytest.fixture
@@ -917,6 +923,180 @@ def test_bounty_other_user_reply_does_not_block_delete(client):
                                     headers=bearer(author_token))
 
     assert delete_response.status_code == 200
+
+
+def create_bounty_post_with_external_answer(client, author_token: str,
+                                            answerer_token: str,
+                                            title: str) -> int:
+    create_response = client.post(
+        f"{API_PREFIX}/posts",
+        headers=bearer(author_token),
+        json={
+            "postType": "BOUNTY",
+            "title": title,
+            "content": "question body",
+            "bountyAmount": 25,
+            "bountyExpireAt": future_utc_timestamp(),
+        },
+    )
+    post_id = unwrap(create_response)["data"]["id"]
+
+    answer_response = client.post(
+        f"{API_PREFIX}/posts/{post_id}/comments",
+        headers=bearer(answerer_token),
+        json={"content": "candidate answer"},
+    )
+    assert answer_response.status_code == 201
+    return post_id
+
+
+def test_bounty_author_delete_request_does_not_create_report(client):
+    author_token = register_user(client, "bounty-request-author",
+                                 "bounty-request-author@example.com")
+    answerer_token = register_user(client, "bounty-request-answerer",
+                                   "bounty-request-answerer@example.com")
+    post_id = create_bounty_post_with_external_answer(
+        client, author_token, answerer_token, "Delete request bounty")
+
+    response = client.post(
+        f"{API_PREFIX}/posts/{post_id}/bounty-delete-requests",
+        headers=bearer(author_token),
+        json={"reason": "question duplicated"},
+    )
+    assert response.status_code == 201
+    payload = unwrap(response)
+    assert payload["data"]["postId"] == post_id
+    assert payload["data"]["status"] == "PENDING"
+
+    async def inspect_rows() -> tuple[int, int]:
+        async with SessionLocal() as session:
+            request_count = await session.scalar(
+                select(func.count()).select_from(BountyDeleteRequest))
+            report_count = await session.scalar(
+                select(func.count()).select_from(PostReport))
+            return request_count or 0, report_count or 0
+
+    request_count, report_count = asyncio.run(inspect_rows())
+    assert request_count == 1
+    assert report_count == 0
+
+
+def test_bounty_delete_request_rejects_non_author(client):
+    author_token = register_user(client, "bounty-request-non-author-owner",
+                                 "bounty-request-non-author-owner@example.com")
+    answerer_token = register_user(
+        client, "bounty-request-non-author-answerer",
+        "bounty-request-non-author-answerer@example.com")
+    other_token = register_user(client, "bounty-request-non-author",
+                                "bounty-request-non-author@example.com")
+    post_id = create_bounty_post_with_external_answer(
+        client, author_token, answerer_token, "Non-author request bounty")
+
+    response = client.post(
+        f"{API_PREFIX}/posts/{post_id}/bounty-delete-requests",
+        headers=bearer(other_token),
+        json={"reason": "not my post"},
+    )
+    payload = unwrap(response)
+
+    assert response.status_code == 403
+    assert payload["error"]["code"] == "FORBIDDEN"
+
+
+def test_bounty_delete_request_rejects_non_bounty_post(client):
+    author_token = register_user(client, "bounty-request-normal-author",
+                                 "bounty-request-normal-author@example.com")
+
+    create_response = client.post(
+        f"{API_PREFIX}/posts",
+        headers=bearer(author_token),
+        json={
+            "postType": "NORMAL",
+            "title": "Normal delete request",
+            "content": "body",
+        },
+    )
+    post_id = unwrap(create_response)["data"]["id"]
+
+    response = client.post(
+        f"{API_PREFIX}/posts/{post_id}/bounty-delete-requests",
+        headers=bearer(author_token),
+        json={"reason": "not a bounty"},
+    )
+    payload = unwrap(response)
+
+    assert response.status_code == 400
+    assert payload["error"]["code"] == "POST_NOT_BOUNTY"
+
+
+def test_bounty_delete_request_rejects_without_external_top_level_answer(
+        client):
+    author_token = register_user(client, "bounty-request-no-answer-author",
+                                 "bounty-request-no-answer-author@example.com")
+    replier_token = register_user(client, "bounty-request-no-answer-replier",
+                                  "bounty-request-no-answer-replier@example.com")
+
+    create_response = client.post(
+        f"{API_PREFIX}/posts",
+        headers=bearer(author_token),
+        json={
+            "postType": "BOUNTY",
+            "title": "No external answer bounty",
+            "content": "question body",
+            "bountyAmount": 25,
+            "bountyExpireAt": future_utc_timestamp(),
+        },
+    )
+    post_id = unwrap(create_response)["data"]["id"]
+    parent_response = client.post(
+        f"{API_PREFIX}/posts/{post_id}/comments",
+        headers=bearer(author_token),
+        json={"content": "author clarification"},
+    )
+    parent_id = unwrap(parent_response)["data"]["id"]
+    reply_response = client.post(
+        f"{API_PREFIX}/posts/{post_id}/comments",
+        headers=bearer(replier_token),
+        json={"parentId": parent_id, "content": "reply only"},
+    )
+    assert reply_response.status_code == 201
+
+    response = client.post(
+        f"{API_PREFIX}/posts/{post_id}/bounty-delete-requests",
+        headers=bearer(author_token),
+        json={"reason": "no answer"},
+    )
+    payload = unwrap(response)
+
+    assert response.status_code == 400
+    assert payload["error"]["code"] == "BOUNTY_DELETE_REQUEST_NOT_ALLOWED"
+
+
+def test_bounty_delete_request_duplicate_pending_rejected(client):
+    author_token = register_user(client, "bounty-request-duplicate-author",
+                                 "bounty-request-duplicate-author@example.com")
+    answerer_token = register_user(
+        client, "bounty-request-duplicate-answerer",
+        "bounty-request-duplicate-answerer@example.com")
+    post_id = create_bounty_post_with_external_answer(
+        client, author_token, answerer_token, "Duplicate request bounty")
+
+    first_response = client.post(
+        f"{API_PREFIX}/posts/{post_id}/bounty-delete-requests",
+        headers=bearer(author_token),
+        json={"reason": "first request"},
+    )
+    assert first_response.status_code == 201
+
+    response = client.post(
+        f"{API_PREFIX}/posts/{post_id}/bounty-delete-requests",
+        headers=bearer(author_token),
+        json={"reason": "second request"},
+    )
+    payload = unwrap(response)
+
+    assert response.status_code == 400
+    assert payload["error"]["code"] == "BOUNTY_DELETE_REQUEST_PENDING"
 
 
 def test_bounty_author_can_submit_delete_request_report(client):

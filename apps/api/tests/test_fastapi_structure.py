@@ -136,7 +136,7 @@ def test_module_models_are_co_located_with_domain_code():
     from lenjoy_bbs.modules.messages.models import SiteMessage
     from lenjoy_bbs.modules.open_api.models import OpenApiAccountBinding, OpenApiClient
     from lenjoy_bbs.modules.posts.models import CommentLike, Post, PostComment, PostFavorite, PostLike, PostTag, ResourcePurchase
-    from lenjoy_bbs.modules.reports.models import CommentReport, PostReport, ResourceAppeal
+    from lenjoy_bbs.modules.reports.models import BountyDeleteRequest, CommentReport, PostReport, ResourceAppeal
     from lenjoy_bbs.modules.taxonomy.models import Category, Tag
     from lenjoy_bbs.modules.users.models import Role, UserAccount, UserFollow, UserRole
     from lenjoy_bbs.modules.wallet.models import Wallet, WalletLedger
@@ -161,6 +161,7 @@ def test_module_models_are_co_located_with_domain_code():
     assert CommentLike is not None
     assert ResourcePurchase is not None
     assert ResourceAppeal is not None
+    assert BountyDeleteRequest is not None
     assert PostReport is not None
     assert CommentReport is not None
     assert OpenApiClient is not None
