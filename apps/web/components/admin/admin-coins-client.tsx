@@ -1,5 +1,6 @@
 "use client";
 
+import { Coins } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -8,9 +9,9 @@ import { queryKeys, readError } from "@/components/post/client-helpers";
 import type { AdminCoinUserSummary } from "@/components/post/types";
 import { useAdminCoinsQuery } from "@/components/admin/use-admin-queries";
 import { useUpdateAdminCoinsMutation } from "@/components/admin/use-admin-mutations";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Table,
   TableBody,
@@ -21,89 +22,77 @@ import {
 } from "@/components/ui/table";
 
 const statusOptions = ["", "ACTIVE", "MUTED", "BANNED"] as const;
-const operationOptions = ["CREDIT", "DEBIT"] as const;
+
+type CoinModalState = {
+  user: AdminCoinUserSummary;
+  operation: "CREDIT" | "DEBIT";
+  amount: string;
+  reason: string;
+};
 
 export function AdminCoinsClient() {
   const [status, setStatus] = useState("");
   const [keyword, setKeyword] = useState("");
-  const [reasonById, setReasonById] = useState<Record<number, string>>({});
-  const [amountById, setAmountById] = useState<Record<number, string>>({});
-  const [operationById, setOperationById] = useState<
-    Record<number, "CREDIT" | "DEBIT">
-  >({});
   const [appliedFilters, setAppliedFilters] = useState({
     status: "",
     keyword: "",
   });
-  const [updatingUserId, setUpdatingUserId] = useState<number | null>(null);
+  const [modal, setModal] = useState<CoinModalState | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
   const queryClient = useQueryClient();
   const coinsQuery = useAdminCoinsQuery(appliedFilters);
   const updateCoinsMutation = useUpdateAdminCoinsMutation();
 
-  async function updateCoins(userId: number) {
-    const reason = (reasonById[userId] || "").trim();
-    const rawAmount = (amountById[userId] || "").trim();
-    const amount = Number(rawAmount);
-    const operation = operationById[userId] || "CREDIT";
-
-    if (!reason) {
-      toast.error("请先填写操作原因");
-      return;
-    }
-    if (!Number.isInteger(amount) || amount <= 0) {
-      toast.error("请输入大于 0 的整数金币数量");
-      return;
-    }
-
-    try {
-      setUpdatingUserId(userId);
-      const payload = await updateCoinsMutation.mutateAsync({
-        userId,
-        operation,
-        amount,
-        reason,
-      });
-      queryClient.setQueryData<AdminCoinUserSummary[]>(
-        queryKeys.adminCoins(appliedFilters),
-        (prev = []) =>
-          prev.map((user) =>
-            user.id === userId
-              ? {
-                  ...user,
-                  availableCoins: payload.availableCoins,
-                  frozenCoins: payload.frozenCoins,
-                  totalCoins: payload.totalCoins,
-                }
-              : user,
-          ),
-      );
-      setReasonById((prev) => ({ ...prev, [userId]: "" }));
-      setAmountById((prev) => ({ ...prev, [userId]: "" }));
-      toast.success(`${operation === "CREDIT" ? "加币" : "扣币"}成功`);
-    } catch (error) {
-      toast.error(readError(error));
-    } finally {
-      setUpdatingUserId(null);
-    }
-  }
-
   const statusBadgeMap = useMemo(
-    () => ({
-      ACTIVE: "admin-badge is-active",
-      MUTED: "admin-badge is-muted",
-      BANNED: "admin-badge is-banned",
-    }),
+    () => ({ ACTIVE: "is-active", MUTED: "is-muted", BANNED: "is-banned" }),
     [],
   );
 
   useEffect(() => {
-    if (coinsQuery.error) {
-      toast.error(readError(coinsQuery.error));
-    }
+    if (coinsQuery.error) toast.error(readError(coinsQuery.error));
   }, [coinsQuery.error]);
 
   const users = coinsQuery.data ?? [];
   const loading = coinsQuery.isLoading || coinsQuery.isFetching;
+
+  function openModal(user: AdminCoinUserSummary, operation: "CREDIT" | "DEBIT") {
+    setModal({ user, operation, amount: "", reason: "" });
+    setSubmitting(false);
+  }
+
+  function closeModal() {
+    setModal(null);
+    setSubmitting(false);
+  }
+
+  async function submitModal() {
+    if (!modal) return;
+    const { user, operation, amount, reason } = modal;
+    if (!reason.trim()) { toast.error("请填写操作原因"); return; }
+    const n = Number(amount);
+    if (!Number.isInteger(n) || n <= 0) { toast.error("请输入大于 0 的整数金币数量"); return; }
+    setSubmitting(true);
+    try {
+      const payload = await updateCoinsMutation.mutateAsync({
+        userId: user.id,
+        operation,
+        amount: n,
+        reason: reason.trim(),
+      });
+      queryClient.setQueryData<AdminCoinUserSummary[]>(
+        queryKeys.adminCoins(appliedFilters),
+        (prev = []) =>
+          prev.map((u) =>
+            u.id === user.id
+              ? { ...u, availableCoins: payload.availableCoins, frozenCoins: payload.frozenCoins, totalCoins: payload.totalCoins }
+              : u,
+          ),
+      );
+      toast.success(operation === "CREDIT" ? "加币成功" : "扣币成功");
+      closeModal();
+    } catch (e) { toast.error(readError(e)); setSubmitting(false); }
+  }
 
   return (
     <main className="admin-main">
@@ -115,9 +104,7 @@ export function AdminCoinsClient() {
             onChange={(e) => setStatus(e.target.value)}
           >
             {statusOptions.map((option) => (
-              <option key={option || "ALL"} value={option}>
-                {option || "全部状态"}
-              </option>
+              <option key={option || "ALL"} value={option}>{option || "全部状态"}</option>
             ))}
           </Select>
           <Input
@@ -126,22 +113,16 @@ export function AdminCoinsClient() {
             onChange={(e) => setKeyword(e.target.value)}
             placeholder="按用户名/邮箱/手机号搜索"
           />
-          <Button
-            type="button"
-            className="admin-btn"
-            onClick={() =>
-              setAppliedFilters({ status, keyword: keyword.trim() })
-            }
-          >
-            查询钱包
-          </Button>
         </div>
       </section>
 
       <section className="admin-table-card">
         <div className="admin-table-head">
-          <h2>金币管理</h2>
-          <p>支持按用户执行加币和扣币，所有操作都会落流水。</p>
+          <h2>
+            <Coins size={17} strokeWidth={2} />
+            金币管理
+          </h2>
+          <p>调整用户金币余额，加扣币操作均会记录流水。</p>
         </div>
 
         {loading ? (
@@ -156,11 +137,8 @@ export function AdminCoinsClient() {
                   <TableHead>ID</TableHead>
                   <TableHead>用户</TableHead>
                   <TableHead>状态</TableHead>
-                  <TableHead>可用/冻结</TableHead>
+                  <TableHead>可用 / 冻结</TableHead>
                   <TableHead>操作</TableHead>
-                  <TableHead>数量</TableHead>
-                  <TableHead>原因</TableHead>
-                  <TableHead>提交</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -168,86 +146,40 @@ export function AdminCoinsClient() {
                   <TableRow key={user.id}>
                     <TableCell>{user.id}</TableCell>
                     <TableCell>
-                      <div className="space-y-1">
+                      <div className="coin-cell-user">
                         <strong>{user.username}</strong>
-                        <div className="text-xs text-slate-500">
-                          {user.email || user.phone || "-"}
-                        </div>
+                        <div className="text-xs text-slate-500">{user.email || user.phone || "-"}</div>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <span
-                        className={
-                          statusBadgeMap[
-                            user.status as keyof typeof statusBadgeMap
-                          ] || "admin-badge"
-                        }
-                      >
-                        {user.status}
+                      <span className={`admin-badge ${statusBadgeMap[user.status as keyof typeof statusBadgeMap] || ""}`}>
+                        {user.status === "ACTIVE" ? "正常" : user.status === "MUTED" ? "禁言" : user.status === "BANNED" ? "封禁" : user.status}
                       </span>
                     </TableCell>
                     <TableCell>
-                      <div className="space-y-1 text-sm">
-                        <div>可用 {user.availableCoins}</div>
-                        <div className="text-slate-500">
-                          冻结 {user.frozenCoins}
-                        </div>
+                      <div className="coin-cell-balance">
+                        <span className="coin-balance-num">{user.availableCoins}</span>
+                        <span className="coin-balance-sep">/</span>
+                        <span className="coin-balance-frozen">{user.frozenCoins}</span>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Select
-                        className="admin-input"
-                        value={operationById[user.id] || "CREDIT"}
-                        onChange={(e) =>
-                          setOperationById((prev) => ({
-                            ...prev,
-                            [user.id]: e.target.value as "CREDIT" | "DEBIT",
-                          }))
-                        }
-                      >
-                        {operationOptions.map((option) => (
-                          <option key={option} value={option}>
-                            {option === "CREDIT" ? "加币" : "扣币"}
-                          </option>
-                        ))}
-                      </Select>
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        className="admin-input"
-                        inputMode="numeric"
-                        placeholder="金币数"
-                        value={amountById[user.id] || ""}
-                        onChange={(e) =>
-                          setAmountById((prev) => ({
-                            ...prev,
-                            [user.id]: e.target.value,
-                          }))
-                        }
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        className="admin-input"
-                        placeholder="填写操作原因"
-                        value={reasonById[user.id] || ""}
-                        onChange={(e) =>
-                          setReasonById((prev) => ({
-                            ...prev,
-                            [user.id]: e.target.value,
-                          }))
-                        }
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        type="button"
-                        className="admin-btn"
-                        onClick={() => void updateCoins(user.id)}
-                        disabled={updatingUserId === user.id}
-                      >
-                        提交
-                      </Button>
+                      <div className="cat-actions">
+                        <button
+                          type="button"
+                          className="cat-btn cat-btn-enable"
+                          onClick={() => openModal(user, "CREDIT")}
+                        >
+                          加币
+                        </button>
+                        <button
+                          type="button"
+                          className="cat-btn cat-btn-delete"
+                          onClick={() => openModal(user, "DEBIT")}
+                        >
+                          扣币
+                        </button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -256,6 +188,40 @@ export function AdminCoinsClient() {
           </div>
         )}
       </section>
+
+      {/* 调整金币模态框 */}
+      <ConfirmDialog
+        open={modal !== null}
+        title={modal?.operation === "DEBIT" ? "扣减金币" : "增加金币"}
+        description="填写金币数量和操作原因后提交。"
+        confirmLabel={modal?.operation === "DEBIT" ? "确认扣减" : "确认增加"}
+        confirmBusy={submitting}
+        confirmDisabled={modal ? (!modal.amount.trim() || !modal.reason.trim()) : false}
+        onConfirm={() => void submitModal()}
+        onOpenChange={(v) => !v && closeModal()}
+      >
+        {modal && (
+          <div style={{ display: "grid", gap: 10 }}>
+            <div className="coin-modal-user">
+              <strong>{modal.user.username}</strong>
+              <span>可用 {modal.user.availableCoins} / 冻结 {modal.user.frozenCoins}</span>
+            </div>
+            <Input
+              className="admin-input"
+              inputMode="numeric"
+              placeholder="金币数量（正整数）"
+              value={modal.amount}
+              onChange={(e) => setModal((p) => p && { ...p, amount: e.target.value })}
+            />
+            <Input
+              className="admin-input"
+              placeholder="操作原因（必填）"
+              value={modal.reason}
+              onChange={(e) => setModal((p) => p && { ...p, reason: e.target.value })}
+            />
+          </div>
+        )}
+      </ConfirmDialog>
     </main>
   );
 }

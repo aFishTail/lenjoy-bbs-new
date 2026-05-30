@@ -140,15 +140,17 @@ export function useUpdateAdminCoinsMutation() {
       operation: "CREDIT" | "DEBIT";
       amount: number;
       reason: string;
-    }) =>
-      requestApiData<WalletSummary>(`/api/admin/coins/users/${userId}`, {
+    }) => {
+      const signedAmount = operation === "DEBIT" ? -amount : amount;
+      return requestApiData<WalletSummary>(`/api/admin/coins/users/${userId}`, {
         method: "PATCH",
         withAuth: true,
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ operation, amount, reason }),
-      }),
+        body: JSON.stringify({ amount: signedAmount, reason }),
+      });
+    },
   });
 }
 

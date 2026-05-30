@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowLeft, Link2, Copy } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -30,19 +31,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-type BindingFormState = {
-  bindingCode: string;
-  userId: string;
-  remark: string;
-  status: "ACTIVE" | "INACTIVE";
-};
+type BindingDialog =
+  | { type: "create" }
+  | { type: "edit"; binding: OpenApiBindingSummary }
+  | null;
 
-const DEFAULT_FORM: BindingFormState = {
-  bindingCode: "",
-  userId: "",
-  remark: "",
-  status: "ACTIVE",
-};
+type ActionDialog =
+  | { binding: OpenApiBindingSummary; action: "disable" | "enable" | "delete" }
+  | null;
 
 export function AdminOpenApiClientDetailClient({ clientId }: { clientId: string }) {
   const router = useRouter();
@@ -50,9 +46,11 @@ export function AdminOpenApiClientDetailClient({ clientId }: { clientId: string 
     const parsed = Number(clientId);
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
   }, [clientId]);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingBinding, setEditingBinding] = useState<OpenApiBindingSummary | null>(null);
-  const [form, setForm] = useState<BindingFormState>(DEFAULT_FORM);
+
+  const [bindingDialog, setBindingDialog] = useState<BindingDialog>(null);
+  const [actionDialog, setActionDialog] = useState<ActionDialog>(null);
+  const [form, setForm] = useState({ bindingCode: "", userId: "", remark: "", status: "ACTIVE" as "ACTIVE" | "INACTIVE" });
+  const [dialogBusy, setDialogBusy] = useState(false);
 
   const clientQuery = useAdminOpenApiClientQuery(resolvedClientId);
   const bindingsQuery = useAdminOpenApiBindingsQuery(resolvedClientId);
@@ -63,265 +61,263 @@ export function AdminOpenApiClientDetailClient({ clientId }: { clientId: string 
   const deleteMutation = useDeleteOpenApiBindingMutation(resolvedClientId ?? 0);
 
   useEffect(() => {
-    if (clientQuery.error) {
-      toast.error(readError(clientQuery.error));
-    }
+    if (clientQuery.error) toast.error(readError(clientQuery.error));
   }, [clientQuery.error]);
-
   useEffect(() => {
-    if (bindingsQuery.error) {
-      toast.error(readError(bindingsQuery.error));
-    }
+    if (bindingsQuery.error) toast.error(readError(bindingsQuery.error));
   }, [bindingsQuery.error]);
 
-  useEffect(() => {
-    if (usersQuery.error) {
-      toast.error(readError(usersQuery.error));
-    }
-  }, [usersQuery.error]);
+  const client = clientQuery.data;
+  const bindings = bindingsQuery.data ?? [];
+  const loading = clientQuery.isLoading || bindingsQuery.isLoading || bindingsQuery.isFetching;
 
-  function resetForm() {
-    setEditingBinding(null);
-    setForm(DEFAULT_FORM);
+  function resetBindingDialog() {
+    setBindingDialog(null);
+    setForm({ bindingCode: "", userId: "", remark: "", status: "ACTIVE" });
+    setDialogBusy(false);
   }
 
-  function openCreateDialog() {
-    resetForm();
-    setDialogOpen(true);
-  }
+  function openCreateDialog() { setBindingDialog({ type: "create" }); }
 
   function openEditDialog(binding: OpenApiBindingSummary) {
-    setEditingBinding(binding);
+    setBindingDialog({ type: "edit", binding });
     setForm({
       bindingCode: binding.bindingCode,
       userId: String(binding.userId),
       remark: binding.remark ?? "",
       status: binding.status,
     });
-    setDialogOpen(true);
   }
 
-  function closeDialog(open: boolean) {
-    if (!open) {
-      setDialogOpen(false);
-      resetForm();
-      return;
-    }
-    setDialogOpen(open);
+  function openActionDialog(binding: OpenApiBindingSummary, action: "disable" | "enable" | "delete") {
+    setActionDialog({ binding, action });
   }
+
+  function closeActionDialog() { setActionDialog(null); }
 
   async function copyApiKey(value: string) {
     try {
       await navigator.clipboard.writeText(value);
-      toast.success("API key copied");
-    } catch {
-      toast.error("Copy failed");
-    }
+      toast.success("API Key 已复制");
+    } catch { toast.error("复制失败"); }
   }
 
   async function submitBinding() {
-    if (!form.bindingCode.trim()) {
-      toast.error("Binding code is required");
-      return;
-    }
-    if (!form.userId.trim()) {
-      toast.error("User is required");
-      return;
-    }
-
-    const userId = form.userId.trim() ? Number(form.userId) : undefined;
-    if (form.userId.trim() && (!Number.isInteger(userId) || Number(userId) <= 0)) {
-      toast.error("User ID must be a positive integer");
-      return;
-    }
-
-    const payload = {
-      bindingCode: form.bindingCode,
-      userId,
-      remark: form.remark.trim() || undefined,
-      status: form.status,
-    };
-
+    if (!form.bindingCode.trim()) { toast.error("绑定码不能为空"); return; }
+    if (!form.userId.trim()) { toast.error("请选择用户"); return; }
+    const userId = Number(form.userId);
+    if (!Number.isInteger(userId) || userId <= 0) { toast.error("用户 ID 必须为正整数"); return; }
+    setDialogBusy(true);
     try {
-      if (editingBinding) {
-        await updateMutation.mutateAsync({
-          bindingId: editingBinding.id,
-          payload,
-        });
-        toast.success("Binding updated");
+      if (bindingDialog?.type === "edit" && bindingDialog.binding) {
+        await updateMutation.mutateAsync({ bindingId: bindingDialog.binding.id, payload: { bindingCode: form.bindingCode, userId, remark: form.remark.trim() || undefined, status: form.status } });
+        toast.success("绑定已更新");
       } else {
-        await createMutation.mutateAsync(payload);
-        toast.success("Binding created");
+        await createMutation.mutateAsync({ bindingCode: form.bindingCode, userId, remark: form.remark.trim() || undefined, status: form.status });
+        toast.success("绑定已创建");
       }
-      setDialogOpen(false);
-      resetForm();
-    } catch (error) {
-      toast.error(readError(error));
-    }
+      resetBindingDialog();
+    } catch (e) { toast.error(readError(e)); setDialogBusy(false); }
   }
 
-  async function toggleStatus(binding: OpenApiBindingSummary) {
+  async function submitAction() {
+    if (!actionDialog) return;
+    setDialogBusy(true);
     try {
-      await updateStatusMutation.mutateAsync({
-        bindingId: binding.id,
-        status: binding.status === "ACTIVE" ? "INACTIVE" : "ACTIVE",
-      });
-      toast.success("Binding status updated");
-    } catch (error) {
-      toast.error(readError(error));
-    }
-  }
-
-  async function deleteBinding(binding: OpenApiBindingSummary) {
-    if (typeof window !== "undefined") {
-      const confirmed = window.confirm(`Delete binding "${binding.bindingCode}"?`);
-      if (!confirmed) {
-        return;
+      if (actionDialog.action === "disable") {
+        await updateStatusMutation.mutateAsync({ bindingId: actionDialog.binding.id, status: "INACTIVE" });
+        toast.success("绑定已停用");
+      } else if (actionDialog.action === "enable") {
+        await updateStatusMutation.mutateAsync({ bindingId: actionDialog.binding.id, status: "ACTIVE" });
+        toast.success("绑定已启用");
+      } else {
+        await deleteMutation.mutateAsync(actionDialog.binding.id);
+        toast.success("绑定已删除");
       }
-    }
-    try {
-      await deleteMutation.mutateAsync(binding.id);
-      toast.success("Binding deleted");
-    } catch (error) {
-      toast.error(readError(error));
-    }
+      setActionDialog(null);
+      setDialogBusy(false);
+    } catch (e) { toast.error(readError(e)); setDialogBusy(false); }
   }
-
-  const client = clientQuery.data;
-  const bindings = bindingsQuery.data ?? [];
-  const users = usersQuery.data ?? [];
-  const busy = createMutation.isPending || updateMutation.isPending;
 
   return (
     <main className="admin-main">
       <section className="admin-toolbar">
         <div className="admin-filter-grid">
-          <Button type="button" variant="outline" onClick={() => router.push("/admin/open-api")}>
-            Back
+          <Button type="button" className="admin-btn" onClick={() => router.push("/admin/open-api")}>
+            <ArrowLeft size={15} strokeWidth={2.5} />
+            返回列表
           </Button>
-          <Button type="button" onClick={openCreateDialog} disabled={resolvedClientId == null}>
-            New Binding
+          <Button type="button" className="admin-btn" onClick={openCreateDialog} disabled={resolvedClientId == null}>
+            <Link2 size={15} strokeWidth={2.5} />
+            新建绑定
           </Button>
         </div>
       </section>
 
-      <section className="admin-table-card">
-        <div className="admin-table-head">
-          <h2>Client Detail</h2>
-          {client ? (
+      {client && (
+        <section className="admin-table-card">
+          <div className="admin-table-head">
+            <h2>
+              <Link2 size={17} strokeWidth={2} />
+              客户端详情
+            </h2>
             <p>
-              {client.name} | {client.status} | {client.apiKeyMasked}
+              {client.name} |{" "}
+              <span className={`admin-badge ${client.status === "ACTIVE" ? "is-active" : "is-muted"}`}>
+                {client.status === "ACTIVE" ? "启用" : "停用"}
+              </span>
+              | {client.apiKeyMasked}
             </p>
-          ) : (
-            <p>Loading client...</p>
-          )}
-        </div>
-        {client ? (
-          <div className="flex items-center gap-3">
-            <span>Copy the full API key from here.</span>
-            <Button type="button" variant="outline" onClick={() => void copyApiKey(client.apiKeyPlaintext)}>
-              Copy
-            </Button>
           </div>
-        ) : null}
-      </section>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 0 14px" }}>
+            <span className="text-sm text-slate-500">完整 API Key：</span>
+            <button type="button" className="cat-btn" onClick={() => void copyApiKey(client.apiKeyPlaintext)}>
+              <Copy size={12} strokeWidth={2} />
+              复制
+            </button>
+          </div>
+        </section>
+      )}
 
       <section className="admin-table-card">
         <div className="admin-table-head">
-          <h2>Bindings</h2>
-          <p>Each binding code maps this client to one existing forum user account.</p>
+          <h2>
+            <Link2 size={17} strokeWidth={2} />
+            绑定管理
+          </h2>
+          <p>每个绑定码将此客户端映射到一个已有论坛用户账户。</p>
         </div>
-        <div className="admin-table-wrap">
-          <Table className="admin-table">
-            <TableHeader>
-              <TableRow>
-                <TableHead>ID</TableHead>
-                <TableHead>Binding Code</TableHead>
-                <TableHead>User</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Remark</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {bindings.map((binding) => (
-                <TableRow key={binding.id}>
-                  <TableCell>{binding.id}</TableCell>
-                  <TableCell>{binding.bindingCode}</TableCell>
-                  <TableCell>
-                    {binding.username || "-"} / {binding.userId}
-                  </TableCell>
-                  <TableCell>{binding.email || binding.phone || "-"}</TableCell>
-                  <TableCell>{binding.status}</TableCell>
-                  <TableCell>{binding.remark || "-"}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button type="button" variant="outline" onClick={() => openEditDialog(binding)}>
-                        Edit
-                      </Button>
-                      <Button type="button" variant="outline" onClick={() => void toggleStatus(binding)}>
-                        {binding.status === "ACTIVE" ? "Disable" : "Enable"}
-                      </Button>
-                      <Button type="button" variant="ghost" onClick={() => void deleteBinding(binding)}>
-                        Delete
-                      </Button>
-                    </div>
-                  </TableCell>
+
+        {loading ? (
+          <div className="admin-loading">加载中...</div>
+        ) : bindings.length === 0 ? (
+          <div className="admin-empty">暂无绑定数据</div>
+        ) : (
+          <div className="admin-table-wrap">
+            <Table className="admin-table">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>ID</TableHead>
+                  <TableHead>绑定码</TableHead>
+                  <TableHead>用户</TableHead>
+                  <TableHead>联系方式</TableHead>
+                  <TableHead>状态</TableHead>
+                  <TableHead>备注</TableHead>
+                  <TableHead>操作</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {bindings.map((binding) => (
+                  <TableRow key={binding.id}>
+                    <TableCell>{binding.id}</TableCell>
+                    <TableCell><strong className="cat-name">{binding.bindingCode}</strong></TableCell>
+                    <TableCell>{binding.username || "-"} / {binding.userId}</TableCell>
+                    <TableCell>{binding.email || binding.phone || "-"}</TableCell>
+                    <TableCell>
+                      <span className={`admin-badge ${binding.status === "ACTIVE" ? "is-active" : "is-muted"}`}>
+                        {binding.status === "ACTIVE" ? "启用" : "停用"}
+                      </span>
+                    </TableCell>
+                    <TableCell>{binding.remark || "-"}</TableCell>
+                    <TableCell>
+                      <div className="cat-actions">
+                        <button type="button" className="cat-btn" onClick={() => openEditDialog(binding)}>编辑</button>
+                        <button
+                          type="button"
+                          className={`cat-btn ${binding.status === "ACTIVE" ? "cat-btn-disable" : "cat-btn-enable"}`}
+                          onClick={() => openActionDialog(binding, binding.status === "ACTIVE" ? "disable" : "enable")}
+                        >
+                          {binding.status === "ACTIVE" ? "停用" : "启用"}
+                        </button>
+                        <button type="button" className="cat-btn cat-btn-delete" onClick={() => openActionDialog(binding, "delete")}>删除</button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </section>
 
+      {/* 创建 / 编辑绑定 */}
       <ConfirmDialog
-        open={dialogOpen}
-        title={editingBinding ? "Edit Binding" : "New Binding"}
-        description="Fill binding code and select the target user."
-        confirmLabel={editingBinding ? "Save" : "Create"}
-        confirmBusy={busy}
-        confirmDisabled={!form.bindingCode.trim()}
+        open={bindingDialog !== null}
+        title={bindingDialog?.type === "edit" ? "编辑绑定" : "新建绑定"}
+        description="填写绑定码并选择目标用户。"
+        confirmLabel={bindingDialog?.type === "edit" ? "保存修改" : "创建绑定"}
+        confirmBusy={dialogBusy}
+        confirmDisabled={!form.bindingCode.trim() || !form.userId.trim()}
         onConfirm={() => void submitBinding()}
-        onOpenChange={closeDialog}
+        onOpenChange={(v) => !v && resetBindingDialog()}
       >
-        <div className="space-y-3">
+        <div style={{ display: "grid", gap: 10 }}>
           <Input
-            placeholder="Binding code"
+            className="admin-input"
+            placeholder="绑定码"
             value={form.bindingCode}
-            onChange={(e) => setForm((prev) => ({ ...prev, bindingCode: e.target.value }))}
+            onChange={(e) => setForm((p) => ({ ...p, bindingCode: e.target.value }))}
           />
           <Select
+            className="admin-input"
             value={form.userId}
-            onChange={(e) => setForm((prev) => ({ ...prev, userId: e.target.value }))}
+            onChange={(e) => setForm((p) => ({ ...p, userId: e.target.value }))}
           >
-            <option value="">Select user</option>
-            {users.map((user) => (
+            <option value="">选择用户</option>
+            {usersQuery.data?.map((user) => (
               <option key={user.id} value={String(user.id)}>
-                {user.username} / {user.id}
-                {user.email ? ` / ${user.email}` : user.phone ? ` / ${user.phone}` : ""}
+                {user.username} / {user.id}{user.email ? ` / ${user.email}` : user.phone ? ` / ${user.phone}` : ""}
               </option>
             ))}
           </Select>
           <Input
-            placeholder="Remark"
+            className="admin-input"
+            placeholder="备注（可选）"
             value={form.remark}
-            onChange={(e) => setForm((prev) => ({ ...prev, remark: e.target.value }))}
+            onChange={(e) => setForm((p) => ({ ...p, remark: e.target.value }))}
           />
           <Select
+            className="admin-input"
             value={form.status}
-            onChange={(e) =>
-              setForm((prev) => ({
-                ...prev,
-                status: e.target.value as BindingFormState["status"],
-              }))
-            }
+            onChange={(e) => setForm((p) => ({ ...p, status: e.target.value as "ACTIVE" | "INACTIVE" }))}
           >
-            <option value="ACTIVE">ACTIVE</option>
-            <option value="INACTIVE">INACTIVE</option>
+            <option value="ACTIVE">启用</option>
+            <option value="INACTIVE">停用</option>
           </Select>
         </div>
       </ConfirmDialog>
+
+      {/* 启用/停用/删除 */}
+      <ConfirmDialog
+        open={actionDialog !== null && actionDialog.action !== "delete"}
+        title={
+          actionDialog?.action === "enable" ? "启用绑定" :
+          actionDialog?.action === "disable" ? "停用绑定" : ""
+        }
+        description={
+          actionDialog && actionDialog.action !== "delete"
+            ? `确认${actionDialog.action === "enable" ? "启用" : "停用"}绑定 "${actionDialog.binding.bindingCode}" 吗？`
+            : ""
+        }
+        confirmLabel={actionDialog?.action === "enable" ? "确认启用" : "确认停用"}
+        confirmBusy={dialogBusy}
+        onConfirm={() => void submitAction()}
+        onOpenChange={(v) => !v && closeActionDialog()}
+      />
+
+      <ConfirmDialog
+        open={actionDialog !== null && actionDialog.action === "delete"}
+        title="删除绑定"
+        description={
+          actionDialog?.action === "delete"
+            ? `确认删除绑定 "${actionDialog.binding.bindingCode}" 吗？此操作不可撤销。`
+            : ""
+        }
+        confirmLabel="确认删除"
+        confirmBusy={dialogBusy}
+        onConfirm={() => void submitAction()}
+        onOpenChange={(v) => !v && closeActionDialog()}
+      />
     </main>
   );
 }

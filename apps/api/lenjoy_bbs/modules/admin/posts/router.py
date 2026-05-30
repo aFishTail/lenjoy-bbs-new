@@ -2,7 +2,7 @@ from fastapi import APIRouter
 
 from lenjoy_bbs.core.dependencies import AdminUser, DbSession
 from lenjoy_bbs.core.responses import success
-from lenjoy_bbs.modules.admin.posts.service import list_bounties, list_posts, offline_post, online_post
+from lenjoy_bbs.modules.admin.posts.service import list_bounties, list_bounty_comments, list_posts, offline_post, online_post
 
 router = APIRouter(tags=["admin"])
 
@@ -27,6 +27,11 @@ async def posts(
             tag_id=tagId,
         )
     )
+
+
+@router.get("/bounties/{post_id}/comments")
+async def bounty_comments(post_id: int, db: DbSession, _: AdminUser):
+    return success(await list_bounty_comments(db, post_id))
 
 
 @router.get("/bounties")

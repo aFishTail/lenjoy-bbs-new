@@ -1,13 +1,15 @@
 "use client";
 
+import { FileText } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { useAdminCategoriesQuery, useAdminPostsQuery, useAdminTagsQuery } from "@/components/admin/use-admin-queries";
-import { readError } from "@/components/post/client-helpers";
 import { useUpdateAdminPostStatusMutation } from "@/components/admin/use-admin-mutations";
+import { readError } from "@/components/post/client-helpers";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import {
@@ -32,66 +34,77 @@ export function AdminPostsClient() {
     categoryId: "",
     tagId: "",
   });
-  const [submittingPostId, setSubmittingPostId] = useState<number | null>(null);
+
+  const [actionDialog, setActionDialog] = useState<{
+    postId: number;
+    action: "online" | "offline";
+    title: string;
+  } | null>(null);
+  const [reason, setReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
   const postsQuery = useAdminPostsQuery(appliedFilters);
   const categoriesQuery = useAdminCategoriesQuery(postType);
   const tagsQuery = useAdminTagsQuery("");
-  const updatePostStatusMutation =
-    useUpdateAdminPostStatusMutation(appliedFilters);
+  const updatePostStatusMutation = useUpdateAdminPostStatusMutation(appliedFilters);
 
   useEffect(() => {
-    if (postsQuery.error) {
-      toast.error(readError(postsQuery.error));
-    }
+    if (postsQuery.error) toast.error(readError(postsQuery.error));
   }, [postsQuery.error]);
 
   const posts = postsQuery.data ?? [];
   const loading = postsQuery.isLoading || postsQuery.isFetching;
 
-  async function offlinePost(postId: number) {
-    try {
-      setSubmittingPostId(postId);
-      await updatePostStatusMutation.mutateAsync({ postId, online: false });
-      toast.success(`帖子 ${postId} 已下架`);
-    } catch (error) {
-      toast.error(readError(error));
-    } finally {
-      setSubmittingPostId(null);
-    }
+  function openOnlineDialog(postId: number, title: string) {
+    setActionDialog({ postId, action: "online", title });
+    setReason("");
+    setSubmitting(false);
   }
 
-  async function onlinePost(postId: number) {
-    try {
-      setSubmittingPostId(postId);
-      await updatePostStatusMutation.mutateAsync({ postId, online: true });
-      toast.success(`帖子 ${postId} 已上架`);
-    } catch (error) {
-      toast.error(readError(error));
-    } finally {
-      setSubmittingPostId(null);
-    }
+  function openOfflineDialog(postId: number, title: string) {
+    setActionDialog({ postId, action: "offline", title });
+    setReason("");
+    setSubmitting(false);
   }
 
-  const getBadgeClass = (type: string) => {
-    switch (type) {
-      case "RESOURCE":
-        return "admin-badge is-resource";
-      case "BOUNTY":
-        return "admin-badge is-bounty";
-      default:
-        return "admin-badge is-normal";
-    }
+  function closeDialog() {
+    setActionDialog(null);
+    setReason("");
+    setSubmitting(false);
+  }
+
+  async function submitAction() {
+    if (!actionDialog) return;
+    if (!reason.trim()) { toast.error("请填写操作原因"); return; }
+    setSubmitting(true);
+    try {
+      await updatePostStatusMutation.mutateAsync({
+        postId: actionDialog.postId,
+        online: actionDialog.action === "online",
+      });
+      toast.success(actionDialog.action === "online" ? "帖子已上架" : "帖子已下架");
+      closeDialog();
+    } catch (e) { toast.error(readError(e)); setSubmitting(false); }
+  }
+
+  const typeBadgeMap: Record<string, string> = {
+    RESOURCE: "is-resource",
+    BOUNTY: "is-bounty",
+    NORMAL: "is-normal",
   };
 
-  const getStatusClass = (value: string) => {
-    switch (value) {
-      case "OFFLINE":
-        return "admin-badge is-banned";
-      case "CLOSED":
-        return "admin-badge is-muted";
-      default:
-        return "admin-badge is-active";
-    }
+  const statusBadgeMap: Record<string, string> = {
+    PUBLISHED: "is-active",
+    OFFLINE: "is-banned",
+    CLOSED: "is-muted",
+    DELETED: "is-banned",
+  };
+
+  const statusLabels: Record<string, string> = {
+    PUBLISHED: "已发布",
+    OFFLINE: "已下架",
+    CLOSED: "已关闭",
+    DELETED: "已删除",
   };
 
   return (
@@ -104,10 +117,10 @@ export function AdminPostsClient() {
             onChange={(e) => setStatus(e.target.value)}
           >
             <option value="">全部状态</option>
-            <option value="PUBLISHED">PUBLISHED</option>
-            <option value="CLOSED">CLOSED</option>
-            <option value="OFFLINE">OFFLINE</option>
-            <option value="DELETED">DELETED</option>
+            <option value="PUBLISHED">已发布</option>
+            <option value="CLOSED">已关闭</option>
+            <option value="OFFLINE">已下架</option>
+            <option value="DELETED">已删除</option>
           </Select>
           <Select
             className="admin-input"
@@ -129,9 +142,7 @@ export function AdminPostsClient() {
           >
             <option value="">全部分类</option>
             {(categoriesQuery.data ?? []).map((category) => (
-              <option key={category.id} value={String(category.id)}>
-                {category.name}
-              </option>
+              <option key={category.id} value={String(category.id)}>{category.name}</option>
             ))}
           </Select>
           <Select
@@ -141,9 +152,7 @@ export function AdminPostsClient() {
           >
             <option value="">全部标签</option>
             {(tagsQuery.data ?? []).map((tag) => (
-              <option key={tag.id} value={String(tag.id)}>
-                {tag.name}
-              </option>
+              <option key={tag.id} value={String(tag.id)}>{tag.name}</option>
             ))}
           </Select>
           <Input
@@ -172,9 +181,13 @@ export function AdminPostsClient() {
 
       <section className="admin-table-card">
         <div className="admin-table-head">
-          <h2>帖子管理</h2>
-          <p>查看帖子当前所属分类和标签，并执行上下架操作。</p>
+          <h2>
+            <FileText size={17} strokeWidth={2} />
+            帖子管理
+          </h2>
+          <p>查看帖子所属分类与标签，并执行上下架操作。</p>
         </div>
+
         {loading ? (
           <div className="admin-loading">加载中...</div>
         ) : posts.length === 0 ? (
@@ -198,18 +211,11 @@ export function AdminPostsClient() {
                   <TableRow key={post.id}>
                     <TableCell>{post.id}</TableCell>
                     <TableCell>
-                      <Link
-                        href={`/posts/${post.id}`}
-                        className="admin-inline-link"
-                      >
-                        {post.title}
-                      </Link>
+                      <Link href={`/posts/${post.id}`} className="admin-inline-link">{post.title}</Link>
                     </TableCell>
+                    <TableCell>{post.authorUsername || post.authorId}</TableCell>
                     <TableCell>
-                      {post.authorUsername || post.authorId}
-                    </TableCell>
-                    <TableCell>
-                      <span className={getBadgeClass(post.postType)}>
+                      <span className={`admin-badge ${typeBadgeMap[post.postType] || ""}`}>
                         {post.postType}
                       </span>
                     </TableCell>
@@ -222,35 +228,30 @@ export function AdminPostsClient() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <span className={getStatusClass(post.status)}>
-                        {post.status}
+                      <span className={`admin-badge ${statusBadgeMap[post.status] || ""}`}>
+                        {statusLabels[post.status] || post.status}
                       </span>
                     </TableCell>
                     <TableCell>
-                      <div className="admin-row-actions">
-                        <Button
-                          className="admin-btn is-soft"
-                          onClick={() => void onlinePost(post.id)}
-                          type="button"
-                          disabled={
-                            post.status !== "OFFLINE" ||
-                            submittingPostId === post.id
-                          }
-                        >
-                          上架
-                        </Button>
-                        <Button
-                          className="admin-btn is-danger"
-                          onClick={() => void offlinePost(post.id)}
-                          type="button"
-                          disabled={
-                            post.status === "OFFLINE" ||
-                            post.status === "DELETED" ||
-                            submittingPostId === post.id
-                          }
-                        >
-                          下架
-                        </Button>
+                      <div className="cat-actions">
+                        {post.status === "OFFLINE" && (
+                          <button
+                            type="button"
+                            className="cat-btn cat-btn-enable"
+                            onClick={() => openOnlineDialog(post.id, post.title)}
+                          >
+                            上架
+                          </button>
+                        )}
+                        {post.status !== "OFFLINE" && post.status !== "DELETED" && (
+                          <button
+                            type="button"
+                            className="cat-btn cat-btn-disable"
+                            onClick={() => openOfflineDialog(post.id, post.title)}
+                          >
+                            下架
+                          </button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -260,6 +261,33 @@ export function AdminPostsClient() {
           </div>
         )}
       </section>
+
+      {/* 上下架模态框 */}
+      <ConfirmDialog
+        open={actionDialog !== null}
+        title={actionDialog?.action === "online" ? "上架帖子" : "下架帖子"}
+        description="请填写操作原因后提交，操作不可撤销。"
+        confirmLabel={actionDialog?.action === "online" ? "确认上架" : "确认下架"}
+        confirmBusy={submitting}
+        confirmDisabled={!reason.trim()}
+        onConfirm={() => void submitAction()}
+        onOpenChange={(v) => !v && closeDialog()}
+      >
+        {actionDialog && (
+          <div style={{ display: "grid", gap: 10 }}>
+            <div className="coin-modal-user">
+              <strong>{actionDialog.title}</strong>
+              <span>帖子 ID {actionDialog.postId}</span>
+            </div>
+            <Input
+              className="admin-input"
+              placeholder="操作原因（必填）"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+            />
+          </div>
+        )}
+      </ConfirmDialog>
     </main>
   );
 }

@@ -1,4 +1,4 @@
-import { AdminPostsClient } from "@/components/post/admin-posts-client";
+import { AdminPostsClient } from "@/components/admin/admin-posts-client";
 
 export default function AdminPostsPage() {
   return <AdminPostsClient />;

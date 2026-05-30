@@ -3,9 +3,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from lenjoy_bbs.core.errors import ApiError
 from lenjoy_bbs.core.messages import Posts
-from lenjoy_bbs.modules.posts.models import Post
+from lenjoy_bbs.modules.posts.models import Post, PostTag
 from lenjoy_bbs.modules.posts.lifecycle import refund_active_bounty_reserve
 from lenjoy_bbs.modules.posts.presenters import serialize_post
+from lenjoy_bbs.modules.posts.read_service import read_post_comments
 from lenjoy_bbs.modules.users.models import UserAccount
 
 
@@ -34,6 +35,13 @@ async def list_posts(
         query = query.where(Post.category_id == category_id)
     posts = (await db.scalars(query.order_by(Post.created_at.desc()))).unique().all()
     return [await serialize_post(db, post) for post in posts]
+
+
+async def list_bounty_comments(db: AsyncSession, post_id: int) -> list[dict]:
+    post = await db.get(Post, post_id)
+    if not post:
+        raise ApiError(Posts.POST_NOT_FOUND)
+    return await read_post_comments(db, post_id, None)
 
 
 async def list_bounties(
