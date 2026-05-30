@@ -71,6 +71,8 @@ export const queryKeys = {
     ["admin", "coins", filters] as const,
   adminBounties: (filters: Record<string, unknown>) =>
     ["admin", "bounties", filters] as const,
+  adminBountyDeleteRequests: (filters: Record<string, unknown>) =>
+    ["admin", "bounty-delete-requests", filters] as const,
   adminBountyComments: (postId: number | null) =>
     ["admin", "bounties", postId, "comments"] as const,
   adminWalletAudit: (filters: Record<string, unknown>) =>

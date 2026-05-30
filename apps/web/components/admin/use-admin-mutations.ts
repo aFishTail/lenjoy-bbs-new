@@ -16,11 +16,17 @@ import type {
 } from "@/components/post/types";
 import type {
   AdminBountiesFilters,
+  AdminBountyDeleteRequestsFilters,
   AdminReportsFilters,
   AdminResourceAppealsFilters,
   AdminUsersFilters,
   AdminPostsFilters,
 } from "@/components/admin/use-admin-queries";
+
+type ReviewBountyDeleteRequestResponse = {
+  id: number;
+  status: "APPROVED" | "REJECTED";
+};
 
 export function useUpdateAdminUserStatusMutation(filters: AdminUsersFilters) {
   const queryClient = useQueryClient();
@@ -123,6 +129,43 @@ export function useReviewResourceAppealMutation(
     onSuccess: async () => {
       await queryClient.invalidateQueries({
         queryKey: queryKeys.adminResourceAppeals(filters),
+      });
+    },
+  });
+}
+
+export function useReviewBountyDeleteRequestMutation(
+  filters: AdminBountyDeleteRequestsFilters,
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      requestId,
+      action,
+      resolutionNote,
+    }: {
+      requestId: number;
+      action: "APPROVE" | "REJECT";
+      resolutionNote: string;
+    }) =>
+      requestApi<ReviewBountyDeleteRequestResponse>(
+        `/api/admin/bounty-delete-requests/${requestId}`,
+        {
+          method: "PATCH",
+          withAuth: true,
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ action, resolutionNote }),
+        },
+      ),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.adminBountyDeleteRequests(filters),
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "bounties"],
       });
     },
   });

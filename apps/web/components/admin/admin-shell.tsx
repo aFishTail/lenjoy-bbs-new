@@ -5,7 +5,10 @@ import { usePathname } from "next/navigation";
 import { PropsWithChildren } from "react";
 import styles from "./admin-shell.module.css";
 
-const menus = [
+type AdminMenuLink = { href: string; label: string };
+type AdminMenu = AdminMenuLink | { label: string; children: AdminMenuLink[] };
+
+const menus: AdminMenu[] = [
   { href: "/admin", label: "总览" },
   { href: "/admin/posts", label: "帖子管理" },
   { href: "/admin/categories", label: "分类管理" },
@@ -14,10 +17,22 @@ const menus = [
   { href: "/admin/audit", label: "审计中心" },
   { href: "/admin/coins", label: "金币管理" },
   { href: "/admin/appeals", label: "资源申诉" },
-  { href: "/admin/bounties", label: "悬赏治理" },
+  {
+    label: "悬赏管理",
+    children: [
+      { href: "/admin/bounties", label: "悬赏治理" },
+      { href: "/admin/bounty-delete-requests", label: "删除申请" },
+    ],
+  },
   { href: "/admin/reports", label: "举报管理" },
   { href: "/admin/open-api", label: "Open API" },
 ];
+
+function isMenuActive(pathname: string, href: string) {
+  return href === "/admin"
+    ? pathname === "/admin"
+    : pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export function AdminShell({ children }: PropsWithChildren) {
   const pathname = usePathname();
@@ -34,18 +49,35 @@ export function AdminShell({ children }: PropsWithChildren) {
         </div>
         <nav className="admin-nav">
           {menus.map((menu) => {
-            const isRootAdminMenu = menu.href === "/admin";
-            const isActive = isRootAdminMenu
-              ? pathname === "/admin"
-              : pathname === menu.href || pathname.startsWith(`${menu.href}/`);
+            if ("href" in menu) {
+              const isActive = isMenuActive(pathname, menu.href);
+              return (
+                <Link
+                  key={menu.href}
+                  href={menu.href}
+                  className={`admin-nav-link ${isActive ? "is-active" : ""}`}
+                >
+                  {menu.label}
+                </Link>
+              );
+            }
+
             return (
-              <Link
-                key={menu.href}
-                href={menu.href}
-                className={`admin-nav-link ${isActive ? "is-active" : ""}`}
-              >
-                {menu.label}
-              </Link>
+              <div key={menu.label}>
+                <div className="admin-nav-link">{menu.label}</div>
+                {menu.children.map((child) => (
+                  <Link
+                    key={child.href}
+                    href={child.href}
+                    className={`admin-nav-link ${
+                      isMenuActive(pathname, child.href) ? "is-active" : ""
+                    }`}
+                    style={{ paddingLeft: 28 }}
+                  >
+                    {child.label}
+                  </Link>
+                ))}
+              </div>
             );
           })}
         </nav>

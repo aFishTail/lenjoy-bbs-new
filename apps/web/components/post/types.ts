@@ -189,6 +189,22 @@ export type ResourceAppeal = {
   updatedAt: string;
 };
 
+export type BountyDeleteRequestItem = {
+  id: number;
+  postId: number;
+  postTitle?: string | null;
+  authorId: number;
+  authorUsername?: string | null;
+  reason: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  resolutionNote?: string | null;
+  handledBy?: number | null;
+  createdAt: string;
+  handledAt?: string | null;
+  bountyAmount?: number | null;
+  answerCount?: number;
+};
+
 export type SiteMessage = {
   id: number;
   messageType: string;
