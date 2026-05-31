@@ -32,7 +32,7 @@ services:
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
       MINIO_BUCKET: lenjoy-bbs
-      MINIO_PUBLIC_BASE_URL: http://localhost:9000/lenjoy-bbs
+      MINIO_PUBLIC_BASE_URL: http://localhost/lenjoy-bbs
     ports:
       - "${API_PORT:-18080}:8080"
     healthcheck:
@@ -112,6 +112,8 @@ services:
         condition: service_started
       api:
         condition: service_healthy
+      minio:
+        condition: service_started
     networks:
       - lenjoy-net
 
