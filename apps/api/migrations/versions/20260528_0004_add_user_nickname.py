@@ -15,10 +15,13 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "user_account",
-        sa.Column("nickname", sa.String(64), nullable=True),
-    )
+    bind = op.get_bind()
+    columns = {column["name"] for column in sa.inspect(bind).get_columns("user_account")}
+    if "nickname" not in columns:
+        op.add_column(
+            "user_account",
+            sa.Column("nickname", sa.String(64), nullable=True),
+        )
     op.execute("UPDATE user_account SET nickname = username WHERE nickname IS NULL")
     op.alter_column("user_account", "nickname", nullable=False)
 
