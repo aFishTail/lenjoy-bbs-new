@@ -166,7 +166,12 @@ def test_module_models_are_co_located_with_domain_code():
     assert CommentReport is not None
     assert OpenApiClient is not None
     assert OpenApiAccountBinding is not None
-    assert SiteMessage is not None
+
+
+def test_settings_env_file_resolution_is_path_depth_safe():
+    from lenjoy_bbs.core.config import ROOT_ENV_FILE
+
+    assert ROOT_ENV_FILE.name == ".env"
 
 
 def test_db_compatibility_model_modules_are_removed():

@@ -5,7 +5,17 @@ from urllib.parse import urlparse
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_JWT_SECRET = "lenjoy-jwt-secret-change-me-at-least-32-chars"
-ROOT_ENV_FILE = Path(__file__).resolve().parents[4] / ".env"
+
+
+def _find_root_env_file() -> Path:
+    for directory in (Path(__file__).resolve().parent, *Path(__file__).resolve().parents):
+        candidate = directory / ".env"
+        if candidate.exists():
+            return candidate
+    return Path.cwd() / ".env"
+
+
+ROOT_ENV_FILE = _find_root_env_file()
 
 
 class Settings(BaseSettings):
