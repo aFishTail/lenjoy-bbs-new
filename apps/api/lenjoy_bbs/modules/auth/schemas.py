@@ -4,21 +4,21 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 class RegisterRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    username: str = Field(min_length=3, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
-    password: str = Field(min_length=8, max_length=128)
+    username: str = Field(min_length=3, max_length=32)
+    password: str = Field(min_length=8, max_length=24)
     email: EmailStr | None = None
     phone: str | None = Field(default=None, max_length=32)
     captcha_id: str = Field(alias="captchaId", min_length=1, max_length=128)
-    captcha_code: str = Field(alias="captchaCode", min_length=1, max_length=16)
+    captcha_code: str = Field(alias="captchaCode", min_length=1, max_length=4)
 
 
 class LoginRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    account: str = Field(min_length=1, max_length=128)
-    password: str = Field(min_length=1, max_length=128)
+    account: str = Field(min_length=1, max_length=32)
+    password: str = Field(min_length=1, max_length=24)
     captcha_id: str = Field(alias="captchaId", min_length=1, max_length=128)
-    captcha_code: str = Field(alias="captchaCode", min_length=1, max_length=16)
+    captcha_code: str = Field(alias="captchaCode", min_length=1, max_length=4)
 
 
 class CaptchaResponse(BaseModel):

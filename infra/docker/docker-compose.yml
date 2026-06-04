@@ -5,6 +5,7 @@ services:
       dockerfile: Dockerfile
     environment:
       API_SERVER_BASE_URL: http://api:8080
+      MINIO_PUBLIC_PROXY_TARGET: http://minio:9000/lenjoy-bbs
     ports:
       - "3000:3000"
     depends_on:

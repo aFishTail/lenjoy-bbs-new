@@ -4,15 +4,17 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  FormEvent,
   startTransition,
   useEffect,
   useMemo,
   useState,
 } from "react";
 
-import { LoginForm } from "@/components/auth/login-form";
-import { RegisterForm } from "@/components/auth/register-form";
+import { LoginForm, type LoginFormValue } from "@/components/auth/login-form";
+import {
+  RegisterForm,
+  type RegisterFormValue,
+} from "@/components/auth/register-form";
 import {
   type CaptchaMetadata,
   type Mode,
@@ -32,20 +34,6 @@ export function AuthPageClient() {
   const [errorText, setErrorText] = useState("");
   const [successText, setSuccessText] = useState("");
   const { setAuth: saveAuth } = useAuth();
-
-  const [loginForm, setLoginForm] = useState({
-    account: "",
-    password: "",
-    captchaCode: "",
-  });
-
-  const [registerForm, setRegisterForm] = useState({
-    username: "",
-    password: "",
-    email: "",
-    phone: "",
-    captchaCode: "",
-  });
 
   const captchaQuery = useQuery({
     queryKey: queryKeys.captcha,
@@ -107,8 +95,6 @@ export function AuthPageClient() {
       return;
     }
     setCaptchaStamp(Date.now());
-    setLoginForm((prev) => ({ ...prev, captchaCode: "" }));
-    setRegisterForm((prev) => ({ ...prev, captchaCode: "" }));
   }, [captchaQuery.data]);
 
   useEffect(() => {
@@ -127,8 +113,7 @@ export function AuthPageClient() {
     }
   }
 
-  async function onSubmitLogin(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function onSubmitLogin(loginForm: LoginFormValue) {
     if (!captchaId) {
       setErrorText("验证码尚未准备好，请刷新重试");
       return;
@@ -155,8 +140,7 @@ export function AuthPageClient() {
     }
   }
 
-  async function onSubmitRegister(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function onSubmitRegister(registerForm: RegisterFormValue) {
     if (!captchaId) {
       setErrorText("验证码尚未准备好，请刷新重试");
       return;
@@ -241,25 +225,23 @@ export function AuthPageClient() {
           {/* Form */}
           {mode === "login" ? (
             <LoginForm
-              value={loginForm}
-              onChange={setLoginForm}
               submitting={submitting}
               refreshingCaptcha={refreshingCaptcha}
               captchaId={captchaId}
               captchaImageSrc={captchaImageSrc}
               captchaExpireText={captchaExpireText}
+              captchaResetKey={captchaStamp}
               onRefreshCaptcha={() => refreshCaptcha()}
               onSubmit={onSubmitLogin}
             />
           ) : (
             <RegisterForm
-              value={registerForm}
-              onChange={setRegisterForm}
               submitting={submitting}
               refreshingCaptcha={refreshingCaptcha}
               captchaId={captchaId}
               captchaImageSrc={captchaImageSrc}
               captchaExpireText={captchaExpireText}
+              captchaResetKey={captchaStamp}
               onRefreshCaptcha={() => refreshCaptcha()}
               onSubmit={onSubmitRegister}
             />

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import {
   Field,
   FieldDescription,
+  FieldError,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
@@ -15,6 +16,8 @@ type CaptchaFieldProps = {
   captchaCode: string;
   captchaExpireText: string;
   refreshingCaptcha: boolean;
+  invalid?: boolean;
+  errorMessage?: string;
   onCaptchaCodeChange: (value: string) => void;
   onRefresh: () => Promise<void>;
 };
@@ -25,19 +28,22 @@ export function CaptchaField({
   captchaCode,
   captchaExpireText,
   refreshingCaptcha,
+  invalid,
+  errorMessage,
   onCaptchaCodeChange,
   onRefresh,
 }: CaptchaFieldProps) {
   return (
-    <Field>
+    <Field data-invalid={invalid || undefined}>
       <FieldLabel htmlFor="captchaCode">图形验证码</FieldLabel>
       <Input
         id="captchaCode"
-        required
+        aria-invalid={invalid}
         placeholder="请输入图中字符"
         value={captchaCode}
         onChange={(e) => onCaptchaCodeChange(e.target.value)}
       />
+      {errorMessage ? <FieldError>{errorMessage}</FieldError> : null}
 
       <div className="grid gap-3 sm:grid-cols-[180px_1fr]">
         <div className="flex min-h-[68px] items-center justify-center rounded-md border border-slate-200 bg-slate-50">
