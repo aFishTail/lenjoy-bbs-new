@@ -93,6 +93,12 @@ export function AdminPostsClient() {
     NORMAL: "is-normal",
   };
 
+  const typeLabels: Record<string, string> = {
+    RESOURCE: "资源帖",
+    BOUNTY: "悬赏帖",
+    NORMAL: "普通帖",
+  };
+
   const statusBadgeMap: Record<string, string> = {
     PUBLISHED: "is-active",
     OFFLINE: "is-banned",
@@ -131,9 +137,9 @@ export function AdminPostsClient() {
             }}
           >
             <option value="">全部类型</option>
-            <option value="NORMAL">NORMAL</option>
-            <option value="RESOURCE">RESOURCE</option>
-            <option value="BOUNTY">BOUNTY</option>
+            <option value="NORMAL">普通帖</option>
+            <option value="RESOURCE">资源帖</option>
+            <option value="BOUNTY">悬赏帖</option>
           </Select>
           <Select
             className="admin-input"
@@ -216,14 +222,16 @@ export function AdminPostsClient() {
                     <TableCell>{post.authorUsername || post.authorId}</TableCell>
                     <TableCell>
                       <span className={`admin-badge ${typeBadgeMap[post.postType] || ""}`}>
-                        {post.postType}
+                        {typeLabels[post.postType] || post.postType}
                       </span>
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">
-                        <div>{post.categoryName || "-"}</div>
-                        <div className="text-slate-500">
-                          {post.tags?.map((tag) => `#${tag.name}`).join(" ") || "-"}
+                        <div><span className="admin-tag is-category">{post.categoryName || "-"}</span></div>
+                        <div className="mt-1">
+                          {post.tags?.length
+                            ? post.tags.map((tag) => <span key={tag.id} className="admin-tag">{tag.name}</span>)
+                            : <span className="admin-tag">-</span>}
                         </div>
                       </div>
                     </TableCell>

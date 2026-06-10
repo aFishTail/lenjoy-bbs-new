@@ -39,16 +39,25 @@ const DEFAULT_FORM: CategoryFormState = {
 };
 
 const CONTENT_TYPE_OPTIONS = [
-  { label: "RESOURCE", value: "RESOURCE" },
-  { label: "NORMAL", value: "NORMAL" },
-  { label: "BOUNTY", value: "BOUNTY" },
+  { label: "全部分类", value: "" },
+  { label: "资源帖", value: "RESOURCE" },
+  { label: "普通帖", value: "NORMAL" },
+  { label: "悬赏帖", value: "BOUNTY" },
+] as const;
+
+const CONTENT_TYPE_FORM_OPTIONS = [
+  { label: "资源帖", value: "RESOURCE" },
+  { label: "普通帖", value: "NORMAL" },
+  { label: "悬赏帖", value: "BOUNTY" },
 ] as const;
 
 export function AdminCategoriesClient() {
-  const [contentType, setContentType] = useState<"RESOURCE" | "NORMAL" | "BOUNTY">("RESOURCE");
+  const [contentType, setContentType] = useState<"" | "RESOURCE" | "NORMAL" | "BOUNTY">("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<CategorySummary | null>(null);
   const [form, setForm] = useState<CategoryFormState>(DEFAULT_FORM);
+  const [deleteDialog, setDeleteDialog] = useState<CategorySummary | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const categoriesQuery = useAdminCategoriesQuery(contentType);
   const createCategoryMutation = useCreateAdminCategoryMutation(contentType);
@@ -64,9 +73,9 @@ export function AdminCategoriesClient() {
   const categories = categoriesQuery.data ?? [];
   const loading = categoriesQuery.isLoading || categoriesQuery.isFetching;
 
-  function resetDialogState(nextContentType: "RESOURCE" | "NORMAL" | "BOUNTY" = contentType) {
+  function resetDialogState() {
     setEditingCategory(null);
-    setForm({ ...DEFAULT_FORM, contentType: nextContentType });
+    setForm({ name: "", contentType: "RESOURCE", sort: "0" });
   }
 
   function openCreateDialog() {
@@ -108,9 +117,9 @@ export function AdminCategoriesClient() {
         await createCategoryMutation.mutateAsync(payload);
         toast.success("分类已创建");
       }
-      setContentType(form.contentType);
+      setContentType("RESOURCE");
       setDialogOpen(false);
-      resetDialogState(form.contentType);
+      resetDialogState();
     } catch (e) { toast.error(readError(e)); }
   }
 
@@ -121,13 +130,14 @@ export function AdminCategoriesClient() {
     } catch (e) { toast.error(readError(e)); }
   }
 
-  async function deleteCategory(categoryId: number, categoryName: string) {
-    if (typeof window === "undefined") return;
-    if (!window.confirm(`确认删除分类 "${categoryName}" 吗？`)) return;
+  async function submitDelete() {
+    if (!deleteDialog) return;
+    setDeleting(true);
     try {
-      await deleteCategoryMutation.mutateAsync(categoryId);
+      await deleteCategoryMutation.mutateAsync(deleteDialog.id);
       toast.success("分类已删除");
-    } catch (e) { toast.error(readError(e)); }
+      setDeleteDialog(null);
+    } catch (e) { toast.error(readError(e)); setDeleting(false); }
   }
 
   return (
@@ -137,7 +147,7 @@ export function AdminCategoriesClient() {
           <Select
             className="admin-input"
             value={contentType}
-            onChange={(e) => setContentType(e.target.value as "RESOURCE" | "NORMAL" | "BOUNTY")}
+            onChange={(e) => setContentType(e.target.value as "" | "RESOURCE" | "NORMAL" | "BOUNTY")}
           >
             {CONTENT_TYPE_OPTIONS.map((item) => (
               <option key={item.value} value={item.value}>{item.label}</option>
@@ -183,7 +193,7 @@ export function AdminCategoriesClient() {
                     <TableCell><strong className="cat-name">{category.name}</strong></TableCell>
                     <TableCell>
                       <span className={`admin-badge ${category.contentType === "RESOURCE" ? "is-resource" : category.contentType === "BOUNTY" ? "is-bounty" : "is-active"}`}>
-                        {category.contentType}
+                        {category.contentType === "RESOURCE" ? "资源帖" : category.contentType === "BOUNTY" ? "悬赏帖" : "普通帖"}
                       </span>
                     </TableCell>
                     <TableCell>{category.sort}</TableCell>
@@ -202,7 +212,7 @@ export function AdminCategoriesClient() {
                         >
                           {category.status === "ACTIVE" ? "停用" : "启用"}
                         </button>
-                        <button type="button" className="cat-btn cat-btn-delete" onClick={() => deleteCategory(category.id, category.name)}>删除</button>
+                        <button type="button" className="cat-btn cat-btn-delete" onClick={() => setDeleteDialog(category)}>删除</button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -241,7 +251,7 @@ export function AdminCategoriesClient() {
               value={form.contentType}
               onChange={(e) => setForm((p) => ({ ...p, contentType: e.target.value as "RESOURCE" | "NORMAL" | "BOUNTY" }))}
             >
-              {CONTENT_TYPE_OPTIONS.map((item) => (
+              {CONTENT_TYPE_FORM_OPTIONS.map((item) => (
                 <option key={item.value} value={item.value}>{item.label}</option>
               ))}
             </Select>
@@ -257,6 +267,25 @@ export function AdminCategoriesClient() {
             />
           </div>
         </div>
+      </ConfirmDialog>
+
+      {/* 删除确认 */}
+      <ConfirmDialog
+        open={deleteDialog !== null}
+        title="删除分类"
+        description="删除后不可恢复，请确认。"
+        confirmLabel="确认删除"
+        confirmBusy={deleting}
+        confirmDisabled={deleting}
+        onConfirm={() => void submitDelete()}
+        onOpenChange={(v) => !v && setDeleteDialog(null)}
+      >
+        {deleteDialog && (
+          <div className="coin-modal-user">
+            <strong>{deleteDialog.name}</strong>
+            <span>ID {deleteDialog.id}</span>
+          </div>
+        )}
       </ConfirmDialog>
     </main>
   );

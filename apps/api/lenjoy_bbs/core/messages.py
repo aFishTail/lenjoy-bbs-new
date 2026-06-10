@@ -84,6 +84,8 @@ class Admin:
     CATEGORY_NOT_FOUND = ApiMessage("CATEGORY_NOT_FOUND", "分类不存在", status.HTTP_404_NOT_FOUND)
     TAG_NOT_FOUND = ApiMessage("TAG_NOT_FOUND", "标签不存在", status.HTTP_404_NOT_FOUND)
     TAG_MERGE_INVALID = ApiMessage("TAG_MERGE_INVALID", "不能将标签合并到自身")
+    CATEGORY_NAME_CONFLICT = ApiMessage("CATEGORY_NAME_CONFLICT", "分类名称已存在")
+    TAG_NAME_CONFLICT = ApiMessage("TAG_NAME_CONFLICT", "标签名称已存在")
 
 
 class OpenApi:

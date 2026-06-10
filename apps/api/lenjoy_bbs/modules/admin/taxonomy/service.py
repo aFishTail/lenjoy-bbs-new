@@ -64,6 +64,9 @@ async def create_category(
     status_value: str,
     is_leaf: bool,
 ) -> dict:
+    existing = await db.scalars(select(Category).where(Category.name == name).limit(1))
+    if existing.first():
+        raise ApiError(Admin.CATEGORY_NAME_CONFLICT)
     category = Category(
         name=name,
         slug=slug or _slugify(name),
@@ -96,6 +99,9 @@ async def update_category(
     category = await db.get(Category, category_id)
     if not category:
         raise ApiError(Admin.CATEGORY_NOT_FOUND)
+    duplicate = await db.scalars(select(Category).where(Category.name == name, Category.id != category_id).limit(1))
+    if duplicate.first():
+        raise ApiError(Admin.CATEGORY_NAME_CONFLICT)
     category.name = name
     category.slug = slug or _slugify(name)
     category.content_type = content_type
@@ -127,6 +133,9 @@ async def delete_category(db: AsyncSession, category_id: int) -> None:
 
 
 async def create_tag(db: AsyncSession, *, name: str, slug: str | None, status_value: str, source: str) -> dict:
+    existing = await db.scalars(select(Tag).where(Tag.name == name).limit(1))
+    if existing.first():
+        raise ApiError(Admin.TAG_NAME_CONFLICT)
     tag = Tag(name=name, slug=slug or _slugify(name), status=status_value, source=source)
     db.add(tag)
     await db.flush()
@@ -140,6 +149,9 @@ async def update_tag(db: AsyncSession, tag_id: int, *, name: str, slug: str | No
     tag = await db.get(Tag, tag_id)
     if not tag:
         raise ApiError(Admin.TAG_NOT_FOUND)
+    duplicate = await db.scalars(select(Tag).where(Tag.name == name, Tag.id != tag_id).limit(1))
+    if duplicate.first():
+        raise ApiError(Admin.TAG_NAME_CONFLICT)
     tag.name = name
     tag.slug = slug or _slugify(name)
     tag.status = status_value
