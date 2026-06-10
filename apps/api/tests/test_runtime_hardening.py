@@ -59,7 +59,7 @@ def register_user(client: TestClient, username: str, email: str) -> str:
         f"{API_PREFIX}/auth/register",
         json={
             "username": username,
-            "password": "correct horse battery staple",
+            "password": "correct-horse-12345",
             "email": email,
             "captchaId": captcha["captchaId"],
             "captchaCode": captcha["debugCode"],

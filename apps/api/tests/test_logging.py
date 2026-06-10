@@ -39,7 +39,7 @@ def register_user(client: TestClient, username: str) -> str:
         "/api/v1/auth/register",
         json={
             "username": username,
-            "password": "correct horse battery staple",
+            "password": "correct-horse-12345",
             "email": f"{username}@example.com",
             "captchaId": captcha["captchaId"],
             "captchaCode": captcha["debugCode"],

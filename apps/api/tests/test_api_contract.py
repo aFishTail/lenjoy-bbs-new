@@ -48,7 +48,7 @@ def register_user(client: TestClient, username: str, email: str) -> str:
         f"{API_PREFIX}/auth/register",
         json={
             "username": username,
-            "password": "correct horse battery staple",
+            "password": "correct-horse-12345",
             "email": email,
             "captchaId": captcha["captchaId"],
             "captchaCode": captcha["debugCode"],
@@ -1318,7 +1318,7 @@ def test_register_login_wallet_post_comment_and_purchase_flow(client):
         f"{API_PREFIX}/auth/login",
         json={
             "account": "alice",
-            "password": "correct horse battery staple",
+            "password": "correct-horse-12345",
             "captchaId": login_captcha["captchaId"],
             "captchaCode": login_captcha["debugCode"],
         },
@@ -1860,7 +1860,7 @@ def test_my_profile_endpoint_returns_counts_and_updates_nickname(client):
         f"{API_PREFIX}/auth/login",
         json={
             "account": "profile-owner",
-            "password": "correct horse battery staple",
+            "password": "correct-horse-12345",
             "captchaId": login_captcha["captchaId"],
             "captchaCode": login_captcha["debugCode"],
         },
@@ -2198,7 +2198,7 @@ def test_register_rejects_reserved_open_api_identifiers(client):
         f"{API_PREFIX}/auth/register",
         json={
             "username": "openapi",
-            "password": "correct horse battery staple",
+            "password": "correct-horse-12345",
             "email": "reserved@example.com",
             "captchaId": captcha["captchaId"],
             "captchaCode": captcha["debugCode"],
@@ -2216,7 +2216,7 @@ def test_register_rejects_identifier_namespace_collisions(client):
         f"{API_PREFIX}/auth/register",
         json={
             "username": "namespace-owner",
-            "password": "correct horse battery staple",
+            "password": "correct-horse-12345",
             "email": "namespace-owner@example.com",
             "phone": "12345",
             "captchaId": captcha["captchaId"],
@@ -2230,7 +2230,7 @@ def test_register_rejects_identifier_namespace_collisions(client):
         f"{API_PREFIX}/auth/register",
         json={
             "username": "12345",
-            "password": "correct horse battery staple",
+            "password": "correct-horse-12345",
             "email": "namespace-collision@example.com",
             "captchaId": second_captcha["captchaId"],
             "captchaCode": second_captcha["debugCode"],
