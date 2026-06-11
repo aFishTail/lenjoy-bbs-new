@@ -205,6 +205,14 @@ pnpm install
 pnpm run dev
 ```
 
+## Platform deployment
+
+`infra/docker/docker-compose.platform.yml` runs only the BBS application containers against infrastructure managed by `lenjoy-platform`. The existing full Compose remains available during migration and must not run concurrently on the same production data.
+
+```bash
+docker compose --env-file ../lenjoy-platform/.env -f infra/docker/docker-compose.platform.yml up -d --build
+```
+
 ## Next Implementation Steps
 
 - Add domain modules under `apps/api/src/main/java/com/lenjoy/bbs/`.

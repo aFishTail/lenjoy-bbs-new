@@ -1,0 +1,51 @@
+name: lenjoy-bbs
+
+services:
+  web:
+    build:
+      context: ../../apps/web
+      dockerfile: Dockerfile
+    environment:
+      API_SERVER_BASE_URL: http://lenjoy-bbs-api:8080
+      MINIO_PUBLIC_PROXY_TARGET: http://platform-minio:9000/lenjoy-bbs
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      lenjoy-platform-net:
+        aliases: [lenjoy-bbs-web]
+
+  api:
+    build:
+      context: ../../apps/api
+      dockerfile: Dockerfile
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
+        PIP_DEFAULT_TIMEOUT: ${PIP_DEFAULT_TIMEOUT:-120}
+        PIP_RETRIES: ${PIP_RETRIES:-5}
+        UV_INDEX_URL: ${UV_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
+    environment:
+      DATABASE_URL: postgresql+psycopg://lenjoy_bbs:${LENJOY_BBS_DB_PASSWORD}@platform-postgres:5432/lenjoy_bbs
+      REDIS_URL: redis://lenjoy_bbs:${REDIS_LENJOY_BBS_PASSWORD}@platform-redis:6379/0
+      MINIO_ENDPOINT: http://platform-minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET:-lenjoy-bbs}
+      MINIO_PUBLIC_BASE_URL: /lenjoy-bbs
+      JWT_SECRET: ${JWT_SECRET}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/v1/health', timeout=2).read()"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      lenjoy-platform-net:
+        aliases: [lenjoy-bbs-api]
+
+networks:
+  lenjoy-platform-net:
+    name: ${PLATFORM_NETWORK:-lenjoy-platform-net}
+    external: true
