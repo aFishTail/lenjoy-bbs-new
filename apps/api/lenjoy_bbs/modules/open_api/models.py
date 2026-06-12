@@ -30,3 +30,14 @@ class OpenApiAccountBinding(Base):
     remark: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, onupdate=now_utc, nullable=False)
+
+
+class OpenApiIdempotencyRecord(Base):
+    __tablename__ = "open_api_idempotency_record"
+    __table_args__ = (UniqueConstraint("client_id", "idempotency_key"),)
+
+    id: Mapped[int] = mapped_column(IdType, primary_key=True, autoincrement=True)
+    client_id: Mapped[int] = mapped_column(ForeignKey("open_api_client.id"), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    post_id: Mapped[int] = mapped_column(ForeignKey("bbs_post.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)

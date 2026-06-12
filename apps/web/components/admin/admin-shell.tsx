@@ -26,6 +26,7 @@ const menus: AdminMenu[] = [
   },
   { href: "/admin/reports", label: "举报管理" },
   { href: "/admin/open-api", label: "Open API" },
+  { href: "/admin/operations", label: "任务中心" },
 ];
 
 function isMenuActive(pathname: string, href: string) {

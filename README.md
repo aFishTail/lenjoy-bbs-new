@@ -23,19 +23,84 @@ docs/
 ## Quick Start (Docker)
 
 1. Open terminal in repository root.
-2. Run:
+2. Copy `.env.example` to `.env` and replace the database, MinIO, internal
+   service, callback, and forum API credentials.
+3. Run:
 
 ```bash
 docker compose -f infra/docker/docker-compose.yml up --build
 ```
 
-1. Access services:
+The full stack also starts `automation-service` and `transfer-service` from
+their sibling repositories. Before starting it, configure
+`TRANSFER_CALLBACK_TOKEN` and an active Lenjoy Open API `FORUM_API_KEY` in
+the root `.env`. Also configure the shared `INTERNAL_SERVICE_TOKEN`, and
+ensure `../transfer-service/config/cookies.txt` contains
+a valid Quark cookie.
 
-- Web: <http://localhost:8080/>
-- API health: <http://localhost:8080/api/v1/health>
-- OpenAPI docs: <http://localhost:8080/docs>
-- MinIO API: <http://localhost:9000>
-- MinIO Console: <http://localhost:9001>
+The auxiliary services use isolated PostgreSQL schemas and are only reachable
+on the Compose network. For the current workload, run one instance of each
+service:
+
+```bash
+docker compose -f infra/docker/docker-compose.yml up -d --build
+```
+
+`automation-service` reconciles unfinished work at startup, and forum publishing
+uses an end-to-end idempotency key. This makes process restarts safe without
+adding multi-instance coordination complexity.
+
+Production management is centralized at `/admin/operations`. The auxiliary
+service images do not include their standalone React admin builds; those
+remain available only for local service development.
+
+`transfer-service` runs one durable polling worker by default. Queued work
+survives process restarts, running work uses renewable leases, and failed
+callbacks are retried with exponential backoff. Tune these through the `TRANSFER_WORKER_*`,
+`TRANSFER_TASK_LEASE_SECONDS`, and `TRANSFER_WEBHOOK_*` variables.
+
+Access the production stack through its configured Nginx domain:
+
+- Web: <https://www.lxziyuan.site/>
+- API health: <https://www.lxziyuan.site/api/v1/health>
+
+Only Nginx publishes host ports in the production Compose file. PostgreSQL,
+Redis, MinIO, API, web, and auxiliary services remain private to the Compose
+network. Use `docker-compose.dev.yml` when local development requires direct
+access to dependency ports.
+
+Before starting Nginx, place a valid certificate and private key under
+`infra/docker/letsencrypt/live/www.lxziyuan.site/`. Placeholder or malformed
+PEM files cause Nginx to restart until valid certificate material is installed.
+
+PostgreSQL applies `POSTGRES_PASSWORD` only when its data volume is initialized.
+Changing `DB_PASSWORD` later also requires updating the existing PostgreSQL role
+password before restarting dependent services.
+
+## Platform E2E Acceptance
+
+Configure the `E2E_*` variables in `.env` with one stable Quark test resource,
+an active Open API author binding, and a valid RESOURCE post category. The
+runner reads `.env`, while explicitly exported environment variables take
+priority.
+
+Run non-destructive service and authentication checks:
+
+```bash
+python scripts/platform_e2e.py smoke
+```
+
+Run the real acceptance flow:
+
+```bash
+python scripts/platform_e2e.py full
+```
+
+Full mode transfers the configured resource, restarts `automation-service`,
+publishes a RESOURCE post, verifies replay idempotency, and soft-deletes the
+test forum post. Each run uses a unique `resource-transfer/e2e/<run-id>` target
+directory, and the transferred drive file is retained. A redacted report is
+written to `artifacts/platform-e2e-report.json`.
 
 ## Local Dependencies Only (PostgreSQL + Redis + MinIO)
 

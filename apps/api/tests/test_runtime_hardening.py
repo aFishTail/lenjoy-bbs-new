@@ -8,7 +8,7 @@ import jwt
 import pytest
 from fastapi import UploadFile
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import func, select
 from starlette.datastructures import Headers
 
 os.environ.setdefault("APP_ENV", "test")
@@ -23,9 +23,9 @@ from lenjoy_bbs.infrastructure.storage.image_storage import MinioImageStorage, v
 from lenjoy_bbs.main import app, create_app
 from lenjoy_bbs.modules.open_api import client_management as open_api_client_management
 from lenjoy_bbs.modules.open_api.client_management import create_client
-from lenjoy_bbs.modules.open_api.publication import create_open_post
+from lenjoy_bbs.modules.open_api.publication import create_open_post, delete_open_post
 from lenjoy_bbs.modules.open_api.constants import OPEN_API_SYSTEM_EMAIL, OPEN_API_SYSTEM_USERNAME
-from lenjoy_bbs.modules.open_api.models import OpenApiClient
+from lenjoy_bbs.modules.open_api.models import OpenApiClient, OpenApiIdempotencyRecord
 from lenjoy_bbs.modules.files.router import get_storage_service, upload_image as upload_image_endpoint
 from lenjoy_bbs.modules.posts.models import Post, PostComment, PostTag
 from lenjoy_bbs.modules.posts.bounty_settlement import accept_bounty_answer_settlement
@@ -262,6 +262,130 @@ async def test_open_api_post_creation_preserves_resource_fields():
     assert stored.category_id == 7
     assert stored.status == "PUBLISHED"
     assert stored_tag_ids == sorted(tag_ids)
+
+
+@pytest.mark.asyncio
+async def test_open_api_post_creation_reuses_post_for_same_idempotency_key():
+    payload = PostCreateRequest(
+        type="NORMAL",
+        title="Idempotent open post",
+        content="public body",
+        tagIds=[],
+    )
+    async with SessionLocal() as db:
+        db.add(OpenApiClient(
+            name="idempotent-client",
+            api_key="idempotent-key",
+            status="ACTIVE",
+            remark=None,
+        ))
+        await db.flush()
+
+        first = await create_open_post(
+            db,
+            api_key="idempotent-key",
+            payload=payload,
+            idempotency_key="automation-item-1",
+        )
+        second = await create_open_post(
+            db,
+            api_key="idempotent-key",
+            payload=payload,
+            idempotency_key="automation-item-1",
+        )
+
+    async with SessionLocal() as db:
+        post_count = await db.scalar(
+            select(func.count()).select_from(Post).where(
+                Post.title == "Idempotent open post"
+            )
+        )
+        record_count = await db.scalar(
+            select(func.count()).select_from(OpenApiIdempotencyRecord)
+        )
+
+    assert second.id == first.id
+    assert post_count == 1
+    assert record_count == 1
+
+
+@pytest.mark.asyncio
+async def test_open_api_client_can_soft_delete_its_idempotent_post_repeatedly():
+    async with SessionLocal() as db:
+        db.add(OpenApiClient(
+            name="cleanup-owner",
+            api_key="cleanup-owner-key",
+            status="ACTIVE",
+            remark=None,
+        ))
+        await db.flush()
+        post = await create_open_post(
+            db,
+            api_key="cleanup-owner-key",
+            payload=PostCreateRequest(
+                type="RESOURCE",
+                title="E2E cleanup post",
+                content="public body",
+                hiddenContent="secret body",
+                price=1,
+                tagIds=[],
+            ),
+            idempotency_key="e2e-cleanup-key",
+        )
+
+        await delete_open_post(db, api_key="cleanup-owner-key", post_id=post.id)
+        await delete_open_post(db, api_key="cleanup-owner-key", post_id=post.id)
+
+    async with SessionLocal() as db:
+        stored = await db.get(Post, post.id)
+
+    assert stored is not None
+    assert stored.is_deleted is True
+
+
+@pytest.mark.asyncio
+async def test_open_api_client_cannot_delete_another_clients_post():
+    async with SessionLocal() as db:
+        db.add_all([
+            OpenApiClient(
+                name="cleanup-owner",
+                api_key="cleanup-owner-key",
+                status="ACTIVE",
+                remark=None,
+            ),
+            OpenApiClient(
+                name="cleanup-other",
+                api_key="cleanup-other-key",
+                status="ACTIVE",
+                remark=None,
+            ),
+        ])
+        await db.flush()
+        post = await create_open_post(
+            db,
+            api_key="cleanup-owner-key",
+            payload=PostCreateRequest(
+                type="NORMAL",
+                title="Owned cleanup post",
+                content="public body",
+                tagIds=[],
+            ),
+            idempotency_key="owned-cleanup-key",
+        )
+        post_id = post.id
+
+        with pytest.raises(ApiError):
+            await delete_open_post(
+                db,
+                api_key="cleanup-other-key",
+                post_id=post_id,
+            )
+
+    async with SessionLocal() as db:
+        stored = await db.get(Post, post_id)
+
+    assert stored is not None
+    assert stored.is_deleted is False
 
 
 @pytest.mark.asyncio

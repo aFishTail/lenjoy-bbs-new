@@ -68,7 +68,7 @@ def test_open_api_and_users_use_service_entrypoints():
     from lenjoy_bbs.modules.open_api.client_auth import require_active_client
     from lenjoy_bbs.modules.open_api.client_management import create_client, list_clients
     from lenjoy_bbs.modules.open_api.publisher_identity import get_or_create_open_api_user
-    from lenjoy_bbs.modules.open_api.publication import create_open_post
+    from lenjoy_bbs.modules.open_api.publication import create_open_post, delete_open_post
     from lenjoy_bbs.modules.users.service import update_profile
 
     create_client_sig = inspect.signature(create_client)
@@ -77,6 +77,7 @@ def test_open_api_and_users_use_service_entrypoints():
 
     assert inspect.iscoroutinefunction(create_client)
     assert inspect.iscoroutinefunction(create_open_post)
+    assert inspect.iscoroutinefunction(delete_open_post)
     assert inspect.iscoroutinefunction(list_clients)
     assert inspect.iscoroutinefunction(require_active_client)
     assert inspect.iscoroutinefunction(get_or_create_open_api_user)
@@ -84,8 +85,17 @@ def test_open_api_and_users_use_service_entrypoints():
     assert list(create_client_sig.parameters) == [
         "db", "name", "remark", "status_value"
     ]
-    assert list(
-        create_open_post_sig.parameters) == ["db", "api_key", "payload"]
+    assert list(create_open_post_sig.parameters) == [
+        "db",
+        "api_key",
+        "payload",
+        "idempotency_key",
+    ]
+    assert list(inspect.signature(delete_open_post).parameters) == [
+        "db",
+        "api_key",
+        "post_id",
+    ]
     assert list(update_profile_sig.parameters) == ["db", "user", "payload"]
 
 
