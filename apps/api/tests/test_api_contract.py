@@ -48,7 +48,7 @@ def register_user(client: TestClient, username: str, email: str) -> str:
         f"{API_PREFIX}/auth/register",
         json={
             "username": username,
-            "password": "correct horse battery staple",
+            "password": "correct-horse-12345",
             "email": email,
             "captchaId": captcha["captchaId"],
             "captchaCode": captcha["debugCode"],
@@ -1003,7 +1003,7 @@ def test_bounty_delete_request_rejects_non_author(client):
     author_token = register_user(client, "bounty-request-non-author-owner",
                                  "bounty-request-non-author-owner@example.com")
     answerer_token = register_user(
-        client, "bounty-request-non-author-answerer",
+        client, "bounty-non-author-answerer",
         "bounty-request-non-author-answerer@example.com")
     other_token = register_user(client, "bounty-request-non-author",
                                 "bounty-request-non-author@example.com")
@@ -1094,7 +1094,7 @@ def test_bounty_delete_request_duplicate_pending_rejected(client):
     author_token = register_user(client, "bounty-request-duplicate-author",
                                  "bounty-request-duplicate-author@example.com")
     answerer_token = register_user(
-        client, "bounty-request-duplicate-answerer",
+        client, "bounty-duplicate-answerer",
         "bounty-request-duplicate-answerer@example.com")
     post_id = create_bounty_post_with_external_answer(
         client, author_token, answerer_token, "Duplicate request bounty")
@@ -1318,7 +1318,7 @@ def test_register_login_wallet_post_comment_and_purchase_flow(client):
         f"{API_PREFIX}/auth/login",
         json={
             "account": "alice",
-            "password": "correct horse battery staple",
+            "password": "correct-horse-12345",
             "captchaId": login_captcha["captchaId"],
             "captchaCode": login_captcha["debugCode"],
         },
@@ -1390,7 +1390,7 @@ def test_bounty_author_can_accept_top_level_answer(client):
             "title": "Need a working answer",
             "content": "question body",
             "bountyAmount": 5,
-            "bountyExpireAt": "2026-06-01T12:00:00Z",
+            "bountyExpireAt": future_utc_timestamp(),
         },
     )
     create_payload = unwrap(create_response)
@@ -1450,7 +1450,7 @@ def test_bounty_answers_are_masked_by_viewer_role(client):
             "title": "Need a private answer",
             "content": "question body",
             "bountyAmount": 5,
-            "bountyExpireAt": "2026-06-01T12:00:00Z",
+            "bountyExpireAt": future_utc_timestamp(),
         },
     )
     post_id = unwrap(create_response)["data"]["id"]
@@ -1860,7 +1860,7 @@ def test_my_profile_endpoint_returns_counts_and_updates_nickname(client):
         f"{API_PREFIX}/auth/login",
         json={
             "account": "profile-owner",
-            "password": "correct horse battery staple",
+            "password": "correct-horse-12345",
             "captchaId": login_captcha["captchaId"],
             "captchaCode": login_captcha["debugCode"],
         },
@@ -2198,7 +2198,7 @@ def test_register_rejects_reserved_open_api_identifiers(client):
         f"{API_PREFIX}/auth/register",
         json={
             "username": "openapi",
-            "password": "correct horse battery staple",
+            "password": "correct-horse-12345",
             "email": "reserved@example.com",
             "captchaId": captcha["captchaId"],
             "captchaCode": captcha["debugCode"],
@@ -2216,7 +2216,7 @@ def test_register_rejects_identifier_namespace_collisions(client):
         f"{API_PREFIX}/auth/register",
         json={
             "username": "namespace-owner",
-            "password": "correct horse battery staple",
+            "password": "correct-horse-12345",
             "email": "namespace-owner@example.com",
             "phone": "12345",
             "captchaId": captcha["captchaId"],
@@ -2230,7 +2230,7 @@ def test_register_rejects_identifier_namespace_collisions(client):
         f"{API_PREFIX}/auth/register",
         json={
             "username": "12345",
-            "password": "correct horse battery staple",
+            "password": "correct-horse-12345",
             "email": "namespace-collision@example.com",
             "captchaId": second_captcha["captchaId"],
             "captchaCode": second_captcha["debugCode"],

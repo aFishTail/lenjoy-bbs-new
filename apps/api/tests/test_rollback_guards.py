@@ -22,7 +22,7 @@ async def _register_account(db, username: str, email: str) -> UserAccount:
         db,
         RegisterRequest(
             username=username,
-            password="correct horse battery staple",
+            password="correct-horse-12345",
             email=email,
             captchaId=captcha["captchaId"],
             captchaCode=captcha["debugCode"],
@@ -70,7 +70,7 @@ async def test_register_user_rolls_back_when_wallet_adjustment_fails(
                 db,
                 RegisterRequest(
                     username="rollback-user",
-                    password="correct horse battery staple",
+                    password="correct-horse-12345",
                     email="rollback-user@example.com",
                     captchaId=captcha["captchaId"],
                     captchaCode=captcha["debugCode"],
