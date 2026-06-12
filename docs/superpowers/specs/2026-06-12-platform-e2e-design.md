@@ -2,7 +2,8 @@
 
 ## Goal
 
-Provide a repeatable acceptance script for the single-host Compose deployment
+Provide a repeatable acceptance script for the compatibility single-host
+integrated Compose deployment
 covering the real Quark transfer, Automation callback, RESOURCE forum post,
 idempotent replay, Automation restart recovery, and forum cleanup flow.
 
@@ -39,7 +40,10 @@ environment variables:
 - `E2E_TIMEOUT_SECONDS`: overall workflow timeout.
 
 Compose file and project directory may be overridden by command-line options,
-but default to `infra/docker/docker-compose.yml` and the repository root.
+but default to the compatibility integration stack at
+`infra/docker/docker-compose.yml` and the repository root. Formal platform
+production deployment remains split across `lenjoy-platform` and each business
+repository's `compose.platform.yml`.
 
 ## Open API Cleanup Endpoint
 

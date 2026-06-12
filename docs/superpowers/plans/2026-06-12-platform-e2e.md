@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a repeatable single-host E2E acceptance script that verifies real transfer, Automation restart recovery, RESOURCE publishing, idempotency, and safe forum cleanup.
+**Goal:** Add a repeatable compatibility-stack E2E acceptance script that verifies real transfer, Automation restart recovery, RESOURCE publishing, idempotency, and safe forum cleanup without replacing the independently deployed platform contracts.
 
 **Architecture:** Extend the BBS Open API with a client-scoped soft-delete operation backed by the existing idempotency ownership record. Implement the host-side E2E runner as a standard-library Python script with isolated configuration, HTTP/Compose adapters, polling, cleanup, and redacted JSON reporting.
 

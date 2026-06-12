@@ -20,7 +20,7 @@ packages/
 docs/
 ```
 
-## Quick Start (Docker)
+## Integrated Local Stack
 
 1. Open terminal in repository root.
 2. Copy `.env.example` to `.env` and replace the database, MinIO, internal
@@ -31,8 +31,10 @@ docs/
 docker compose -f infra/docker/docker-compose.yml up --build
 ```
 
-The full stack also starts `automation-service` and `transfer-service` from
-their sibling repositories. Before starting it, configure
+This compatibility stack also starts `automation-service` and
+`transfer-service` from their sibling repositories. It is intended for local
+integration testing and the platform E2E acceptance runner, not independent
+platform production deployment. Before starting it, configure
 `TRANSFER_CALLBACK_TOKEN` and an active Lenjoy Open API `FORUM_API_KEY` in
 the root `.env`. Also configure the shared `INTERNAL_SERVICE_TOKEN`, and
 ensure `../transfer-service/config/cookies.txt` contains
@@ -50,7 +52,7 @@ docker compose -f infra/docker/docker-compose.yml up -d --build
 uses an end-to-end idempotency key. This makes process restarts safe without
 adding multi-instance coordination complexity.
 
-Production management is centralized at `/admin/operations`. The auxiliary
+Integrated-stack management is centralized at `/admin/operations`. The auxiliary
 service images do not include their standalone React admin builds; those
 remain available only for local service development.
 
@@ -59,12 +61,12 @@ survives process restarts, running work uses renewable leases, and failed
 callbacks are retried with exponential backoff. Tune these through the `TRANSFER_WORKER_*`,
 `TRANSFER_TASK_LEASE_SECONDS`, and `TRANSFER_WEBHOOK_*` variables.
 
-Access the production stack through its configured Nginx domain:
+Access the integrated stack through its configured Nginx domain:
 
 - Web: <https://www.lxziyuan.site/>
 - API health: <https://www.lxziyuan.site/api/v1/health>
 
-Only Nginx publishes host ports in the production Compose file. PostgreSQL,
+Only Nginx publishes host ports in the integrated Compose file. PostgreSQL,
 Redis, MinIO, API, web, and auxiliary services remain private to the Compose
 network. Use `docker-compose.dev.yml` when local development requires direct
 access to dependency ports.
@@ -272,7 +274,12 @@ pnpm run dev
 
 ## Platform deployment
 
-`infra/docker/docker-compose.platform.yml` runs only the BBS application containers against infrastructure managed by `lenjoy-platform`. The existing full Compose remains available during migration and must not run concurrently on the same production data.
+`infra/docker/docker-compose.platform.yml` is the production platform contract.
+It runs only the BBS application containers against infrastructure managed by
+`lenjoy-platform`. Automation and transfer are deployed independently from
+their owning repositories. The integrated Compose remains available for local
+acceptance and rollback compatibility, and must not run concurrently against
+the same production data.
 
 ```bash
 docker compose --env-file ../lenjoy-platform/.env -f infra/docker/docker-compose.platform.yml up -d --build
