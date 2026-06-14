@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { PropsWithChildren } from "react";
 import styles from "./admin-shell.module.css";
+import { AdminReadOnlyBanner } from "./admin-read-only-banner";
 
 type AdminMenuLink = { href: string; label: string };
 type AdminMenu = AdminMenuLink | { label: string; children: AdminMenuLink[] };
@@ -40,6 +41,7 @@ export function AdminShell({ children }: PropsWithChildren) {
 
   return (
     <div className={styles.shell}>
+      <AdminReadOnlyBanner />
       <aside className="admin-sidebar">
         <div className="admin-brand">
           <span className="admin-brand-mark">LX</span>
