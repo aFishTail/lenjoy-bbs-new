@@ -19,6 +19,21 @@ from lenjoy_bbs.modules.users.models import Role, UserAccount, UserRole
 from lenjoy_bbs.modules.wallet.models import Wallet
 
 API_PREFIX = "/api/v1"
+INTERNAL_SERVICE_TOKEN_FOR_CONTRACT_TESTS = "contract-tests-service-token"
+
+
+@pytest.fixture(autouse=True)
+def _contract_test_service_token(monkeypatch):
+    """Pin the internal service token for the legacy-admin-bypass contract
+    tests in this module. Tests that opt into the trusted internal admin
+    API use this header value."""
+    from lenjoy_bbs.core.config import get_settings
+
+    get_settings.cache_clear()
+    monkeypatch.setenv("INTERNAL_SERVICE_TOKEN", INTERNAL_SERVICE_TOKEN_FOR_CONTRACT_TESTS)
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 def future_utc_timestamp() -> str:
@@ -1134,9 +1149,16 @@ def test_admin_approves_bounty_delete_request_soft_deletes_post_and_notifies_aut
     )
     request_id = unwrap(request_response)["data"]["id"]
 
+    # The legacy browser admin surface is read-only by default. The
+    # trusted internal admin API is the only path that may resolve a
+    # bounty delete request, so the contract test exercises it.
     review_response = client.patch(
-        f"{API_PREFIX}/admin/bounty-delete-requests/{request_id}",
-        headers=bearer(admin_token),
+        "/api/internal/v1/admin/bounty-delete-requests/" + str(request_id),
+        headers={
+            "X-Service-Token": INTERNAL_SERVICE_TOKEN_FOR_CONTRACT_TESTS,
+            "X-Operator-Id": "ops-approve-admin",
+            "Idempotency-Key": "idem-approve-admin-1",
+        },
         json={
             "action": "APPROVE",
             "resolutionNote": "approved",
@@ -1154,8 +1176,12 @@ def test_admin_approves_bounty_delete_request_soft_deletes_post_and_notifies_aut
                for item in messages)
 
     second_review_response = client.patch(
-        f"{API_PREFIX}/admin/bounty-delete-requests/{request_id}",
-        headers=bearer(admin_token),
+        "/api/internal/v1/admin/bounty-delete-requests/" + str(request_id),
+        headers={
+            "X-Service-Token": INTERNAL_SERVICE_TOKEN_FOR_CONTRACT_TESTS,
+            "X-Operator-Id": "ops-approve-admin",
+            "Idempotency-Key": "idem-approve-admin-2",
+        },
         json={"action": "REJECT"},
     )
     second_review_payload = unwrap(second_review_response)
@@ -1181,8 +1207,12 @@ def test_admin_rejects_bounty_delete_request_keeps_post_visible(client):
     request_id = unwrap(request_response)["data"]["id"]
 
     review_response = client.patch(
-        f"{API_PREFIX}/admin/bounty-delete-requests/{request_id}",
-        headers=bearer(admin_token),
+        "/api/internal/v1/admin/bounty-delete-requests/" + str(request_id),
+        headers={
+            "X-Service-Token": INTERNAL_SERVICE_TOKEN_FOR_CONTRACT_TESTS,
+            "X-Operator-Id": "ops-reject-admin",
+            "Idempotency-Key": "idem-reject-admin-1",
+        },
         json={
             "action": "REJECT",
             "resolutionNote": "keep visible",
@@ -1239,8 +1269,12 @@ def test_admin_rejects_approval_when_bounty_delete_request_is_resolved(
     assert accept_response.status_code == 200
 
     review_response = client.patch(
-        f"{API_PREFIX}/admin/bounty-delete-requests/{request_id}",
-        headers=bearer(admin_token),
+        "/api/internal/v1/admin/bounty-delete-requests/" + str(request_id),
+        headers={
+            "X-Service-Token": INTERNAL_SERVICE_TOKEN_FOR_CONTRACT_TESTS,
+            "X-Operator-Id": "ops-resolved-admin",
+            "Idempotency-Key": "idem-resolved-admin-1",
+        },
         json={"action": "APPROVE"},
     )
     review_payload = unwrap(review_response)

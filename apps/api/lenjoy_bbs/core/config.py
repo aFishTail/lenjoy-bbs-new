@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     captcha_length: int = 4
     captcha_debug_enabled: bool = False
     initial_register_coins: int = 100
+    legacy_admin_mutations_enabled: bool = False
     redis_url: str | None = None
     redis_host: str = "localhost"
     redis_port: int = 6379

@@ -77,6 +77,11 @@ class Files:
 
 class Admin:
     BOUNTY_DELETE_REQUEST_NOT_APPROVABLE = ApiMessage("BOUNTY_DELETE_REQUEST_NOT_APPROVABLE", "当前悬赏删除申请不能通过")
+    LEGACY_READ_ONLY = ApiMessage(
+        "LEGACY_ADMIN_READ_ONLY",
+        "Legacy admin mutations are disabled; use the new /ops/ admin plane at /ops/ for administrative actions.",
+        status.HTTP_410_GONE,
+    )
     BOUNTY_DELETE_REQUEST_NOT_FOUND = ApiMessage("BOUNTY_DELETE_REQUEST_NOT_FOUND", "悬赏删除申请不存在", status.HTTP_404_NOT_FOUND)
     BOUNTY_DELETE_REQUEST_ALREADY_HANDLED = ApiMessage("BOUNTY_DELETE_REQUEST_ALREADY_HANDLED", "悬赏删除申请已处理")
     REPORT_NOT_FOUND = ApiMessage("REPORT_NOT_FOUND", "举报不存在", status.HTTP_404_NOT_FOUND)

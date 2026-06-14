@@ -35,6 +35,23 @@ from lenjoy_bbs.modules.users.models import Role, UserAccount, UserRole
 from lenjoy_bbs.modules.wallet.models import Wallet, WalletLedger
 
 API_PREFIX = "/api/v1"
+INTERNAL_SERVICE_TOKEN_FOR_HARDENING_TESTS = "hardening-tests-service-token"
+
+
+@pytest.fixture(autouse=True)
+def _hardening_service_token(monkeypatch):
+    """Pin the internal service token for legacy-admin-bypass contract
+    tests in this module. The legacy browser admin surface is
+    read-only by default; tests that need to exercise the underlying
+    domain logic use the trusted internal admin API path with this
+    token instead."""
+    from lenjoy_bbs.core.config import get_settings
+
+    get_settings.cache_clear()
+    monkeypatch.setenv("INTERNAL_SERVICE_TOKEN", INTERNAL_SERVICE_TOKEN_FOR_HARDENING_TESTS)
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 @pytest.fixture
@@ -738,18 +755,29 @@ def test_admin_missing_resources_return_404_and_wallet_ledger_balances_are_after
             await db.commit()
             return create_access_token(user, ["ADMIN"]), user.id
 
-    admin_token, user_id = asyncio.run(prepare_admin())
+    _admin_token, user_id = asyncio.run(prepare_admin())
 
+    # The legacy browser admin surface is read-only by default. Tests
+    # that exercise the underlying domain logic use the trusted
+    # internal admin API path with a service token instead.
+    internal_headers = {
+        "X-Service-Token": INTERNAL_SERVICE_TOKEN_FOR_HARDENING_TESTS,
+        "X-Operator-Id": "ops-missing-admin",
+        "Idempotency-Key": "idem-missing-admin",
+    }
     missing_response = client.patch(
-        f"{API_PREFIX}/admin/users/999999/status",
-        headers=bearer(admin_token),
+        "/api/internal/v1/admin/users/999999/status",
+        headers=internal_headers,
         json={"status": "BANNED"},
     )
     assert missing_response.status_code == 404
 
     adjust_response = client.patch(
-        f"{API_PREFIX}/admin/coins/users/{user_id}",
-        headers=bearer(admin_token),
+        f"/api/internal/v1/admin/coins/users/{user_id}",
+        headers={
+            **internal_headers,
+            "Idempotency-Key": "idem-missing-admin-coins",
+        },
         json={
             "amount": 25,
             "reason": "bonus"
@@ -797,18 +825,31 @@ def test_admin_role_revocation_invalidates_old_token_authorization(client):
 
     asyncio.run(revoke_admin())
 
-    response = client.patch(
+    # With the legacy admin read-only gate in production default, the
+    # admin role check is gated behind the read-only block. Either
+    # way, the old JWT must NOT mutate anything.
+    legacy_response = client.patch(
         f"{API_PREFIX}/admin/coins/users/{user_id}",
         headers=bearer(admin_token),
-        json={
-            "amount": 25,
-            "reason": "bonus"
-        },
+        json={"amount": 25, "reason": "bonus"},
     )
-    payload = unwrap(response)
+    # Legacy admin: 410 (gate) or 403 (auth) both prove the JWT is
+    # no longer authorized to mutate.
+    assert legacy_response.status_code in {403, 410}
 
-    assert response.status_code == 403
-    assert payload["error"]["code"] == "FORBIDDEN"
+    # Internal admin: BBS user JWT is rejected outright, regardless
+    # of admin role state.
+    internal_response = client.patch(
+        f"/api/internal/v1/admin/coins/users/{user_id}",
+        headers={
+            "X-Service-Token": INTERNAL_SERVICE_TOKEN_FOR_HARDENING_TESTS,
+            "X-Operator-Id": "ops-revoked",
+            "Idempotency-Key": "idem-revoked",
+            "Authorization": bearer(admin_token)["Authorization"],
+        },
+        json={"amount": 25, "reason": "bonus"},
+    )
+    assert internal_response.status_code == 401
 
 
 def test_offline_post_is_hidden_from_public_detail_comment_and_purchase(
@@ -817,8 +858,8 @@ def test_offline_post_is_hidden_from_public_detail_comment_and_purchase(
                                  "offline-author@example.com")
     buyer_token = register_user(client, "offline-buyer",
                                 "offline-buyer@example.com")
-    admin_user_token = register_user(client, "offline-admin",
-                                     "offline-admin@example.com")
+    register_user(client, "offline-admin",
+                  "offline-admin@example.com")
 
     post_response = client.post(
         f"{API_PREFIX}/posts",
@@ -833,24 +874,15 @@ def test_offline_post_is_hidden_from_public_detail_comment_and_purchase(
     )
     post_id = unwrap(post_response)["data"]["id"]
 
-    async def promote_admin() -> str:
-        async with SessionLocal() as db:
-            user = await db.scalar(
-                select(UserAccount).where(
-                    UserAccount.username == "offline-admin"))
-            role = await db.scalar(
-                select(Role).where(Role.role_code == "ADMIN"))
-            assert user is not None
-            assert role is not None
-            db.add(UserRole(user_id=user.id, role_id=role.id))
-            await db.commit()
-            return create_access_token(user, ["ADMIN"])
-
-    admin_token = asyncio.run(promote_admin())
-
+    # Legacy browser admin is read-only; use the trusted internal API.
     offline_response = client.patch(
-        f"{API_PREFIX}/admin/posts/{post_id}/offline",
-        headers=bearer(admin_token))
+        f"/api/internal/v1/admin/posts/{post_id}/offline",
+        headers={
+            "X-Service-Token": INTERNAL_SERVICE_TOKEN_FOR_HARDENING_TESTS,
+            "X-Operator-Id": "ops-offline-admin",
+            "Idempotency-Key": "idem-offline-admin",
+        },
+    )
     assert offline_response.status_code == 200
 
     detail_response = client.get(f"{API_PREFIX}/posts/{post_id}",
@@ -886,24 +918,15 @@ def test_admin_offline_active_bounty_refunds_frozen_balance(client):
     )
     post_id = unwrap(post_response)["data"]["id"]
 
-    async def promote_admin() -> str:
-        async with SessionLocal() as db:
-            user = await db.scalar(
-                select(UserAccount).where(
-                    UserAccount.username == "offline-bounty-admin"))
-            role = await db.scalar(
-                select(Role).where(Role.role_code == "ADMIN"))
-            assert user is not None
-            assert role is not None
-            db.add(UserRole(user_id=user.id, role_id=role.id))
-            await db.commit()
-            return create_access_token(user, ["ADMIN"])
-
-    admin_token = asyncio.run(promote_admin())
-
+    # Legacy browser admin is read-only; use the trusted internal API.
     offline_response = client.patch(
-        f"{API_PREFIX}/admin/posts/{post_id}/offline",
-        headers=bearer(admin_token))
+        f"/api/internal/v1/admin/posts/{post_id}/offline",
+        headers={
+            "X-Service-Token": INTERNAL_SERVICE_TOKEN_FOR_HARDENING_TESTS,
+            "X-Operator-Id": "ops-offline-bounty-admin",
+            "Idempotency-Key": "idem-offline-bounty-admin",
+        },
+    )
     wallet_payload = unwrap(
         client.get(f"{API_PREFIX}/users/me/wallet",
                    headers=bearer(author_token)))
@@ -942,24 +965,14 @@ def test_admin_report_offline_post_notifies_author_only(client):
     )
     report_id = unwrap(report_response)["data"]["id"]
 
-    async def promote_admin() -> str:
-        async with SessionLocal() as db:
-            user = await db.scalar(
-                select(UserAccount).where(
-                    UserAccount.username == "report-offline-admin"))
-            role = await db.scalar(
-                select(Role).where(Role.role_code == "ADMIN"))
-            assert user is not None
-            assert role is not None
-            db.add(UserRole(user_id=user.id, role_id=role.id))
-            await db.commit()
-            return create_access_token(user, ["ADMIN"])
-
-    admin_token = asyncio.run(promote_admin())
-
+    # Legacy browser admin is read-only; use the trusted internal API.
     review_response = client.patch(
-        f"{API_PREFIX}/admin/reports/posts/{report_id}",
-        headers=bearer(admin_token),
+        f"/api/internal/v1/admin/reports/posts/{report_id}",
+        headers={
+            "X-Service-Token": INTERNAL_SERVICE_TOKEN_FOR_HARDENING_TESTS,
+            "X-Operator-Id": "ops-report-offline-admin",
+            "Idempotency-Key": "idem-report-offline-admin",
+        },
         json={
             "status": "VALID",
             "resolutionNote": "违规内容",
@@ -1014,24 +1027,14 @@ def test_admin_report_offline_active_bounty_refunds_frozen_balance(client):
     )
     report_id = unwrap(report_response)["data"]["id"]
 
-    async def promote_admin() -> str:
-        async with SessionLocal() as db:
-            user = await db.scalar(
-                select(UserAccount).where(
-                    UserAccount.username == "report-bounty-admin"))
-            role = await db.scalar(
-                select(Role).where(Role.role_code == "ADMIN"))
-            assert user is not None
-            assert role is not None
-            db.add(UserRole(user_id=user.id, role_id=role.id))
-            await db.commit()
-            return create_access_token(user, ["ADMIN"])
-
-    admin_token = asyncio.run(promote_admin())
-
+    # Legacy browser admin is read-only; use the trusted internal API.
     review_response = client.patch(
-        f"{API_PREFIX}/admin/reports/posts/{report_id}",
-        headers=bearer(admin_token),
+        f"/api/internal/v1/admin/reports/posts/{report_id}",
+        headers={
+            "X-Service-Token": INTERNAL_SERVICE_TOKEN_FOR_HARDENING_TESTS,
+            "X-Operator-Id": "ops-report-bounty-admin",
+            "Idempotency-Key": "idem-report-bounty-admin",
+        },
         json={
             "status": "VALID",
             "resolutionNote": "违规悬赏",

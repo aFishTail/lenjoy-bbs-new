@@ -1,10 +1,12 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from lenjoy_bbs.core.dependencies import AdminUser, DbSession
+from lenjoy_bbs.core.legacy_admin import require_legacy_admin_mutations_enabled
 from lenjoy_bbs.core.responses import success
 from lenjoy_bbs.modules.admin.posts.service import list_bounties, list_bounty_comments, list_posts, offline_post, online_post
 
 router = APIRouter(tags=["admin"])
+LegacyMutationGate = Depends(require_legacy_admin_mutations_enabled)
 
 
 @router.get("/posts")
@@ -39,13 +41,13 @@ async def bounties(db: DbSession, _: AdminUser, status: str | None = None, keywo
     return success(await list_bounties(db, bounty_status=status, keyword=keyword))
 
 
-@router.patch("/posts/{post_id}/offline")
+@router.patch("/posts/{post_id}/offline", dependencies=[LegacyMutationGate])
 async def offline(post_id: int, db: DbSession, admin: AdminUser):
     await offline_post(db, post_id, admin.id)
     return success(None)
 
 
-@router.patch("/posts/{post_id}/online")
+@router.patch("/posts/{post_id}/online", dependencies=[LegacyMutationGate])
 async def online(post_id: int, db: DbSession, _: AdminUser):
     await online_post(db, post_id)
     return success(None)

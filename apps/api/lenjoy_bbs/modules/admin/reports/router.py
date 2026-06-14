@@ -1,6 +1,7 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from lenjoy_bbs.core.dependencies import AdminUser, DbSession
+from lenjoy_bbs.core.legacy_admin import require_legacy_admin_mutations_enabled
 from lenjoy_bbs.core.responses import success
 from lenjoy_bbs.modules.admin.reports.schemas import ReportReviewRequest, ResourceAppealReviewRequest
 from lenjoy_bbs.modules.admin.reports.service import (
@@ -12,6 +13,7 @@ from lenjoy_bbs.modules.admin.reports.service import (
 )
 
 router = APIRouter(tags=["admin"])
+LegacyMutationGate = Depends(require_legacy_admin_mutations_enabled)
 
 
 @router.get("/reports")
@@ -25,7 +27,7 @@ async def reports(
     return success(await list_reports(db, status_value=status, target_type=targetType, keyword=keyword))
 
 
-@router.patch("/reports/posts/{report_id}")
+@router.patch("/reports/posts/{report_id}", dependencies=[LegacyMutationGate])
 async def post_report_status(report_id: int, payload: ReportReviewRequest, db: DbSession, admin: AdminUser):
     return success(
         await review_post_report(
@@ -39,7 +41,7 @@ async def post_report_status(report_id: int, payload: ReportReviewRequest, db: D
     )
 
 
-@router.patch("/reports/comments/{report_id}")
+@router.patch("/reports/comments/{report_id}", dependencies=[LegacyMutationGate])
 async def comment_report_status(report_id: int, payload: ReportReviewRequest, db: DbSession, admin: AdminUser):
     return success(
         await review_comment_report(
@@ -58,7 +60,7 @@ async def resource_appeals(db: DbSession, _: AdminUser, status: str | None = Non
     return success(await list_resource_appeals(db, status_value=status, keyword=keyword))
 
 
-@router.patch("/resource-appeals/{appeal_id}")
+@router.patch("/resource-appeals/{appeal_id}", dependencies=[LegacyMutationGate])
 async def resource_appeal_status(appeal_id: int, payload: ResourceAppealReviewRequest, db: DbSession, admin: AdminUser):
     return success(
         await review_resource_appeal(

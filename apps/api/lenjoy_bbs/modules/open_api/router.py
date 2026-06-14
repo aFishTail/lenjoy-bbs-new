@@ -1,8 +1,9 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Header, status
+from fastapi import APIRouter, Depends, Header, status
 
 from lenjoy_bbs.core.dependencies import AdminUser, DbSession
+from lenjoy_bbs.core.legacy_admin import require_legacy_admin_mutations_enabled
 from lenjoy_bbs.core.responses import success
 from lenjoy_bbs.modules.open_api.client_management import create_client, list_clients
 from lenjoy_bbs.modules.open_api.publication import create_open_post, delete_open_post
@@ -11,6 +12,7 @@ from lenjoy_bbs.modules.posts.schemas import PostCreateRequest
 
 admin_router = APIRouter(prefix="/admin/open-api", tags=["admin-open-api"])
 open_router = APIRouter(prefix="/open", tags=["open-api"])
+LegacyMutationGate = Depends(require_legacy_admin_mutations_enabled)
 
 
 @admin_router.get("/clients")
@@ -18,7 +20,7 @@ async def clients(db: DbSession, _: AdminUser):
     return success(await list_clients(db))
 
 
-@admin_router.post("/clients", status_code=status.HTTP_201_CREATED)
+@admin_router.post("/clients", status_code=status.HTTP_201_CREATED, dependencies=[LegacyMutationGate])
 async def create_client_route(payload: ClientRequest, db: DbSession,
                               _: AdminUser):
     client = await create_client(

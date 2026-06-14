@@ -1,11 +1,13 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from lenjoy_bbs.core.dependencies import AdminUser, DbSession
+from lenjoy_bbs.core.legacy_admin import require_legacy_admin_mutations_enabled
 from lenjoy_bbs.core.responses import success
 from lenjoy_bbs.modules.admin.wallet.schemas import CoinRequest
 from lenjoy_bbs.modules.admin.wallet.service import list_resource_trades, list_wallet_ledger, list_wallets, update_wallet_coins
 
 router = APIRouter(tags=["admin"])
+LegacyMutationGate = Depends(require_legacy_admin_mutations_enabled)
 
 
 @router.get("/coins/users")
@@ -13,7 +15,7 @@ async def coin_users(db: DbSession, _: AdminUser, status: str | None = None, key
     return success(await list_wallets(db, status, keyword))
 
 
-@router.patch("/coins/users/{user_id}")
+@router.patch("/coins/users/{user_id}", dependencies=[LegacyMutationGate])
 async def update_coins(user_id: int, payload: CoinRequest, db: DbSession, admin: AdminUser):
     return success(await update_wallet_coins(db, user_id, payload.amount, payload.reason, admin.id))
 
