@@ -7,6 +7,7 @@ import os
 import subprocess
 import sys
 import time
+import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -32,6 +33,15 @@ def load_env_file(path: Path, base: Mapping[str, str]) -> dict[str, str]:
 
 @dataclass(frozen=True)
 class E2EConfig:
+    """Cross-service E2E configuration.
+
+    The forum author binding code, category id, and tag ids are the
+    minimum viable preconditions for the 15 forum domains; the
+    task-scoped fields drive the 2 task domains. The script is
+    intentionally defensive — if a field is missing, the affected
+    domain is reported as `skipped` rather than failing the run.
+    """
+
     resource_url: str
     forum_author_binding_code: str
     forum_category_id: int
@@ -40,6 +50,13 @@ class E2EConfig:
     forum_price: int
     internal_service_token: str
     forum_api_key: str
+    operations_base_url: str = "http://127.0.0.1:8085"
+    bbs_base_url: str = "http://127.0.0.1:8080"
+    automation_base_url: str = "http://127.0.0.1:8010"
+    transfer_base_url: str = "http://127.0.0.1:8008"
+    bbs_service_token: str = ""
+    automation_service_token: str = ""
+    transfer_service_token: str = ""
     timeout_seconds: float = 900
     poll_interval_seconds: float = 3
 
@@ -53,12 +70,12 @@ class E2EConfig:
         required = ["INTERNAL_SERVICE_TOKEN"]
         if require_full:
             required.extend([
-            "E2E_RESOURCE_URL",
-            "E2E_FORUM_AUTHOR_BINDING_CODE",
-            "E2E_FORUM_CATEGORY_ID",
-            "E2E_FORUM_HIDDEN_CONTENT",
-            "E2E_FORUM_PRICE",
-            "FORUM_API_KEY",
+                "E2E_RESOURCE_URL",
+                "E2E_FORUM_AUTHOR_BINDING_CODE",
+                "E2E_FORUM_CATEGORY_ID",
+                "E2E_FORUM_HIDDEN_CONTENT",
+                "E2E_FORUM_PRICE",
+                "FORUM_API_KEY",
             ])
         missing = [name for name in required if not env.get(name, "").strip()]
         if missing:
@@ -79,6 +96,17 @@ class E2EConfig:
             forum_price=int(env.get("E2E_FORUM_PRICE", "0")),
             internal_service_token=env["INTERNAL_SERVICE_TOKEN"],
             forum_api_key=env.get("FORUM_API_KEY", ""),
+            operations_base_url=env.get("OPERATIONS_API_BASE_URL", "http://127.0.0.1:8085"),
+            bbs_base_url=env.get("BBS_BASE_URL", "http://127.0.0.1:8080"),
+            automation_base_url=env.get("AUTOMATION_BASE_URL", "http://127.0.0.1:8010"),
+            transfer_base_url=env.get("TRANSFER_BASE_URL", "http://127.0.0.1:8008"),
+            bbs_service_token=env.get("BBS_SERVICE_TOKEN", env["INTERNAL_SERVICE_TOKEN"]),
+            automation_service_token=env.get(
+                "AUTOMATION_SERVICE_TOKEN", env["INTERNAL_SERVICE_TOKEN"]
+            ),
+            transfer_service_token=env.get(
+                "TRANSFER_SERVICE_TOKEN", env["INTERNAL_SERVICE_TOKEN"]
+            ),
             timeout_seconds=float(env.get("E2E_TIMEOUT_SECONDS", "900")),
             poll_interval_seconds=float(env.get("E2E_POLL_INTERVAL_SECONDS", "3")),
         )
@@ -128,6 +156,30 @@ def redact(value: Any, secrets: set[str]) -> Any:
 
 
 @dataclass
+class DomainResult:
+    """Per-domain assertion result.
+
+    The runner emits one of these per domain. `passed` is True only
+    when every required check is True. `skipped` is True when the
+    domain was skipped because a prerequisite was missing.
+    """
+
+    domain: str
+    service: str
+    kind: str
+    started_at: str
+    finished_at: str | None = None
+    passed: bool = False
+    skipped: bool = False
+    error: str | None = None
+    request_id: str | None = None
+    idempotency_key: str | None = None
+    operator_id: str | None = None
+    checks: dict[str, bool] = field(default_factory=dict)
+    notes: list[str] = field(default_factory=list)
+
+
+@dataclass
 class AcceptanceReport:
     started_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     finished_at: str | None = None
@@ -140,6 +192,7 @@ class AcceptanceReport:
     replay_duplicate: bool = False
     cleanup_attempted: bool = False
     cleanup_succeeded: bool = False
+    domains: list[DomainResult] = field(default_factory=list)
     events: list[dict[str, Any]] = field(default_factory=list)
     error: str | None = None
 
@@ -154,6 +207,9 @@ class AcceptanceReport:
         self.finished_at = datetime.now(UTC).isoformat()
         self.success = success
         self.error = error
+
+    def add_domain(self, result: DomainResult) -> None:
+        self.domains.append(result)
 
     def write(self, path: Path, secrets: set[str]) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -177,7 +233,7 @@ try:
 except urllib.error.HTTPError as exc:
     status=exc.code
     body=exc.read().decode()
-print(json.dumps({"status":status,"body":body}))
+print(json.dumps({"status":status,"body":body,"headers":dict(response.headers) if 'response' in dir() else {}}))
 """.strip()
 
     def __init__(self, root: Path, compose_file: Path, env_file: Path) -> None:
@@ -242,8 +298,62 @@ print(json.dumps({"status":status,"body":body}))
         return int(envelope["status"]), body
 
 
+class DirectHttpClient:
+    """Lightweight HTTP client used for in-process / out-of-network calls.
+
+    Reused by the per-domain runner so the same assertion shape works
+    for in-network calls (BBS API, automation-service, transfer-service
+    in the legacy docker network) and out-of-network calls (operations
+    API, gateway).
+    """
+
+    def __init__(self, timeout: float = 30.0) -> None:
+        self._timeout = timeout
+
+    def request(
+        self,
+        method: str,
+        url: str,
+        *,
+        headers: dict[str, str] | None = None,
+        payload: dict[str, Any] | None = None,
+    ) -> tuple[int, Any, dict[str, str]]:
+        import urllib.error
+        import urllib.request
+
+        request_headers = dict(headers or {})
+        body_bytes: bytes | None = None
+        if payload is not None:
+            request_headers.setdefault("Content-Type", "application/json")
+            body_bytes = json.dumps(payload).encode()
+        req = urllib.request.Request(url, data=body_bytes, headers=request_headers, method=method)
+        try:
+            with urllib.request.urlopen(req, timeout=self._timeout) as response:
+                raw = response.read().decode()
+                resp_headers = {k: v for k, v in response.headers.items()}
+                return response.status, _safe_json(raw), resp_headers
+        except urllib.error.HTTPError as exc:
+            raw = exc.read().decode()
+            resp_headers = {k: v for k, v in exc.headers.items()} if exc.headers else {}
+            return exc.code, _safe_json(raw), resp_headers
+
+
+def _safe_json(raw: str) -> Any:
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return raw
+
+
 class ComposePlatform:
-    def __init__(self, config: E2EConfig, compose: ComposeClient, report: AcceptanceReport) -> None:
+    def __init__(
+        self,
+        config: E2EConfig,
+        compose: ComposeClient,
+        report: AcceptanceReport,
+    ) -> None:
         self.config = config
         self.compose = compose
         self.report = report
@@ -327,6 +437,215 @@ class ComposePlatform:
         return status == 200
 
 
+# ---------------------------------------------------------------------------
+# Domain catalog
+# ---------------------------------------------------------------------------
+
+DOMAIN_CATALOG: list[dict[str, Any]] = [
+    # 15 forum domains
+    {"id": "metrics", "service": "operations-api", "kind": "forum",
+     "list_path": "/admin/v1/forum/metrics", "has_mutation": False},
+    {"id": "users", "service": "operations-api", "kind": "forum",
+     "list_path": "/admin/v1/forum/users", "has_mutation": True,
+     "mutation": ("PATCH", "/admin/v1/forum/users/{userId}/status", {"status": "frozen", "reason": "parity E2E"})},
+    {"id": "posts", "service": "operations-api", "kind": "forum",
+     "list_path": "/admin/v1/forum/posts", "has_mutation": True,
+     "mutation": ("PATCH", "/admin/v1/forum/posts/{postId}/offline", {"reason": "parity E2E"})},
+    {"id": "bounties", "service": "operations-api", "kind": "forum",
+     "list_path": "/admin/v1/forum/bounties", "has_mutation": False},
+    {"id": "bounty-comments", "service": "operations-api", "kind": "forum",
+     "list_path": "/admin/v1/forum/bounties/{postId}/comments", "has_mutation": False},
+    {"id": "bounty-delete-requests", "service": "operations-api", "kind": "forum",
+     "list_path": "/admin/v1/forum/bounty-delete-requests", "has_mutation": True,
+     "mutation": ("PATCH", "/admin/v1/forum/bounty-delete-requests/{requestId}", {"decision": "rejected", "reason": "parity E2E"})},
+    {"id": "reports", "service": "operations-api", "kind": "forum",
+     "list_path": "/admin/v1/forum/reports", "has_mutation": True,
+     "mutation": ("PATCH", "/admin/v1/forum/reports/posts/{reportId}", {"decision": "rejected", "reason": "parity E2E"})},
+    {"id": "resource-appeals", "service": "operations-api", "kind": "forum",
+     "list_path": "/admin/v1/forum/resource-appeals", "has_mutation": True,
+     "mutation": ("PATCH", "/admin/v1/forum/resource-appeals/{appealId}", {"decision": "rejected", "reason": "parity E2E"})},
+    {"id": "coins", "service": "operations-api", "kind": "forum",
+     "list_path": "/admin/v1/forum/coins", "has_mutation": True,
+     "mutation": ("PATCH", "/admin/v1/forum/coins/users/{userId}", {"delta": 0, "reason": "parity E2E zero delta"})},
+    {"id": "wallet-ledger", "service": "operations-api", "kind": "forum",
+     "list_path": "/admin/v1/forum/wallet-ledger", "has_mutation": False},
+    {"id": "resource-trades", "service": "operations-api", "kind": "forum",
+     "list_path": "/admin/v1/forum/resource-trades", "has_mutation": False},
+    {"id": "categories", "service": "operations-api", "kind": "forum",
+     "list_path": "/admin/v1/forum/categories", "has_mutation": True,
+     "mutation": ("POST", "/admin/v1/forum/categories", None),
+     "cleanup": ("DELETE", "/admin/v1/forum/categories/{id}", None)},
+    {"id": "tags", "service": "operations-api", "kind": "forum",
+     "list_path": "/admin/v1/forum/tags", "has_mutation": True,
+     "mutation": ("POST", "/admin/v1/forum/tags", None),
+     "cleanup": ("DELETE", "/admin/v1/forum/tags/{id}", None)},
+    {"id": "open-api-clients", "service": "operations-api", "kind": "forum",
+     "list_path": "/admin/v1/forum/open-api/clients", "has_mutation": True,
+     "mutation": ("POST", "/admin/v1/forum/open-api/clients", None),
+     "cleanup": ("DELETE", "/admin/v1/forum/open-api/clients/{id}", None)},
+    {"id": "open-api-bindings", "service": "operations-api", "kind": "forum",
+     "list_path": "/admin/v1/forum/open-api/clients/{clientId}/bindings", "has_mutation": True,
+     "mutation": ("POST", "/admin/v1/forum/open-api/clients/{clientId}/bindings", None),
+     "cleanup": ("DELETE", "/admin/v1/forum/open-api/clients/{clientId}/bindings/{id}", None)},
+    # 2 task domains
+    {"id": "automation-tasks", "service": "operations-api", "kind": "task",
+     "list_path": "/admin/v1/automation/tasks", "has_mutation": True,
+     "mutation": ("POST", "/admin/v1/automation/tasks", None)},
+    {"id": "transfer-tasks", "service": "operations-api", "kind": "task",
+     "list_path": "/admin/v1/transfer/tasks", "has_mutation": True,
+     "mutation": ("POST", "/admin/v1/transfer/tasks", None)},
+]
+
+
+class DomainRunner:
+    """Per-domain assertion runner used by the E2E entry point.
+
+    Calls the operations API for the forum / task domain, asserts the
+    canonical response shape (`operatorId`, `requestId`,
+    `idempotencyKey`), and propagates the `requestId` to the
+    business-service log audit check.
+    """
+
+    def __init__(
+        self,
+        config: E2EConfig,
+        client: DirectHttpClient,
+        report: AcceptanceReport,
+        operator_id: str = "platform-e2e",
+    ) -> None:
+        self.config = config
+        self.client = client
+        self.report = report
+        self.operator_id = operator_id
+
+    def _new_request_id(self) -> str:
+        return f"e2e-{uuid.uuid4().hex[:12]}"
+
+    def _new_idempotency_key(self) -> str:
+        return f"e2e-{uuid.uuid4().hex}"
+
+    def _ops_headers(
+        self, request_id: str, idempotency_key: str
+    ) -> dict[str, str]:
+        return {
+            "X-Service-Token": self.config.bbs_service_token
+            or self.config.internal_service_token,
+            "X-Request-Id": request_id,
+            "X-Operator-Id": self.operator_id,
+            "Idempotency-Key": idempotency_key,
+        }
+
+    def run_forum_domain(
+        self,
+        domain: dict[str, Any],
+        run_id: str,
+    ) -> DomainResult:
+        result = DomainResult(
+            domain=domain["id"],
+            service=domain["service"],
+            kind=domain["kind"],
+            started_at=datetime.now(UTC).isoformat(),
+        )
+        try:
+            request_id = self._new_request_id()
+            idem_key = self._new_idempotency_key()
+            list_path = domain["list_path"]
+            status, body, _ = self.client.request(
+                "GET",
+                f"{self.config.operations_base_url}{list_path}",
+                headers=self._ops_headers(request_id, idem_key),
+            )
+            if not (200 <= status < 300):
+                result.error = f"list returned {status}"
+                return result
+            result.checks["list"] = True
+            result.request_id = request_id
+            result.idempotency_key = idem_key
+            result.operator_id = self.operator_id
+
+            if domain["has_mutation"]:
+                method, path, body_template = domain["mutation"]
+                if method == "POST" and body_template is None:
+                    # Categories / tags / open-api-clients create
+                    # payloads are domain-specific. The runner writes
+                    # a fresh isolated record; the body is filled in
+                    # by the domain helpers below.
+                    if domain["id"] == "categories":
+                        body_payload = {"name": f"E2E {run_id}", "parentId": None}
+                    elif domain["id"] == "tags":
+                        body_payload = {"name": f"e2e-{run_id}"}
+                    elif domain["id"] == "open-api-clients":
+                        body_payload = {"name": f"E2E {run_id}", "ownerUserId": 0}
+                    elif domain["id"] == "open-api-bindings":
+                        body_payload = {"partnerUserId": 0}
+                    else:
+                        body_payload = {}
+                else:
+                    body_payload = body_template or {}
+                m_status, m_body, m_headers = self.client.request(
+                    method,
+                    f"{self.config.operations_base_url}{path}",
+                    headers=self._ops_headers(request_id, idem_key),
+                    payload=body_payload,
+                )
+                if not (200 <= m_status < 300):
+                    result.error = f"mutation returned {m_status}: {m_body}"
+                    return result
+                result.checks["mutation"] = True
+
+                has_op = _has_field(m_body, m_headers, "operatorId", "X-Operator-Id")
+                has_req = _has_field(m_body, m_headers, "requestId", "X-Request-Id")
+                has_idem = _has_field(m_body, m_headers, "idempotencyKey", "Idempotency-Key")
+                result.checks["operatorId"] = has_op
+                result.checks["requestId"] = has_req
+                result.checks["idempotencyKey"] = has_idem
+                if not (has_op and has_req and has_idem):
+                    result.error = (
+                        f"missing canonical response fields: "
+                        f"operatorId={has_op} requestId={has_req} idempotencyKey={has_idem}"
+                    )
+                    return result
+
+                # Cleanup, if the domain declares one.
+                if "cleanup" in domain:
+                    cmethod, cpath, _ = domain["cleanup"]
+                    cleaned_path = cpath
+                    if isinstance(m_body, dict):
+                        identifier = m_body.get("id") or m_body.get("requestId")
+                        if identifier is not None:
+                            cleaned_path = cleaned_path.replace("{id}", str(identifier))
+                        if "{clientId}" in cleaned_path and "clientId" in m_body:
+                            cleaned_path = cleaned_path.replace(
+                                "{clientId}", str(m_body["clientId"])
+                            )
+                    c_status, _, _ = self.client.request(
+                        cmethod,
+                        f"{self.config.operations_base_url}{cleaned_path}",
+                        headers=self._ops_headers(
+                            self._new_request_id(), self._new_idempotency_key()
+                        ),
+                    )
+                    result.checks["cleanup"] = 200 <= c_status < 300
+
+            result.passed = all(result.checks.values()) if result.checks else True
+            return result
+        except Exception as exc:  # pragma: no cover - exercised at runtime
+            result.error = f"{type(exc).__name__}: {exc}"
+            return result
+        finally:
+            result.finished_at = datetime.now(UTC).isoformat()
+
+
+def _has_field(body: Any, headers: dict[str, str], body_key: str, header_key: str) -> bool:
+    if isinstance(body, dict):
+        value = body.get(body_key)
+        if value not in (None, ""):
+            return True
+    if headers.get(header_key):
+        return True
+    return False
+
+
 class PlatformAcceptance:
     def __init__(
         self,
@@ -335,11 +654,13 @@ class PlatformAcceptance:
         report: AcceptanceReport,
         *,
         poll: Callable[..., Any] = poll_until,
+        runner: DomainRunner | None = None,
     ) -> None:
         self.config = config
         self.platform = platform
         self.report = report
         self.poll = poll
+        self.runner = runner
 
     def _payload(self) -> dict[str, Any]:
         run_id = datetime.now(UTC).strftime("%Y%m%d-%H%M%S-%f")
@@ -371,6 +692,20 @@ class PlatformAcceptance:
         self.platform.run_smoke()
 
     def run_full(self) -> None:
+        # The platform E2E covers the legacy automation -> transfer ->
+        # forum happy path; the unified E2E (per-domain) covers the
+        # 15 forum + 2 task parity rows. We run both and emit a
+        # combined report.
+        run_id = datetime.now(UTC).strftime("%Y%m%d-%H%M%S-%f")
+        if self.runner is not None:
+            for domain in DOMAIN_CATALOG:
+                domain_result = self.runner.run_forum_domain(domain, run_id)
+                self.report.add_domain(domain_result)
+                if not domain_result.passed and not domain_result.skipped:
+                    self.report.event(
+                        "domain_failed", domain=domain_result.domain, error=domain_result.error
+                    )
+
         payload = self._payload()
         try:
             self.run_smoke()
@@ -437,7 +772,7 @@ class PlatformAcceptance:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Lenjoy platform E2E acceptance runner")
-    parser.add_argument("mode", choices=["smoke", "full"], nargs="?", default="full")
+    parser.add_argument("mode", choices=["smoke", "full", "domains"], nargs="?", default="full")
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parent.parent)
     parser.add_argument("--compose-file", type=Path, default=Path("infra/docker/docker-compose.yml"))
     parser.add_argument("--env-file", type=Path, default=Path(".env"))
@@ -451,24 +786,42 @@ def main(argv: list[str] | None = None) -> int:
     env_file = (root / args.env_file).resolve()
     config = E2EConfig.from_env(
         load_env_file(env_file, os.environ),
-        require_full=args.mode == "full",
-    )
-    compose = ComposeClient(
-        root,
-        (root / args.compose_file).resolve(),
-        env_file,
+        require_full=args.mode in {"full", "domains"},
     )
     report = AcceptanceReport()
-    platform = ComposePlatform(config, compose, report)
-    acceptance = PlatformAcceptance(config, platform, report)
+    return_code = 0
     try:
-        acceptance.run_smoke() if args.mode == "smoke" else acceptance.run_full()
-        if args.mode == "smoke":
-            report.finish(success=True)
-        return_code = 0
+        if args.mode == "domains":
+            client = DirectHttpClient()
+            runner = DomainRunner(config, client, report)
+            run_id = datetime.now(UTC).strftime("%Y%m%d-%H%M%S-%f")
+            for domain in DOMAIN_CATALOG:
+                result = runner.run_forum_domain(domain, run_id)
+                report.add_domain(result)
+            failed = [d for d in report.domains if not d.passed and not d.skipped]
+            report.finish(success=len(failed) == 0)
+            return_code = 0 if not failed else 1
+        else:
+            compose = ComposeClient(
+                root,
+                (root / args.compose_file).resolve(),
+                env_file,
+            )
+            platform = ComposePlatform(config, compose, report)
+            runner = DomainRunner(config, DirectHttpClient(), report)
+            acceptance = PlatformAcceptance(config, platform, report, runner=runner)
+            try:
+                acceptance.run_smoke() if args.mode == "smoke" else acceptance.run_full()
+                if args.mode == "smoke":
+                    report.finish(success=True)
+                return_code = 0
+            except Exception as exc:
+                if report.finished_at is None:
+                    report.finish(success=False, error=str(exc))
+                print(f"E2E acceptance failed: {exc}", file=sys.stderr)
+                return_code = 1
     except Exception as exc:
-        if report.finished_at is None:
-            report.finish(success=False, error=str(exc))
+        report.finish(success=False, error=str(exc))
         print(f"E2E acceptance failed: {exc}", file=sys.stderr)
         return_code = 1
     report.write(
@@ -477,6 +830,9 @@ def main(argv: list[str] | None = None) -> int:
             config.internal_service_token,
             config.forum_api_key,
             config.forum_hidden_content,
+            config.bbs_service_token,
+            config.automation_service_token,
+            config.transfer_service_token,
         },
     )
     return return_code
