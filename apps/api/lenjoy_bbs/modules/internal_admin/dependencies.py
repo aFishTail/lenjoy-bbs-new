@@ -26,22 +26,6 @@ _MAX_OPERATOR_ID_LEN = 128
 _MAX_IDEMPOTENCY_KEY_LEN = 128
 
 
-class InternalAuthError(ApiError):
-    def __init__(self, code: str, text: str) -> None:
-        super().__init__(Common.HTTP_ERROR)
-        self.code = code
-        self.message = text
-        self.http_status = 401
-
-
-class InternalMutationContractError(ApiError):
-    def __init__(self, code: str, text: str, *, http_status: int = 400) -> None:
-        super().__init__(Common.VALIDATION_ERROR)
-        self.code = code
-        self.message = text
-        self.http_status = http_status
-
-
 @dataclass(frozen=True)
 class InternalCaller:
     """Identity carried by every internal admin request."""
@@ -154,9 +138,7 @@ def require_mutation_headers(
 
 # Re-export for tests / consumers that need to construct the audit model.
 __all__ = [
-    "InternalAuthError",
     "InternalCaller",
-    "InternalMutationContractError",
     "get_request_context_headers",
     "require_mutation_headers",
     "require_service_token",

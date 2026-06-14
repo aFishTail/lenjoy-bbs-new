@@ -25,6 +25,7 @@ class InternalAdminAuditLog(Base):
     idempotency_key: Mapped[str | None] = mapped_column(String(128))
     payload: Mapped[str | None] = mapped_column(Text)
     status_code: Mapped[int] = mapped_column(Integer, nullable=False)
+    error_message: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=now_utc, nullable=False
     )

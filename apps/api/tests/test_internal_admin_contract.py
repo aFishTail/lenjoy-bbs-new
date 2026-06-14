@@ -498,7 +498,7 @@ def test_open_api_client_status_mutation_records_audit(client):
 
 def test_open_api_binding_create_mutation_records_audit(client):
     user_id = _ensure_user("mut-bind-1")
-    _make_client("BindingTestClient")
+    client_id = _make_client("BindingTestClient")
     before = count_audit(domain="open_api.bindings", action="create")
     response = client.post(
         f"{API_PREFIX}/open-api/bindings",
@@ -506,6 +506,7 @@ def test_open_api_binding_create_mutation_records_audit(client):
             operator_id="ops-bind", idempotency_key="idem-bind-1",
         ),
         json={
+            "clientId": client_id,
             "bindingCode": "binding-code-1",
             "userId": user_id,
             "remark": "from ops",
@@ -525,11 +526,31 @@ def test_open_api_binding_create_mutation_records_audit(client):
     binding = asyncio.run(_fetch())
     assert binding is not None
     assert binding.binding_code == "binding-code-1"
+    assert binding.client_id == client_id
+
+
+def test_open_api_binding_create_requires_client_id(client):
+    """Legacy callers that omit ``clientId`` must be rejected."""
+    user_id = _ensure_user("mut-bind-legacy")
+    response = client.post(
+        f"{API_PREFIX}/open-api/bindings",
+        headers=auth_headers(
+            operator_id="ops-legacy", idempotency_key="idem-legacy-1",
+        ),
+        json={
+            "bindingCode": "binding-code-legacy",
+            "userId": user_id,
+        },
+    )
+    # Pydantic returns 422 for missing required fields. We accept 400 too,
+    # since the contract intent is "the request must not be silently
+    # fulfilled by falling back to the first ACTIVE client".
+    assert response.status_code in {400, 422}, response.text
 
 
 def test_open_api_binding_status_mutation_records_audit(client):
     user_id = _ensure_user("mut-bind-2")
-    _make_client("BindingStatusClient")
+    client_id = _make_client("BindingStatusClient")
 
     # Create a binding first.
     create = client.post(
@@ -538,6 +559,7 @@ def test_open_api_binding_status_mutation_records_audit(client):
             operator_id="ops-bind", idempotency_key="idem-bind-2",
         ),
         json={
+            "clientId": client_id,
             "bindingCode": "binding-code-2",
             "userId": user_id,
         },
@@ -801,3 +823,146 @@ def test_state_isolated_between_tests(client):
     assert response.status_code == 200
     payload = unwrap(response)
     assert "data" in payload
+
+
+# ---------------------------------------------------------------------------
+# Audit row status_code for create routes
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "path,payload_body,idem",
+    [
+        (
+            "/categories",
+            {"name": "AuditStatusCat", "slug": "audit-status-cat"},
+            "idem-status-cat",
+        ),
+        (
+            "/tags",
+            {"name": "AuditStatusTag", "slug": "audit-status-tag"},
+            "idem-status-tag",
+        ),
+    ],
+)
+def test_create_route_audit_row_records_201(
+    client, path, payload_body, idem
+):
+    """Create routes return 201 — the audit row must reflect that, not 200."""
+    response = client.post(
+        f"{API_PREFIX}{path}",
+        headers=auth_headers(
+            operator_id="ops-status-201",
+            idempotency_key=idem,
+            request_id=f"req-{idem}",
+        ),
+        json=payload_body,
+    )
+    assert response.status_code == 201, response.text
+
+    async def _fetch() -> InternalAdminAuditLog | None:
+        async with SessionLocal() as db:
+            return await db.scalar(
+                select(InternalAdminAuditLog).where(
+                    InternalAdminAuditLog.idempotency_key == idem
+                )
+            )
+
+    row = asyncio.run(_fetch())
+    assert row is not None
+    assert row.status_code == 201
+
+
+def test_open_api_client_create_audit_row_records_201(client):
+    idem = "idem-status-client"
+    response = client.post(
+        f"{API_PREFIX}/open-api/clients",
+        headers=auth_headers(
+            operator_id="ops-client-201",
+            idempotency_key=idem,
+            request_id=f"req-{idem}",
+        ),
+        json={"name": "AuditStatusClient", "remark": "x"},
+    )
+    assert response.status_code == 201, response.text
+
+    async def _fetch() -> InternalAdminAuditLog | None:
+        async with SessionLocal() as db:
+            return await db.scalar(
+                select(InternalAdminAuditLog).where(
+                    InternalAdminAuditLog.idempotency_key == idem
+                )
+            )
+
+    row = asyncio.run(_fetch())
+    assert row is not None
+    assert row.status_code == 201
+
+
+def test_open_api_binding_create_audit_row_records_201(client):
+    user_id = _ensure_user("mut-bind-status")
+    client_id = _make_client("BindingStatus201Client")
+    idem = "idem-status-bind"
+    response = client.post(
+        f"{API_PREFIX}/open-api/bindings",
+        headers=auth_headers(
+            operator_id="ops-bind-201",
+            idempotency_key=idem,
+            request_id=f"req-{idem}",
+        ),
+        json={
+            "clientId": client_id,
+            "bindingCode": "binding-code-201",
+            "userId": user_id,
+        },
+    )
+    assert response.status_code == 201, response.text
+
+    async def _fetch() -> InternalAdminAuditLog | None:
+        async with SessionLocal() as db:
+            return await db.scalar(
+                select(InternalAdminAuditLog).where(
+                    InternalAdminAuditLog.idempotency_key == idem
+                )
+            )
+
+    row = asyncio.run(_fetch())
+    assert row is not None
+    assert row.status_code == 201
+
+
+# ---------------------------------------------------------------------------
+# Production guard for INTERNAL_SERVICE_TOKEN
+# ---------------------------------------------------------------------------
+
+
+def test_internal_service_token_default_is_rejected_outside_dev(monkeypatch):
+    """Booting with the placeholder token outside dev/test must fail loud."""
+    from lenjoy_bbs.core import config as config_module
+
+    get_settings.cache_clear()
+    monkeypatch.delenv("INTERNAL_SERVICE_TOKEN", raising=False)
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://example/db")
+    monkeypatch.setenv("JWT_SECRET", "a-real-jwt-secret-at-least-32-chars")
+    try:
+        with pytest.raises(RuntimeError, match="INTERNAL_SERVICE_TOKEN"):
+            config_module.Settings().validate_runtime_configuration()
+    finally:
+        get_settings.cache_clear()
+
+
+def test_internal_service_token_set_in_production_is_accepted(monkeypatch):
+    """Booting with a real token in production must succeed."""
+    from lenjoy_bbs.core import config as config_module
+
+    get_settings.cache_clear()
+    monkeypatch.setenv("INTERNAL_SERVICE_TOKEN", "real-prod-token-rotate-me")
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://example/db")
+    monkeypatch.setenv("JWT_SECRET", "a-real-jwt-secret-at-least-32-chars")
+    try:
+        # Should not raise.
+        config_module.Settings().validate_runtime_configuration()
+    finally:
+        get_settings.cache_clear()

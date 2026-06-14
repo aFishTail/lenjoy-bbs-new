@@ -155,6 +155,7 @@ class OpenApiClientStatusRequest(BaseModel):
 
 
 class OpenApiBindingRequest(BaseModel):
+    clientId: int = Field(gt=0)
     bindingCode: str = Field(min_length=1, max_length=128)
     userId: int = Field(gt=0)
     remark: str | None = Field(default=None, max_length=255)

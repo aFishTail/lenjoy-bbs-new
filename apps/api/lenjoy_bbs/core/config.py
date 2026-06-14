@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_JWT_SECRET = "lenjoy-jwt-secret-change-me-at-least-32-chars"
+DEFAULT_INTERNAL_SERVICE_TOKEN = "__INTERNAL_SERVICE_TOKEN_MUST_BE_SET__"
 
 
 def _find_root_env_file() -> Path:
@@ -33,7 +34,7 @@ class Settings(BaseSettings):
     server_port: int = 8080
     jwt_secret: str = DEFAULT_JWT_SECRET
     jwt_access_token_ttl_seconds: int = 72000
-    internal_service_token: str = "lenjoy-internal-service-token-change-me"
+    internal_service_token: str = DEFAULT_INTERNAL_SERVICE_TOKEN
     captcha_ttl_seconds: int = 120
     captcha_length: int = 4
     captcha_debug_enabled: bool = False
@@ -102,6 +103,10 @@ class Settings(BaseSettings):
             raise RuntimeError("DATABASE_URL or DB_URL is required outside development")
         if self.jwt_secret == DEFAULT_JWT_SECRET:
             raise RuntimeError("JWT_SECRET must be changed outside development")
+        if self.internal_service_token == DEFAULT_INTERNAL_SERVICE_TOKEN:
+            raise RuntimeError(
+                "INTERNAL_SERVICE_TOKEN must be set outside development"
+            )
 
 
 @lru_cache

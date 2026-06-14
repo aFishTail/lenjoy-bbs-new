@@ -37,6 +37,7 @@ async def record_audit(
     target_id: str | int | None = None,
     payload: Any = None,
     status_code: int = 200,
+    error_message: str | None = None,
 ) -> None:
     """Persist a single ``InternalAdminAuditLog`` row."""
     try:
@@ -50,6 +51,7 @@ async def record_audit(
                 idempotency_key=idempotency_key,
                 payload=_jsonify(payload),
                 status_code=status_code,
+                error_message=error_message,
             )
         )
         await db.commit()
@@ -72,16 +74,21 @@ async def audit_mutation(
     idempotency_key: str | None,
     target_id: str | int | None = None,
     payload: Any = None,
+    expected_status: int | None = None,
 ):
     """Async context manager that records an audit row when the block exits.
 
-    The handler should assign the produced result dict to ``state["result"]``
-    and the desired HTTP status to ``state["status_code"]`` (default 200).
+    The handler may assign the produced result dict to ``state["result"]``
+    and the desired HTTP status to ``state["status_code"]``. The default
+    ``status_code`` is :data:`expected_status` (which itself defaults to
+    ``200``), so the common case — passing ``expected_status=201`` for
+    create routes — needs no per-handler bookkeeping.
     """
-    state: dict[str, Any] = {"status_code": 200, "result": None}
+    default_status = expected_status if expected_status is not None else 200
+    state: dict[str, Any] = {"status_code": default_status, "result": None}
     try:
         yield state
-    except Exception:
+    except Exception as exc:
         # Roll back any pending transaction so the audit write is clean.
         try:
             await db.rollback()
@@ -98,6 +105,7 @@ async def audit_mutation(
                 target_id=target_id,
                 payload={"request": payload, "error": True},
                 status_code=500,
+                error_message=str(exc) or exc.__class__.__name__,
             )
         except Exception:  # pragma: no cover
             logger.exception("internal_admin.audit_persist_failed")

@@ -100,6 +100,19 @@ def _operator_admin_id(operator_id: str) -> int:
     a string operator identifier (so it can carry the operations
     service's user name) and we fold it into a stable positive int for
     storage.
+
+    KNOWN LIMITATION: two distinct operators with the same numeric or
+    string ``operator_id`` will hash to the same synthetic int, so the
+    downstream ``handled_by`` / ``offlined_by`` columns lie about who
+    actually performed the action. The numeric id also permits values
+    that don't exist as ``UserAccount.id`` rows. The ``operator_id``
+    string is preserved verbatim on the ``InternalAdminAuditLog`` row
+    and on every mutation response payload, so audit attribution is
+    recoverable from there.
+
+    TODO(Task 9 / follow-up): migrate the FK columns from ``int`` to
+    ``str`` (or to a real admin mapping table) so the synthetic int
+    can be removed entirely.
     """
     try:
         return int(operator_id)
@@ -573,6 +586,7 @@ async def create_category_route(
         request_id=caller.request_id,
         idempotency_key=caller.idempotency_key,
         payload=payload.model_dump(),
+        expected_status=201,
     ):
         result = await create_category(
             db,
@@ -694,6 +708,7 @@ async def create_tag_route(
         request_id=caller.request_id,
         idempotency_key=caller.idempotency_key,
         payload=payload.model_dump(),
+        expected_status=201,
     ):
         result = await create_tag(
             db,
@@ -835,6 +850,7 @@ async def create_open_api_client_route(
         request_id=caller.request_id,
         idempotency_key=caller.idempotency_key,
         payload=payload.model_dump(),
+        expected_status=201,
     ):
         client = await create_client(
             db,
@@ -913,41 +929,13 @@ async def create_open_api_binding_route(
         request_id=caller.request_id,
         idempotency_key=caller.idempotency_key,
         payload=payload.model_dump(),
+        expected_status=201,
     ):
-        # The user_id is supplied by the trusted caller; the binding code
-        # is part of the payload. We resolve the client by looking up the
-        # binding code's owning client. For simplicity, we accept the
-        # binding code and store it directly.
-        # NOTE: legacy admin did not expose bindings, so we delegate to a
-        # fresh service that handles creation atomically.
-        # The service requires a client_id; we resolve it by binding_code.
-        from sqlalchemy import select
-        from lenjoy_bbs.modules.open_api.models import OpenApiAccountBinding
-
-        existing = await db.scalar(
-            select(OpenApiAccountBinding).where(
-                OpenApiAccountBinding.binding_code == payload.bindingCode
-            )
-        )
-        if existing is not None:
-            # Reuse existing client_id.
-            client_id = existing.client_id
-        else:
-            # No prior binding with this code — fall back to the first
-            # active client. This keeps the API usable even before the
-            # Operations service wires its own client lookup.
-            from lenjoy_bbs.modules.open_api.models import OpenApiClient
-
-            client = await db.scalar(
-                select(OpenApiClient).where(OpenApiClient.status == "ACTIVE").order_by(OpenApiClient.id)
-            )
-            if client is None:
-                from lenjoy_bbs.core.errors import ApiError
-                from lenjoy_bbs.core.messages import OpenApi
-
-                raise ApiError(OpenApi.CLIENT_NOT_FOUND)
-            client_id = client.id
-
+        # The Operations service must specify the owning client explicitly.
+        # We do NOT silently fall back to the first ACTIVE client because
+        # that would mask a real contract problem and arbitrarily bind a
+        # user to whichever client happens to be id ASC.
+        client_id = payload.clientId
         result = await create_binding(
             db,
             client_id=client_id,
