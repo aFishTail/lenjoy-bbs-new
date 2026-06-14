@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from lenjoy_bbs.api import api_router
+from lenjoy_bbs.api import api_router, internal_api_router
 from lenjoy_bbs.core.config import get_settings
 from lenjoy_bbs.core.errors import install_error_handlers
 from lenjoy_bbs.core.logging import configure_logging, install_request_logging
@@ -33,6 +33,7 @@ def create_app() -> FastAPI:
     install_request_logging(app)
     install_error_handlers(app)
     app.include_router(api_router)
+    app.include_router(internal_api_router)
     return app
 
 

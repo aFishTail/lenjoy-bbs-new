@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     server_port: int = 8080
     jwt_secret: str = DEFAULT_JWT_SECRET
     jwt_access_token_ttl_seconds: int = 72000
+    internal_service_token: str = "lenjoy-internal-service-token-change-me"
     captcha_ttl_seconds: int = 120
     captcha_length: int = 4
     captcha_debug_enabled: bool = False

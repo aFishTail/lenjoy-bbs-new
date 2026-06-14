@@ -95,3 +95,6 @@ class OpenApi:
         "Open API 系统用户配置冲突",
         status.HTTP_500_INTERNAL_SERVER_ERROR,
     )
+    CLIENT_NOT_FOUND = ApiMessage("OPEN_API_CLIENT_NOT_FOUND", "Open API 客户端不存在", status.HTTP_404_NOT_FOUND)
+    BINDING_NOT_FOUND = ApiMessage("OPEN_API_BINDING_NOT_FOUND", "Open API 账号绑定不存在", status.HTTP_404_NOT_FOUND)
+    BINDING_CONFLICT = ApiMessage("OPEN_API_BINDING_CONFLICT", "Open API 账号绑定已存在")

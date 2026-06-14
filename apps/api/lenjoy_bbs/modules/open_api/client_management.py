@@ -56,4 +56,35 @@ async def create_client(
         raise
 
 
-__all__ = ["create_client", "list_clients"]
+async def update_client_status(
+    db: AsyncSession,
+    client_id: int,
+    *,
+    status_value: str,
+) -> dict:
+    from lenjoy_bbs.core.errors import ApiError
+    from lenjoy_bbs.core.messages import OpenApi
+
+    client = await db.get(OpenApiClient, client_id)
+    if not client:
+        raise ApiError(OpenApi.CLIENT_NOT_FOUND)
+    client.status = status_value
+    await db.commit()
+    await db.refresh(client)
+    log_event(
+        logger,
+        logging.INFO,
+        "open_api.client_status_updated",
+        client_id=client.id,
+        status=client.status,
+    )
+    return {
+        "id": client.id,
+        "name": client.name,
+        "apiKey": client.api_key,
+        "status": client.status,
+        "remark": client.remark,
+    }
+
+
+__all__ = ["create_client", "list_clients", "update_client_status"]

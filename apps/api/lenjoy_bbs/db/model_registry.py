@@ -1,4 +1,5 @@
 from lenjoy_bbs.db.base import Base
+from lenjoy_bbs.modules.internal_admin import models as internal_admin_models
 from lenjoy_bbs.modules.messages import models as message_models
 from lenjoy_bbs.modules.open_api import models as open_api_models
 from lenjoy_bbs.modules.posts import models as post_models
@@ -15,6 +16,7 @@ MODEL_MODULES = (
     report_models,
     open_api_models,
     message_models,
+    internal_admin_models,
 )
 
 __all__ = ["Base", "MODEL_MODULES"]
