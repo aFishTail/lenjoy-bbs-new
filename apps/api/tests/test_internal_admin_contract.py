@@ -23,7 +23,11 @@ from lenjoy_bbs.core.config import get_settings
 from lenjoy_bbs.core.tokens import create_access_token
 from lenjoy_bbs.db.session import SessionLocal
 from lenjoy_bbs.main import app
-from lenjoy_bbs.modules.internal_admin.models import InternalAdminAuditLog
+from lenjoy_bbs.modules.internal_admin.models import (
+    InternalAdminAuditLog,
+    InternalAdminIdempotencyRecord,
+)
+from lenjoy_bbs.modules.wallet.models import Wallet
 from lenjoy_bbs.modules.open_api.models import (
     OpenApiAccountBinding,
     OpenApiClient,
@@ -245,7 +249,7 @@ def test_mutation_rejects_missing_service_token(client):
         "/categories",
         "/tags",
         "/open-api/clients",
-        "/open-api/bindings",
+        "/open-api/clients/1/bindings",
     ],
 )
 def test_internal_admin_read_endpoints_are_reachable(client, path):
@@ -325,7 +329,37 @@ def test_open_api_client_create_mutation_records_audit(client):
     payload = unwrap(response)
     assert payload["data"]["operatorId"] == "ops-client"
     assert payload["data"]["idempotencyKey"] == "idem-client"
+    assert payload["data"]["client"]["apiKey"]
     assert count_audit(domain="open_api.clients", action="create") == before + 1
+
+    listed = client.get(
+        f"{API_PREFIX}/open-api/clients",
+        headers=auth_headers(),
+    )
+    assert listed.status_code == 200
+    assert "apiKey" not in listed.text
+
+    async def _audit_payload() -> str | None:
+        async with SessionLocal() as db:
+            return await db.scalar(
+                select(InternalAdminAuditLog.payload).where(
+                    InternalAdminAuditLog.idempotency_key == "idem-client"
+                )
+            )
+
+    assert "apiKey" not in (asyncio.run(_audit_payload()) or "")
+
+
+def test_open_api_client_secret_endpoint_returns_full_key(client):
+    client_id = _make_client("SecretReadClient")
+    response = client.get(
+        f"{API_PREFIX}/open-api/clients/{client_id}/secret",
+        headers=auth_headers(),
+    )
+    assert response.status_code == 200, response.text
+    payload = unwrap(response)
+    assert payload["data"]["clientId"] == client_id
+    assert payload["data"]["apiKey"] == "ljo_test_aaaaaaaaaaaaaaaaaaaaaa"
 
 
 def test_audit_row_records_operator_and_request_id(client):
@@ -404,6 +438,99 @@ def test_coin_adjust_mutation_records_audit(client):
     assert count_audit(domain="wallet", action="adjust_coins") == before + 1
 
 
+def test_coin_adjust_replays_same_idempotency_key_without_double_mutation(client):
+    user_id = _ensure_user("mut-coin-replay")
+    headers = auth_headers(
+        operator_id="ops-coin-replay", idempotency_key="idem-coin-replay"
+    )
+    first = client.patch(
+        f"{API_PREFIX}/coins/users/{user_id}",
+        headers=headers,
+        json={"amount": 50, "reason": "one adjustment"},
+    )
+    second = client.patch(
+        f"{API_PREFIX}/coins/users/{user_id}",
+        headers=headers,
+        json={"amount": 50, "reason": "one adjustment"},
+    )
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert second.headers["X-Idempotent-Replay"] == "true"
+    assert second.json() == first.json()
+
+    async def _balance_and_records() -> tuple[int, int]:
+        async with SessionLocal() as db:
+            wallet = await db.scalar(
+                select(Wallet).where(Wallet.user_id == user_id)
+            )
+            records = await db.scalar(
+                select(func.count()).select_from(InternalAdminIdempotencyRecord)
+            )
+            assert wallet is not None
+            return wallet.available_coins, int(records or 0)
+
+    balance, records = asyncio.run(_balance_and_records())
+    assert balance == 50
+    assert records == 1
+
+
+def test_same_idempotency_key_with_different_payload_conflicts(client):
+    user_id = _ensure_user("mut-coin-conflict")
+    headers = auth_headers(idempotency_key="idem-coin-conflict")
+    assert client.patch(
+        f"{API_PREFIX}/coins/users/{user_id}",
+        headers=headers,
+        json={"amount": 10},
+    ).status_code == 200
+    conflict = client.patch(
+        f"{API_PREFIX}/coins/users/{user_id}",
+        headers=headers,
+        json={"amount": 20},
+    )
+    assert conflict.status_code == 409
+    assert conflict.json()["error"]["code"] == "INTERNAL_IDEMPOTENCY_CONFLICT"
+
+
+def test_idempotency_key_is_isolated_by_operator(client):
+    first_user = _ensure_user("mut-idem-operator-one")
+    second_user = _ensure_user("mut-idem-operator-two")
+    key = "idem-shared-by-two-operators"
+    first = client.patch(
+        f"{API_PREFIX}/users/{first_user}/status",
+        headers=auth_headers(operator_id="operator-one", idempotency_key=key),
+        json={"status": "MUTED"},
+    )
+    second = client.patch(
+        f"{API_PREFIX}/users/{second_user}/status",
+        headers=auth_headers(operator_id="operator-two", idempotency_key=key),
+        json={"status": "MUTED"},
+    )
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert "X-Idempotent-Replay" not in second.headers
+
+
+def test_generated_request_id_is_shared_by_response_and_audit(client):
+    user_id = _ensure_user("mut-request-id")
+    response = client.patch(
+        f"{API_PREFIX}/users/{user_id}/status",
+        headers=auth_headers(request_id=None, idempotency_key="idem-generated-rid"),
+        json={"status": "MUTED"},
+    )
+    assert response.status_code == 200
+    response_request_id = response.headers["X-Request-Id"]
+
+    async def _audit_request_id() -> str | None:
+        async with SessionLocal() as db:
+            return await db.scalar(
+                select(InternalAdminAuditLog.request_id).where(
+                    InternalAdminAuditLog.idempotency_key == "idem-generated-rid"
+                )
+            )
+
+    assert asyncio.run(_audit_request_id()) == response_request_id
+
+
 # ---------------------------------------------------------------------------
 # Tag merge / delete
 # ---------------------------------------------------------------------------
@@ -474,7 +601,7 @@ def _make_client(name: str = "OpsTestClient") -> int:
 def test_open_api_bindings_listing(client):
     client_id = _make_client("ListTestClient")
     response = client.get(
-        f"{API_PREFIX}/open-api/bindings",
+        f"{API_PREFIX}/open-api/clients/{client_id}/bindings",
         headers=auth_headers(),
     )
     assert response.status_code == 200
@@ -486,7 +613,7 @@ def test_open_api_client_status_mutation_records_audit(client):
     client_id = _make_client("StatusTestClient")
     before = count_audit(domain="open_api.clients", action="update_status")
     response = client.patch(
-        f"{API_PREFIX}/open-api/clients/{client_id}/status",
+        f"{API_PREFIX}/open-api/clients/{client_id}",
         headers=auth_headers(
             operator_id="ops-cs", idempotency_key="idem-cs",
         ),
@@ -501,14 +628,13 @@ def test_open_api_binding_create_mutation_records_audit(client):
     client_id = _make_client("BindingTestClient")
     before = count_audit(domain="open_api.bindings", action="create")
     response = client.post(
-        f"{API_PREFIX}/open-api/bindings",
+        f"{API_PREFIX}/open-api/clients/{client_id}/bindings",
         headers=auth_headers(
             operator_id="ops-bind", idempotency_key="idem-bind-1",
         ),
         json={
-            "clientId": client_id,
-            "bindingCode": "binding-code-1",
-            "userId": user_id,
+            "scope": "binding-code-1",
+            "partnerUserId": user_id,
             "remark": "from ops",
         },
     )
@@ -529,17 +655,15 @@ def test_open_api_binding_create_mutation_records_audit(client):
     assert binding.client_id == client_id
 
 
-def test_open_api_binding_create_requires_client_id(client):
-    """Legacy callers that omit ``clientId`` must be rejected."""
+def test_open_api_binding_create_requires_partner_user_id(client):
     user_id = _ensure_user("mut-bind-legacy")
     response = client.post(
-        f"{API_PREFIX}/open-api/bindings",
+        f"{API_PREFIX}/open-api/clients/1/bindings",
         headers=auth_headers(
             operator_id="ops-legacy", idempotency_key="idem-legacy-1",
         ),
         json={
-            "bindingCode": "binding-code-legacy",
-            "userId": user_id,
+            "scope": "binding-code-legacy",
         },
     )
     # Pydantic returns 422 for missing required fields. We accept 400 too,
@@ -554,14 +678,13 @@ def test_open_api_binding_status_mutation_records_audit(client):
 
     # Create a binding first.
     create = client.post(
-        f"{API_PREFIX}/open-api/bindings",
+        f"{API_PREFIX}/open-api/clients/{client_id}/bindings",
         headers=auth_headers(
             operator_id="ops-bind", idempotency_key="idem-bind-2",
         ),
         json={
-            "clientId": client_id,
-            "bindingCode": "binding-code-2",
-            "userId": user_id,
+            "scope": "binding-code-2",
+            "partnerUserId": user_id,
         },
     )
     assert create.status_code == 201, create.text
@@ -580,7 +703,7 @@ def test_open_api_binding_status_mutation_records_audit(client):
 
     before = count_audit(domain="open_api.bindings", action="update_status")
     response = client.patch(
-        f"{API_PREFIX}/open-api/bindings/{binding_id}/status",
+        f"{API_PREFIX}/open-api/clients/{client_id}/bindings/{binding_id}/status",
         headers=auth_headers(
             operator_id="ops-bs", idempotency_key="idem-bs",
         ),
@@ -904,16 +1027,15 @@ def test_open_api_binding_create_audit_row_records_201(client):
     client_id = _make_client("BindingStatus201Client")
     idem = "idem-status-bind"
     response = client.post(
-        f"{API_PREFIX}/open-api/bindings",
+        f"{API_PREFIX}/open-api/clients/{client_id}/bindings",
         headers=auth_headers(
             operator_id="ops-bind-201",
             idempotency_key=idem,
             request_id=f"req-{idem}",
         ),
         json={
-            "clientId": client_id,
-            "bindingCode": "binding-code-201",
-            "userId": user_id,
+            "scope": "binding-code-201",
+            "partnerUserId": user_id,
         },
     )
     assert response.status_code == 201, response.text

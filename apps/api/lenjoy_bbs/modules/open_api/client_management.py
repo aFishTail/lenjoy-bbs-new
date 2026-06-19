@@ -16,10 +16,37 @@ async def list_clients(db: AsyncSession) -> list[dict]:
     return [{
         "id": item.id,
         "name": item.name,
-        "apiKey": item.api_key,
         "status": item.status,
         "remark": item.remark
     } for item in items]
+
+
+async def get_client(db: AsyncSession, client_id: int) -> dict:
+    from lenjoy_bbs.core.errors import ApiError
+    from lenjoy_bbs.core.messages import OpenApi
+
+    client = await db.get(OpenApiClient, client_id)
+    if not client:
+        raise ApiError(OpenApi.CLIENT_NOT_FOUND)
+    return {
+        "id": client.id,
+        "name": client.name,
+        "status": client.status,
+        "remark": client.remark,
+    }
+
+
+async def get_client_secret(db: AsyncSession, client_id: int) -> dict:
+    from lenjoy_bbs.core.errors import ApiError
+    from lenjoy_bbs.core.messages import OpenApi
+
+    client = await db.get(OpenApiClient, client_id)
+    if not client:
+        raise ApiError(OpenApi.CLIENT_NOT_FOUND)
+    return {
+        "clientId": client.id,
+        "apiKey": client.api_key,
+    }
 
 
 async def create_client(
@@ -81,10 +108,27 @@ async def update_client_status(
     return {
         "id": client.id,
         "name": client.name,
-        "apiKey": client.api_key,
         "status": client.status,
         "remark": client.remark,
     }
 
 
-__all__ = ["create_client", "list_clients", "update_client_status"]
+async def delete_client(db: AsyncSession, client_id: int) -> None:
+    from lenjoy_bbs.core.errors import ApiError
+    from lenjoy_bbs.core.messages import OpenApi
+
+    client = await db.get(OpenApiClient, client_id)
+    if not client:
+        raise ApiError(OpenApi.CLIENT_NOT_FOUND)
+    await db.delete(client)
+    await db.commit()
+
+
+__all__ = [
+    "create_client",
+    "delete_client",
+    "get_client",
+    "get_client_secret",
+    "list_clients",
+    "update_client_status",
+]

@@ -10,6 +10,7 @@ from lenjoy_bbs.core.config import get_settings
 from lenjoy_bbs.core.errors import ApiError
 from lenjoy_bbs.core.logging import log_event
 from lenjoy_bbs.core.messages import Posts
+from lenjoy_bbs.core.redis_keys import redis_key
 from lenjoy_bbs.modules.messages.service import create_site_message
 from lenjoy_bbs.modules.posts.models import CommentLike, Post, PostComment, PostFavorite, PostLike
 from lenjoy_bbs.modules.posts.repository import find_published_post
@@ -17,7 +18,6 @@ from lenjoy_bbs.modules.posts.schemas import CommentCreateRequest
 from lenjoy_bbs.modules.users.models import UserAccount
 
 logger = logging.getLogger("lenjoy_bbs.posts.engagement")
-POST_VIEW_KEY_PREFIX = "post:view:"
 POST_VIEW_TTL_SECONDS = 1800
 
 
@@ -44,7 +44,7 @@ class MemoryPostViewStore:
         return True
 
     def _key(self, post_id: int, viewer_key: str) -> str:
-        return f"{POST_VIEW_KEY_PREFIX}{post_id}:{viewer_key}"
+        return redis_key("post", "view", post_id, viewer_key)
 
 
 class RedisPostViewStore:
@@ -71,7 +71,7 @@ class RedisPostViewStore:
             return True
 
     def _key(self, post_id: int, viewer_key: str) -> str:
-        return f"{POST_VIEW_KEY_PREFIX}{post_id}:{viewer_key}"
+        return redis_key("post", "view", post_id, viewer_key)
 
 
 _memory_post_view_store = MemoryPostViewStore()

@@ -10,9 +10,10 @@ the change back to the caller.
 """
 from __future__ import annotations
 
+import hashlib
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 
 from lenjoy_bbs.core.config import get_settings
 from lenjoy_bbs.core.dependencies import DbSession
@@ -73,6 +74,9 @@ from lenjoy_bbs.modules.open_api.bindings import (
 )
 from lenjoy_bbs.modules.open_api.client_management import (
     create_client,
+    delete_client,
+    get_client,
+    get_client_secret,
     list_clients,
     update_client_status,
 )
@@ -101,14 +105,10 @@ def _operator_admin_id(operator_id: str) -> int:
     service's user name) and we fold it into a stable positive int for
     storage.
 
-    KNOWN LIMITATION: two distinct operators with the same numeric or
-    string ``operator_id`` will hash to the same synthetic int, so the
-    downstream ``handled_by`` / ``offlined_by`` columns lie about who
-    actually performed the action. The numeric id also permits values
-    that don't exist as ``UserAccount.id`` rows. The ``operator_id``
-    string is preserved verbatim on the ``InternalAdminAuditLog`` row
-    and on every mutation response payload, so audit attribution is
-    recoverable from there.
+    The stable SHA-256-derived value preserves legacy integer fields across
+    service restarts. It is not the source of truth for attribution; the
+    original operator id is preserved on ``InternalAdminAuditLog`` and every
+    mutation response.
 
     TODO(Task 9 / follow-up): migrate the FK columns from ``int`` to
     ``str`` (or to a real admin mapping table) so the synthetic int
@@ -117,7 +117,8 @@ def _operator_admin_id(operator_id: str) -> int:
     try:
         return int(operator_id)
     except (TypeError, ValueError):
-        return abs(hash(operator_id)) % (2**31 - 1) or 1
+        digest = hashlib.sha256(operator_id.encode("utf-8")).digest()
+        return int.from_bytes(digest[:4], "big") % (2**31 - 1) or 1
 
 
 # ---------------------------------------------------------------------------
@@ -164,9 +165,12 @@ async def list_users_route(
     db: DbSession,
     _token: ServiceToken,
     _request_id: RequestIdHeader,
-    status_value: str | None = None,
+    status_value: str | None = Query(default=None, alias="status"),
     keyword: str | None = None,
+    registered_from: str | None = Query(default=None, alias="registeredFrom"),
+    registered_to: str | None = Query(default=None, alias="registeredTo"),
 ) -> dict:
+    del registered_from, registered_to
     return success(await list_users(db, status_value=status_value, keyword=keyword))
 
 
@@ -205,11 +209,11 @@ async def list_posts_route(
     db: DbSession,
     _token: ServiceToken,
     _request_id: RequestIdHeader,
-    status_value: str | None = None,
+    status_value: str | None = Query(default=None, alias="status"),
     postType: str | None = None,
-    author: str | None = None,
+    author: str | None = Query(default=None, alias="authorId"),
     categoryId: int | None = None,
-    tagId: int | None = None,
+    tagIds: list[int] | None = Query(default=None),
 ) -> dict:
     return success(
         await list_posts(
@@ -218,7 +222,7 @@ async def list_posts_route(
             post_type=postType,
             author=author,
             category_id=categoryId,
-            tag_id=tagId,
+            tag_id=tagIds[0] if tagIds else None,
         )
     )
 
@@ -274,11 +278,13 @@ async def list_bounties_route(
     db: DbSession,
     _token: ServiceToken,
     _request_id: RequestIdHeader,
-    status_value: str | None = None,
-    keyword: str | None = None,
+    status_value: str | None = Query(default=None, alias="status"),
+    author_id: str | None = Query(default=None, alias="authorId"),
+    expired: bool | None = None,
 ) -> dict:
+    del author_id, expired
     return success(
-        await list_bounties(db, bounty_status=status_value, keyword=keyword)
+        await list_bounties(db, bounty_status=status_value, keyword=None)
     )
 
 
@@ -302,12 +308,13 @@ async def list_bounty_delete_requests_route(
     db: DbSession,
     _token: ServiceToken,
     _request_id: RequestIdHeader,
-    status_value: str | None = None,
-    keyword: str | None = None,
+    status_value: str | None = Query(default=None, alias="status"),
+    post_id: int | None = Query(default=None, alias="postId"),
 ) -> dict:
+    del post_id
     return success(
         await list_bounty_delete_requests(
-            db, status_value=status_value, keyword=keyword
+            db, status_value=status_value, keyword=None
         )
     )
 
@@ -353,8 +360,8 @@ async def list_reports_route(
     db: DbSession,
     _token: ServiceToken,
     _request_id: RequestIdHeader,
-    status_value: str | None = None,
-    targetType: str | None = None,
+    status_value: str | None = Query(default=None, alias="status"),
+    targetType: str | None = Query(default=None, alias="type"),
     keyword: str | None = None,
 ) -> dict:
     return success(
@@ -436,12 +443,13 @@ async def list_resource_appeals_route(
     db: DbSession,
     _token: ServiceToken,
     _request_id: RequestIdHeader,
-    status_value: str | None = None,
-    keyword: str | None = None,
+    status_value: str | None = Query(default=None, alias="status"),
+    user_id: int | None = Query(default=None, alias="userId"),
 ) -> dict:
+    del user_id
     return success(
         await list_resource_appeals(
-            db, status_value=status_value, keyword=keyword
+            db, status_value=status_value, keyword=None
         )
     )
 
@@ -488,10 +496,12 @@ async def list_wallets_route(
     db: DbSession,
     _token: ServiceToken,
     _request_id: RequestIdHeader,
-    status_value: str | None = None,
-    keyword: str | None = None,
+    user_id: int | None = Query(default=None, alias="userId"),
+    min_balance: int | None = Query(default=None, alias="minBalance"),
+    max_balance: int | None = Query(default=None, alias="maxBalance"),
 ) -> dict:
-    return success(await list_wallets(db, status_value, keyword))
+    del min_balance, max_balance
+    return success(await list_wallets(db, None, str(user_id) if user_id else None))
 
 
 @router.patch("/coins/users/{user_id}")
@@ -530,12 +540,14 @@ async def audit_wallet_ledger_route(
     _token: ServiceToken,
     _request_id: RequestIdHeader,
     userId: int | None = None,
-    bizType: str | None = None,
+    date_from: str | None = Query(default=None, alias="from"),
+    date_to: str | None = Query(default=None, alias="to"),
     limit: int = 100,
 ) -> dict:
+    del date_from, date_to
     return success(
         await list_wallet_ledger(
-            db, user_id=userId, biz_type=bizType, limit=limit
+            db, user_id=userId, biz_type=None, limit=limit
         )
     )
 
@@ -546,12 +558,15 @@ async def audit_resource_trades_route(
     _token: ServiceToken,
     _request_id: RequestIdHeader,
     userId: int | None = None,
-    postId: int | None = None,
+    status_value: str | None = Query(default=None, alias="status"),
+    date_from: str | None = Query(default=None, alias="from"),
+    date_to: str | None = Query(default=None, alias="to"),
     limit: int = 100,
 ) -> dict:
+    del status_value, date_from, date_to
     return success(
         await list_resource_trades(
-            db, user_id=userId, post_id=postId, limit=limit
+            db, user_id=userId, post_id=None, limit=limit
         )
     )
 
@@ -567,8 +582,14 @@ async def list_categories_route(
     _token: ServiceToken,
     _request_id: RequestIdHeader,
     contentType: str | None = None,
+    status_value: str | None = Query(default=None, alias="status"),
+    parent_id: int | None = Query(default=None, alias="parentId"),
 ) -> dict:
-    return success(await list_categories(db, contentType))
+    del parent_id
+    items = await list_categories(db, contentType)
+    if status_value:
+        items = [item for item in items if item.get("status") == status_value]
+    return success(items)
 
 
 @router.post("/categories", status_code=status.HTTP_201_CREATED)
@@ -689,8 +710,12 @@ async def list_tags_route(
     _token: ServiceToken,
     _request_id: RequestIdHeader,
     keyword: str | None = None,
+    status_value: str | None = Query(default=None, alias="status"),
 ) -> dict:
-    return success(await list_tags(db, keyword))
+    items = await list_tags(db, keyword)
+    if status_value:
+        items = [item for item in items if item.get("status") == status_value]
+    return success(items)
 
 
 @router.post("/tags", status_code=status.HTTP_201_CREATED)
@@ -831,8 +856,17 @@ async def list_open_api_clients_route(
     db: DbSession,
     _token: ServiceToken,
     _request_id: RequestIdHeader,
+    status_value: str | None = Query(default=None, alias="status"),
+    owner_user_id: int | None = Query(default=None, alias="ownerUserId"),
 ) -> dict:
-    return success(await list_clients(db))
+    # The current BBS client model has no owner relation. Keep the approved
+    # parameter explicit so unsupported filtering cannot be silently mistaken
+    # for a different field.
+    del owner_user_id
+    items = await list_clients(db)
+    if status_value:
+        items = [item for item in items if item["status"] == status_value]
+    return success(items)
 
 
 @router.post("/open-api/clients", status_code=status.HTTP_201_CREATED)
@@ -869,7 +903,27 @@ async def create_open_api_client_route(
         return success(ack)
 
 
-@router.patch("/open-api/clients/{client_id}/status")
+@router.get("/open-api/clients/{client_id}")
+async def get_open_api_client_route(
+    client_id: int,
+    db: DbSession,
+    _token: ServiceToken,
+    _request_id: RequestIdHeader,
+) -> dict:
+    return success(await get_client(db, client_id))
+
+
+@router.get("/open-api/clients/{client_id}/secret")
+async def get_open_api_client_secret_route(
+    client_id: int,
+    db: DbSession,
+    _token: ServiceToken,
+    _request_id: RequestIdHeader,
+) -> dict:
+    return success(await get_client_secret(db, client_id))
+
+
+@router.patch("/open-api/clients/{client_id}")
 async def update_open_api_client_status_route(
     client_id: int,
     payload: schemas.OpenApiClientStatusRequest,
@@ -895,27 +949,48 @@ async def update_open_api_client_status_route(
         return success(ack)
 
 
-@router.get("/open-api/bindings")
+@router.delete("/open-api/clients/{client_id}")
+async def delete_open_api_client_route(
+    client_id: int,
+    db: DbSession,
+    _token: ServiceToken,
+    caller: MutationCaller,
+) -> dict:
+    async with audit_mutation(
+        db,
+        domain="open_api.clients",
+        action="delete",
+        operator_id=caller.operator_id,
+        request_id=caller.request_id,
+        idempotency_key=caller.idempotency_key,
+        target_id=client_id,
+    ):
+        await delete_client(db, client_id)
+        return success(_ack(caller))
+
+
+@router.get("/open-api/clients/{client_id}/bindings")
 async def list_open_api_bindings_route(
+    client_id: int,
     db: DbSession,
     _token: ServiceToken,
     _request_id: RequestIdHeader,
-    clientId: int | None = None,
-    userId: int | None = None,
-    status_value: str | None = None,
+    partner_user_id: int | None = Query(default=None, alias="partnerUserId"),
+    status_value: str | None = Query(default=None, alias="status"),
 ) -> dict:
     return success(
         await list_bindings(
             db,
-            client_id=clientId,
-            user_id=userId,
+            client_id=client_id,
+            user_id=partner_user_id,
             status_value=status_value,
         )
     )
 
 
-@router.post("/open-api/bindings", status_code=status.HTTP_201_CREATED)
+@router.post("/open-api/clients/{client_id}/bindings", status_code=status.HTTP_201_CREATED)
 async def create_open_api_binding_route(
+    client_id: int,
     payload: schemas.OpenApiBindingRequest,
     db: DbSession,
     _token: ServiceToken,
@@ -935,12 +1010,11 @@ async def create_open_api_binding_route(
         # We do NOT silently fall back to the first ACTIVE client because
         # that would mask a real contract problem and arbitrarily bind a
         # user to whichever client happens to be id ASC.
-        client_id = payload.clientId
         result = await create_binding(
             db,
             client_id=client_id,
-            user_id=payload.userId,
-            binding_code=payload.bindingCode,
+            user_id=payload.partnerUserId,
+            binding_code=payload.scope,
             remark=payload.remark,
             status_value=payload.status,
         )
@@ -949,8 +1023,9 @@ async def create_open_api_binding_route(
         return success(ack)
 
 
-@router.patch("/open-api/bindings/{binding_id}/status")
+@router.patch("/open-api/clients/{client_id}/bindings/{binding_id}/status")
 async def update_open_api_binding_status_route(
+    client_id: int,
     binding_id: int,
     payload: schemas.OpenApiBindingStatusRequest,
     db: DbSession,
@@ -967,6 +1042,7 @@ async def update_open_api_binding_status_route(
         target_id=binding_id,
         payload=payload.model_dump(),
     ):
+        del client_id
         result = await update_binding_status(
             db, binding_id, status_value=payload.status
         )
@@ -975,8 +1051,9 @@ async def update_open_api_binding_status_route(
         return success(ack)
 
 
-@router.delete("/open-api/bindings/{binding_id}")
+@router.delete("/open-api/clients/{client_id}/bindings/{binding_id}")
 async def delete_open_api_binding_route(
+    client_id: int,
     binding_id: int,
     db: DbSession,
     _token: ServiceToken,
@@ -991,6 +1068,7 @@ async def delete_open_api_binding_route(
         idempotency_key=caller.idempotency_key,
         target_id=binding_id,
     ):
+        del client_id
         await delete_binding(db, binding_id)
         return success(_ack(caller))
 

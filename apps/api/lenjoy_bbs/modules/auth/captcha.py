@@ -12,8 +12,8 @@ from lenjoy_bbs.core.config import get_settings
 from lenjoy_bbs.core.errors import ApiError
 from lenjoy_bbs.core.logging import log_event
 from lenjoy_bbs.core.messages import Auth
+from lenjoy_bbs.core.redis_keys import redis_key
 
-CAPTCHA_KEY_PREFIX = "auth:captcha:"
 CAPTCHA_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 logger = logging.getLogger("lenjoy_bbs.captcha")
 
@@ -84,7 +84,7 @@ class RedisCaptchaStore:
             raise ApiError(Auth.CAPTCHA_UNAVAILABLE) from exc
 
     def _key(self, captcha_id: str) -> str:
-        return CAPTCHA_KEY_PREFIX + captcha_id
+        return redis_key("auth", "captcha", captcha_id)
 
 
 _memory_store = MemoryCaptchaStore()

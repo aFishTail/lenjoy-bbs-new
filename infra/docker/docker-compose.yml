@@ -42,6 +42,7 @@ services:
       DB_USER: ${DB_USER:-lenjoy}
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
       REDIS_URL: redis://redis:6379/0
+      REDIS_KEY_PREFIX: ${REDIS_KEY_PREFIX:-lenjoy_bbs}
       MINIO_ENDPOINT: http://minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}

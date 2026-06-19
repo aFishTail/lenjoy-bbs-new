@@ -83,6 +83,7 @@ def require_service_token(
 
 
 def get_request_context_headers(
+    request: Request,
     x_request_id: Annotated[str | None, Header(alias="X-Request-Id")] = None,
 ) -> str:
     """Resolve the request ID, generating one if missing.
@@ -90,7 +91,11 @@ def get_request_context_headers(
     The value is bound to the logging context for the duration of the
     request and is mirrored on the response.
     """
-    request_id = (x_request_id or "").strip() or uuid4().hex
+    request_id = (
+        (x_request_id or "").strip()
+        or getattr(request.state, "request_id", None)
+        or uuid4().hex
+    )
     bind_request_context(internal_request_id=request_id)
     return request_id
 
@@ -126,7 +131,11 @@ def require_mutation_headers(
             "INTERNAL_IDEMPOTENCY_KEY_TOO_LONG",
             f"Idempotency-Key must be <= {_MAX_IDEMPOTENCY_KEY_LEN} characters",
         )
-    request_id = (x_request_id or "").strip() or uuid4().hex
+    request_id = (
+        (x_request_id or "").strip()
+        or getattr(request.state, "request_id", None)
+        or uuid4().hex
+    )
     request.state.internal_request_id = request_id
     bind_request_context(internal_request_id=request_id, internal_operator_id=operator_id)
     return InternalCaller(

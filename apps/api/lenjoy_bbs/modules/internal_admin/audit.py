@@ -15,13 +15,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from lenjoy_bbs.modules.internal_admin.models import InternalAdminAuditLog
 
 logger = logging.getLogger("lenjoy_bbs.internal_admin")
+_SENSITIVE_KEYS = {"apikey", "api_key", "password", "secret", "token", "cookie"}
+
+
+def _redact(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            key: "[REDACTED]" if key.lower() in _SENSITIVE_KEYS else _redact(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_redact(item) for item in value]
+    return value
 
 
 def _jsonify(value: Any) -> str | None:
     if value is None:
         return None
     try:
-        return json.dumps(value, default=str, ensure_ascii=False)
+        return json.dumps(_redact(value), default=str, ensure_ascii=False)
     except TypeError:
         return str(value)
 
